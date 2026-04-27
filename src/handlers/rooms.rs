@@ -33,14 +33,16 @@ pub struct RoomEntityDto {
     pub sort_order: i32,
 }
 
-async fn load_rooms(pool: &sqlx::PgPool) -> Result<Vec<RoomDto>, AppError> {
+async fn load_rooms(pool: &sqlx::PgPool, instance_id: Uuid) -> Result<Vec<RoomDto>, AppError> {
     let rows = sqlx::query(
         "SELECT r.id, r.name, r.icon, r.accent, r.sort_order, r.ha_area_id, r.created_at, r.updated_at,
                 re.entity_id, re.sort_order AS entity_sort_order
          FROM rooms r
          LEFT JOIN room_entities re ON re.room_id = r.id
+         WHERE r.instance_id = $1
          ORDER BY r.sort_order, r.created_at, re.sort_order",
     )
+    .bind(instance_id)
     .fetch_all(pool)
     .await?;
 
@@ -76,9 +78,9 @@ async fn load_rooms(pool: &sqlx::PgPool) -> Result<Vec<RoomDto>, AppError> {
 
 pub async fn list(
     State(ctx): State<Arc<AppCtx>>,
-    Path(_id): Path<Uuid>,
+    Path(id): Path<Uuid>,
 ) -> Result<Json<Vec<RoomDto>>, AppError> {
-    let rooms = load_rooms(&ctx.pool).await?;
+    let rooms = load_rooms(&ctx.pool, id).await?;
     Ok(Json(rooms))
 }
 
@@ -95,7 +97,7 @@ pub struct CreateRoomReq {
 
 pub async fn create(
     State(ctx): State<Arc<AppCtx>>,
-    Path(_id): Path<Uuid>,
+    Path(id): Path<Uuid>,
     Json(req): Json<CreateRoomReq>,
 ) -> Result<Json<RoomDto>, AppError> {
     if req.name.trim().is_empty() {
@@ -103,10 +105,11 @@ pub async fn create(
     }
     let sort_order = req.sort_order.unwrap_or(0);
     let r = sqlx::query(
-        "INSERT INTO rooms(name, icon, accent, sort_order)
-         VALUES ($1, $2, $3, $4)
+        "INSERT INTO rooms(instance_id, name, icon, accent, sort_order)
+         VALUES ($1, $2, $3, $4, $5)
          RETURNING id, name, icon, accent, sort_order, ha_area_id, created_at, updated_at",
     )
+    .bind(id)
     .bind(&req.name)
     .bind(&req.icon)
     .bind(&req.accent)
@@ -303,11 +306,12 @@ pub async fn sync_areas(
             continue;
         }
         sqlx::query(
-            r#"INSERT INTO rooms(name, ha_area_id)
-               VALUES ($1, $2)
-               ON CONFLICT (ha_area_id) WHERE ha_area_id IS NOT NULL
+            r#"INSERT INTO rooms(instance_id, name, ha_area_id)
+               VALUES ($1, $2, $3)
+               ON CONFLICT (instance_id, ha_area_id)
                DO UPDATE SET name = EXCLUDED.name, updated_at = NOW()"#,
         )
+        .bind(id)
         .bind(name)
         .bind(ha_area_id)
         .execute(&ctx.pool)

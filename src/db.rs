@@ -8,8 +8,13 @@ use sqlx::{ConnectOptions, Executor, Row};
 use std::str::FromStr;
 use tracing::{debug, info};
 
-const MIGRATIONS: &[(&str, &str)] =
-    &[("0001_init", include_str!("../migrations/0001_init.sql"))];
+const MIGRATIONS: &[(&str, &str)] = &[
+    ("0001_init", include_str!("../migrations/0001_init.sql")),
+    (
+        "0002_rooms_instance_id",
+        include_str!("../migrations/0002_rooms_instance_id.sql"),
+    ),
+];
 
 pub async fn init_pool() -> anyhow::Result<PgPool> {
     let url = std::env::var("DATABASE_URL")
