@@ -78,6 +78,47 @@ export interface EntityOverride {
   hidden?: boolean;
 }
 
+export type EntitySize = "small" | "medium" | "large";
+
+export interface EntityDisplay {
+  instance_id: string;
+  entity_id: string;
+  display_name?: string | null;
+  custom_icon?: string | null;
+  area_id?: string | null;
+  hidden: boolean;
+  is_favorite: boolean;
+  favorite_order: number;
+  size: EntitySize;
+  sort_order: number;
+  updated_at?: string;
+}
+
+export interface UpdateEntityDisplayDto {
+  display_name?: string | null;
+  custom_icon?: string | null;
+  area_id?: string | null;
+  hidden?: boolean;
+  is_favorite?: boolean;
+  favorite_order?: number;
+  size?: EntitySize;
+  sort_order?: number;
+}
+
+export interface RoomReorderItem {
+  room_id: string;
+  sort_order: number;
+}
+
+export interface FavoriteReorderItem {
+  entity_id: string;
+  favorite_order: number;
+}
+
+export interface ReorderResult {
+  updated: number;
+}
+
 export interface EntityState {
   entity_id: string;
   state: string;
