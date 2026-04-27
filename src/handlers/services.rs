@@ -46,12 +46,15 @@ pub async fn call_service(
     Path((id, domain, service)): Path<(Uuid, String, String)>,
     Json(req): Json<ServiceCallReq>,
 ) -> Result<Json<ServiceCallResp>, AppError> {
-    let r = sqlx::query("SELECT base_url, access_token FROM instances WHERE id = $1")
+    let r = sqlx::query("SELECT base_url, access_token, verify_tls FROM instances WHERE id = $1")
         .bind(id)
         .fetch_one(&ctx.pool)
         .await?;
     let base_url: String = r.get("base_url");
     let access_token: String = r.get("access_token");
+    let verify_tls: bool = r.get("verify_tls");
+
+    let http = super::instance_http_client(&ctx, id, verify_tls);
 
     // Merge entity_id from target into the body forwarded to HA.
     let mut body = if req.data.is_object() {
@@ -74,7 +77,7 @@ pub async fn call_service(
         }
 
     let result = crate::ha::rest::call_service(
-        &ctx.conn_pool.http,
+        &http,
         &base_url,
         &access_token,
         &domain,

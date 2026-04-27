@@ -75,3 +75,15 @@ pub async fn instance_status_value(ctx: &AppCtx, id: uuid::Uuid) -> serde_json::
         serde_json::Value::String("connecting".to_string())
     }
 }
+
+/// Get an HTTP client honoring the instance's `verify_tls` setting.
+///
+/// Prefers the live per-instance client owned by `InstanceCtx`. Falls back
+/// to a fresh client built with the requested verification flag when the
+/// instance is not registered with the connection pool yet.
+pub fn instance_http_client(ctx: &AppCtx, id: uuid::Uuid, verify_tls: bool) -> reqwest::Client {
+    if let Some(entry) = ctx.conn_pool.instances.get(&id) {
+        return entry.value().http.clone();
+    }
+    crate::tls::build_http_client(verify_tls)
+}

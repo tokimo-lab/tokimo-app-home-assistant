@@ -274,19 +274,16 @@ pub async fn sync_areas(
     State(ctx): State<Arc<AppCtx>>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<SyncAreasResp>, AppError> {
-    let r = sqlx::query("SELECT base_url, access_token FROM instances WHERE id = $1")
+    let r = sqlx::query("SELECT base_url, access_token, verify_tls FROM instances WHERE id = $1")
         .bind(id)
         .fetch_one(&ctx.pool)
         .await?;
     let base_url: String = r.get("base_url");
     let access_token: String = r.get("access_token");
+    let verify_tls: bool = r.get("verify_tls");
 
-    let areas = crate::ha::rest::get_area_registry(
-        &ctx.conn_pool.http,
-        &base_url,
-        &access_token,
-    )
-    .await?;
+    let http = super::instance_http_client(&ctx, id, verify_tls);
+    let areas = crate::ha::rest::get_area_registry(&http, &base_url, &access_token).await?;
 
     let arr = areas
         .as_array()
@@ -327,14 +324,15 @@ pub async fn areas(
     State(ctx): State<Arc<AppCtx>>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    let r = sqlx::query("SELECT base_url, access_token FROM instances WHERE id = $1")
+    let r = sqlx::query("SELECT base_url, access_token, verify_tls FROM instances WHERE id = $1")
         .bind(id)
         .fetch_one(&ctx.pool)
         .await?;
     let base_url: String = r.get("base_url");
     let access_token: String = r.get("access_token");
+    let verify_tls: bool = r.get("verify_tls");
 
-    let result =
-        crate::ha::rest::get_area_registry(&ctx.conn_pool.http, &base_url, &access_token).await?;
+    let http = super::instance_http_client(&ctx, id, verify_tls);
+    let result = crate::ha::rest::get_area_registry(&http, &base_url, &access_token).await?;
     Ok(Json(result))
 }

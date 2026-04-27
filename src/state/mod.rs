@@ -163,6 +163,8 @@ pub struct InstanceCtx {
     pub id: Uuid,
     /// Current config — Arc-swapped on PATCH so reads never block writers long.
     pub config: RwLock<Arc<InstanceConfig>>,
+    /// Per-instance HTTP client honoring `verify_tls`.
+    pub http: reqwest::Client,
     /// Monotonically increasing; bumped on every config update so stale
     /// supervisor tasks can detect they should exit.
     pub generation: AtomicU64,
@@ -176,9 +178,11 @@ pub struct InstanceCtx {
 
 impl InstanceCtx {
     pub fn new(id: Uuid, config: InstanceConfig) -> Arc<Self> {
+        let http = crate::tls::build_http_client(config.verify_tls);
         Arc::new(Self {
             id,
             config: RwLock::new(Arc::new(config)),
+            http,
             generation: AtomicU64::new(0),
             cancel: CancelToken::new(),
             store: EntityStore::new(),
@@ -189,25 +193,18 @@ impl InstanceCtx {
 
 // ─── ConnectionPool ───────────────────────────────────────────────────────────
 
-/// Owns all per-instance live state and the reqwest HTTP client.
+/// Owns all per-instance live state.
 pub struct ConnectionPool {
     pub instances: DashMap<Uuid, Arc<InstanceCtx>>,
     pub pool: PgPool,
-    pub http: reqwest::Client,
 }
 
 impl ConnectionPool {
     /// Create a new pool, load instances from DB, and spawn supervisors.
     pub async fn new(pool: PgPool) -> anyhow::Result<Arc<Self>> {
-        let http = reqwest::Client::builder()
-            .timeout(Duration::from_secs(30))
-            .build()
-            .map_err(|e| anyhow::anyhow!("reqwest: {e}"))?;
-
         let cp = Arc::new(Self {
             instances: DashMap::new(),
             pool: pool.clone(),
-            http,
         });
 
         // Load all instances from DB and spawn supervisors.

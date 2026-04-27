@@ -43,18 +43,21 @@ struct StateChangedData {
 /// failure / protocol violation. The caller handles backoff and cancellation.
 pub async fn run_connection(instance: Arc<InstanceCtx>) -> anyhow::Result<()> {
     // Build WS URL from base_url.
-    let (base_url, access_token) = {
+    let (base_url, access_token, verify_tls) = {
         let cfg = instance.config.read().await;
-        (cfg.base_url.clone(), cfg.access_token.clone())
+        (cfg.base_url.clone(), cfg.access_token.clone(), cfg.verify_tls)
     };
 
     let ws_url = to_ws_url(&base_url)?;
-    info!(instance_id = %instance.id, %ws_url, "HA WS: connecting");
+    info!(instance_id = %instance.id, %ws_url, verify_tls, "HA WS: connecting");
 
-    // Connect — tokio-tungstenite handles TLS via rustls-tls-webpki-roots.
+    let connector = crate::tls::ws_connector(verify_tls);
+
+    // Connect — tokio-tungstenite handles TLS via rustls. When verify_tls is
+    // false we pass a custom Connector that accepts any cert.
     let (mut stream, _) = timeout(
         Duration::from_secs(15),
-        connect_async_tls_with_config(&ws_url, None, false, None),
+        connect_async_tls_with_config(&ws_url, None, false, connector),
     )
     .await
     .map_err(|_| anyhow::anyhow!("WS connect timed out"))?

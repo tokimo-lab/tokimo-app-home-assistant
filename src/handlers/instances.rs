@@ -182,8 +182,9 @@ pub async fn update(
     .fetch_one(&ctx.pool)
     .await?;
 
-    // Restart supervisor only when connection-relevant fields changed.
-    let conn_changed = req.base_url.is_some() || req.access_token.is_some();
+    // Restart supervisor when any connection-relevant field changed.
+    let conn_changed =
+        req.base_url.is_some() || req.access_token.is_some() || req.verify_tls.is_some();
     if conn_changed {
         info!(%id, "instance: config changed, restarting supervisor");
         ctx.conn_pool
@@ -247,15 +248,18 @@ pub async fn test(
     State(ctx): State<Arc<AppCtx>>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<TestResp>, AppError> {
-    let r = sqlx::query("SELECT base_url, access_token FROM instances WHERE id = $1")
+    let r = sqlx::query("SELECT base_url, access_token, verify_tls FROM instances WHERE id = $1")
         .bind(id)
         .fetch_one(&ctx.pool)
         .await?;
 
     let base_url: String = r.get("base_url");
     let access_token: String = r.get("access_token");
+    let verify_tls: bool = r.get("verify_tls");
 
-    match crate::ha::rest::test_connection(&ctx.conn_pool.http, &base_url, &access_token).await {
+    let http = super::instance_http_client(&ctx, id, verify_tls);
+
+    match crate::ha::rest::test_connection(&http, &base_url, &access_token).await {
         Ok(version) => Ok(Json(TestResp { ok: true, version, error: None })),
         Err(e) => Ok(Json(TestResp { ok: false, version: None, error: Some(e.message) })),
     }

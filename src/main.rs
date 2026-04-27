@@ -16,6 +16,7 @@ mod error;
 mod ha;
 mod handlers;
 mod state;
+mod tls;
 
 use std::sync::{Arc, OnceLock};
 

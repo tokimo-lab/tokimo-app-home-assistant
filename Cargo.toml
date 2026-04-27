@@ -30,6 +30,8 @@ http-body-util     = "0.1"
 axum               = { version = "0.8", features = ["json"] }
 tower              = "0.5"
 reqwest            = { version = "0.12", default-features = false, features = ["rustls-tls-webpki-roots", "json", "stream"] }
+rustls             = { version = "0.23", default-features = false, features = ["ring", "std"] }
+rustls-pki-types   = "1"
 futures-util       = "0.3"
 async-stream       = "0.3"
 dashmap            = "6"
