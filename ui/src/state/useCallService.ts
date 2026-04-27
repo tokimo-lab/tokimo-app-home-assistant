@@ -1,8 +1,10 @@
 import type { AppRuntimeCtx } from "@tokimo/sdk";
 import { useShellToast } from "@tokimo/sdk/react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ApiError } from "../api/client";
 import { callService } from "../api/entities";
 import type { CallParams, EntityState, PendingOp } from "../types";
+import { setActiveInstance } from "./activeInstanceStore";
 import {
   applyOptimistic,
   getEntity,
@@ -140,6 +142,11 @@ export function useCallService(instanceId: string | null, ctx: AppRuntimeCtx) {
           entry.unsub();
           pendingRef.current.delete(entity_id);
           rerender();
+        }
+        if (e instanceof ApiError && e.status === 404) {
+          // Instance no longer exists on backend — let route guard reconcile.
+          setActiveInstance(null, null);
+          return;
         }
         toast.error(e instanceof Error ? e.message : String(e));
       }

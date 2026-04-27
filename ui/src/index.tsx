@@ -130,6 +130,32 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
     }
   }, [parsed.page, instances, instancesLoading, nav, t]);
 
+  // ── Reconcile stale instanceId in URL ────────────────────────────────────
+  // If the URL points at an instance that no longer exists (e.g. it was
+  // deleted in another window), redirect to the first valid instance or
+  // /setup so subsequent hooks don't keep 404'ing.
+  useEffect(() => {
+    if (!subPage) return;
+    if (instancesLoading) return;
+    if (!instanceId) return;
+    if (instances.some((i) => i.id === instanceId)) return;
+    if (instances.length === 0) {
+      nav.replace("/setup", "Home Assistant");
+    } else {
+      const first = instances[0];
+      const pageName =
+        subPage === "home"
+          ? t("navHome")
+          : subPage === "rooms"
+            ? t("navRooms")
+            : t("navDevices");
+      nav.replace(
+        `/instance/${first.id}/${subPage}`,
+        `${first.name} · ${pageName}`,
+      );
+    }
+  }, [subPage, instanceId, instances, instancesLoading, nav, t]);
+
   // ── Navigate helpers ─────────────────────────────────────────────────────
   function navigateTo(path: string) {
     const r = parseRoute(path);

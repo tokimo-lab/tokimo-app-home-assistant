@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { ApiError } from "../api/client";
 import {
   addEntityToRoom,
   createRoom as apiCreateRoom,
@@ -14,6 +15,7 @@ import type {
   SyncAreasResult,
   UpdateRoomDto,
 } from "../types";
+import { setActiveInstance } from "./activeInstanceStore";
 
 export function useRooms(instanceId: string | null) {
   const [rooms, setRooms] = useState<HaRoom[]>([]);
@@ -31,6 +33,13 @@ export function useRooms(instanceId: string | null) {
       const data = await listRooms(instanceId);
       setRooms(data);
     } catch (e) {
+      if (e instanceof ApiError && e.status === 404) {
+        // Instance no longer exists on backend — clear active so the
+        // route guard in index.tsx can reconcile to a valid instance.
+        setRooms([]);
+        setActiveInstance(null, null);
+        return;
+      }
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);

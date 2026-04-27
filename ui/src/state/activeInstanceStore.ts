@@ -26,6 +26,10 @@ function getSnapshot(): ActiveInstanceInfo {
   return current;
 }
 
+export function getActiveInstance(): ActiveInstanceInfo {
+  return current;
+}
+
 export function setActiveInstance(id: string | null, name: string | null) {
   if (current.id === id && current.name === name) return;
   current = { id, name };
