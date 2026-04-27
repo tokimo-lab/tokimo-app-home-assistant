@@ -14,28 +14,30 @@ import {
 } from "@tokimo/ui";
 import { StrictMode, useEffect, useMemo } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import { HomeView } from "./components/home/HomeView";
+import { RoomDetailView } from "./components/home/RoomDetailView";
 import { AppShell } from "./components/shell/AppShell";
 import { enUS, zhCN } from "./i18n";
 import "./index.css";
-import { DevicesPage } from "./pages/DevicesPage";
-import { HomePage } from "./pages/HomePage";
 import { InstancesPage } from "./pages/InstancesPage";
-import { RoomsPage } from "./pages/RoomsPage";
 import { SetupPage } from "./pages/SetupPage";
 import { setActiveInstance } from "./state/activeInstanceStore";
 import { useCallService } from "./state/useCallService";
 import { useEntities } from "./state/useEntities";
 import { useInstances } from "./state/useInstances";
 import { useRooms } from "./state/useRooms";
-import type { ParsedRoute, SubPage } from "./types";
+import type { ParsedRoute } from "./types";
 
 function parseRoute(route: string): ParsedRoute {
   if (route === "/setup") return { page: "setup" };
   if (route === "/instances") return { page: "instances" };
-  const m = route.match(/^\/instance\/([^/]+)\/(home|rooms|devices)$/);
-  if (m) {
-    return { page: m[2] as SubPage, instanceId: m[1] };
-  }
+  const home = route.match(/^\/instance\/([^/]+)\/home$/);
+  if (home) return { page: "home", instanceId: home[1] };
+  const room = route.match(/^\/instance\/([^/]+)\/room\/([^/]+)$/);
+  if (room) return { page: "room", instanceId: room[1], roomId: room[2] };
+  // Backward-compat: redirect old /rooms and /devices routes to /home.
+  const legacy = route.match(/^\/instance\/([^/]+)\/(rooms|devices)$/);
+  if (legacy) return { page: "home", instanceId: legacy[1] };
   return { page: "root" };
 }
 
@@ -58,17 +60,8 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
   const parsed = useMemo(() => parseRoute(route), [route]);
 
   const instanceId =
-    parsed.page === "home" ||
-    parsed.page === "rooms" ||
-    parsed.page === "devices"
+    parsed.page === "home" || parsed.page === "room"
       ? (parsed.instanceId ?? null)
-      : null;
-
-  const subPage: SubPage | null =
-    parsed.page === "home" ||
-    parsed.page === "rooms" ||
-    parsed.page === "devices"
-      ? (parsed.page as SubPage)
       : null;
 
   // ── Instances ────────────────────────────────────────────────────────────
@@ -84,7 +77,7 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
   // ── Service calls (optimistic-UI) ────────────────────────────────────────
   const { call: onCall, getPending } = useCallService(instanceId, ctx);
 
-  // ── Rooms (for HomePage grouping) ────────────────────────────────────────
+  // ── Rooms (for HomeView grouping + room detail navigation) ───────────────
   const { rooms } = useRooms(instanceId);
 
   // ── Sync activeInstanceStore ─────────────────────────────────────────────
@@ -131,11 +124,8 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
   }, [parsed.page, instances, instancesLoading, nav, t]);
 
   // ── Reconcile stale instanceId in URL ────────────────────────────────────
-  // If the URL points at an instance that no longer exists (e.g. it was
-  // deleted in another window), redirect to the first valid instance or
-  // /setup so subsequent hooks don't keep 404'ing.
   useEffect(() => {
-    if (!subPage) return;
+    if (parsed.page !== "home" && parsed.page !== "room") return;
     if (instancesLoading) return;
     if (!instanceId) return;
     if (instances.some((i) => i.id === instanceId)) return;
@@ -143,18 +133,25 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
       nav.replace("/setup", "Home Assistant");
     } else {
       const first = instances[0];
-      const pageName =
-        subPage === "home"
-          ? t("navHome")
-          : subPage === "rooms"
-            ? t("navRooms")
-            : t("navDevices");
       nav.replace(
-        `/instance/${first.id}/${subPage}`,
-        `${first.name} · ${pageName}`,
+        `/instance/${first.id}/home`,
+        `${first.name} · ${t("navHome")}`,
       );
     }
-  }, [subPage, instanceId, instances, instancesLoading, nav, t]);
+  }, [parsed.page, instanceId, instances, instancesLoading, nav, t]);
+
+  // ── Reconcile stale roomId in URL (room no longer exists → /home) ────────
+  useEffect(() => {
+    if (parsed.page !== "room") return;
+    if (!instanceId || !parsed.roomId) return;
+    if (rooms.length === 0) return;
+    if (rooms.some((r) => r.id === parsed.roomId)) return;
+    const inst = instances.find((i) => i.id === instanceId);
+    nav.replace(
+      `/instance/${instanceId}/home`,
+      inst ? `${inst.name} · ${t("navHome")}` : "Home Assistant",
+    );
+  }, [parsed.page, parsed.roomId, instanceId, rooms, instances, nav, t]);
 
   // ── Navigate helpers ─────────────────────────────────────────────────────
   function navigateTo(path: string) {
@@ -162,15 +159,9 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
     let title = "Home Assistant";
     if (r.page === "instances") title = t("instancesTitle");
     else if (r.page === "setup") title = t("setupTitle");
-    else if (r.page !== "root") {
+    else if (r.page === "home" || r.page === "room") {
       const inst = instances.find((i) => i.id === r.instanceId);
-      const pageName =
-        r.page === "home"
-          ? t("navHome")
-          : r.page === "rooms"
-            ? t("navRooms")
-            : t("navDevices");
-      title = inst ? `${inst.name} · ${pageName}` : "Home Assistant";
+      title = inst ? `${inst.name} · ${t("navHome")}` : "Home Assistant";
     }
     nav.navigate(path, title);
   }
@@ -216,12 +207,14 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
     );
   }
 
-  // Instance page (home | rooms | devices)
+  // Instance page (home | room)
+  const activeInstance = instances.find((i) => i.id === instanceId) ?? null;
+
   return (
     <AppShell
       instances={instances}
       activeInstanceId={instanceId}
-      subPage={subPage ?? "home"}
+      subPage="home"
       connStatus={connStatus}
       t={t}
       onNavigate={navigateTo}
@@ -229,35 +222,72 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
         nav.navigate("/instances", t("instancesTitle"))
       }
     >
-      {subPage === "home" && (
-        <HomePage
+      {parsed.page === "home" && activeInstance && (
+        <HomeView
+          instance={activeInstance}
           entities={entities}
           rooms={rooms}
-          instanceId={instanceId ?? ""}
           getPending={getPending}
           onCall={onCall}
+          onOpenRoom={(rid) =>
+            navigateTo(`/instance/${activeInstance.id}/room/${rid}`)
+          }
+          onOpenSettings={() => {
+            // TODO R7p: open AnimatedSettingsPane for this instance.
+          }}
           t={t}
         />
       )}
-      {subPage === "rooms" && (
-        <RoomsPage
+      {parsed.page === "room" && activeInstance && parsed.roomId && (
+        <RoomDetailViewWrapper
+          instance={activeInstance}
+          roomId={parsed.roomId}
+          rooms={rooms}
           entities={entities}
-          instanceId={instanceId ?? ""}
           getPending={getPending}
           onCall={onCall}
-          t={t}
-        />
-      )}
-      {subPage === "devices" && (
-        <DevicesPage
-          entities={entities}
-          instanceId={instanceId ?? ""}
-          getPending={getPending}
-          onCall={onCall}
+          onBack={() => navigateTo(`/instance/${activeInstance.id}/home`)}
           t={t}
         />
       )}
     </AppShell>
+  );
+}
+
+function RoomDetailViewWrapper({
+  instance,
+  roomId,
+  rooms,
+  entities,
+  getPending,
+  onCall,
+  onBack,
+  t,
+}: {
+  instance: import("./types").HaInstance;
+  roomId: string;
+  rooms: import("./types").HaRoom[];
+  entities: ReadonlyMap<string, import("./types").EntityState>;
+  getPending: (entityId: string) => import("./types").PendingOp | undefined;
+  onCall: (params: import("./types").CallParams) => void;
+  onBack: () => void;
+  t: (k: string) => string;
+}) {
+  const room = rooms.find((r) => r.id === roomId);
+  if (!room) {
+    // Rooms may still be loading — show spinner; the URL reconciler will redirect if it truly is gone.
+    return <Spinner />;
+  }
+  return (
+    <RoomDetailView
+      instance={instance}
+      room={room}
+      entities={entities}
+      getPending={getPending}
+      onCall={onCall}
+      onBack={onBack}
+      t={t}
+    />
   );
 }
 

@@ -1,4 +1,4 @@
-import { Cpu, LayoutGrid, MonitorSpeaker, Settings } from "lucide-react";
+import { LayoutGrid, Settings } from "lucide-react";
 import type { ReactNode } from "react";
 import type { ConnStatus, HaInstance, SubPage } from "../../types";
 import { ConnectionBadge } from "./ConnectionBadge";
@@ -10,10 +10,9 @@ interface NavItem {
   labelKey: string;
 }
 
+// TODO R9p: sidebar redesign — re-introduce richer nav (rooms / devices / settings).
 const NAV_ITEMS: NavItem[] = [
   { id: "home", icon: LayoutGrid, labelKey: "navHome" },
-  { id: "rooms", icon: MonitorSpeaker, labelKey: "navRooms" },
-  { id: "devices", icon: Cpu, labelKey: "navDevices" },
 ];
 
 interface AppShellProps {
