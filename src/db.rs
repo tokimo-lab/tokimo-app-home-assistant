@@ -14,7 +14,6 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "0002_rooms_instance_id",
         include_str!("../migrations/0002_rooms_instance_id.sql"),
     ),
-    ("0003_pages", include_str!("../migrations/0003_pages.sql")),
 ];
 
 pub async fn init_pool() -> anyhow::Result<PgPool> {
