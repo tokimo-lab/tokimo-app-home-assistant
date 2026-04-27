@@ -28,8 +28,12 @@ pub struct EntityDto {
     pub context: Option<serde_json::Value>,
     pub display_name: Option<String>,
     pub custom_icon: Option<String>,
+    pub area_id: Option<Uuid>,
     pub hidden: bool,
     pub is_favorite: bool,
+    pub favorite_order: i32,
+    pub size: String,
+    pub sort_order: i32,
 }
 
 fn apply_override(state: EntityState, ov: Option<&OverrideRow>) -> EntityDto {
@@ -42,8 +46,12 @@ fn apply_override(state: EntityState, ov: Option<&OverrideRow>) -> EntityDto {
         context: state.context,
         display_name: ov.and_then(|o| o.display_name.clone()),
         custom_icon: ov.and_then(|o| o.custom_icon.clone()),
+        area_id: ov.and_then(|o| o.area_id),
         hidden: ov.map(|o| o.hidden).unwrap_or(false),
         is_favorite: ov.map(|o| o.is_favorite).unwrap_or(false),
+        favorite_order: ov.map(|o| o.favorite_order).unwrap_or(0),
+        size: ov.map(|o| o.size.clone()).unwrap_or_else(|| "small".to_string()),
+        sort_order: ov.map(|o| o.sort_order).unwrap_or(0),
     }
 }
 
@@ -51,28 +59,39 @@ struct OverrideRow {
     entity_id: String,
     display_name: Option<String>,
     custom_icon: Option<String>,
+    area_id: Option<Uuid>,
     hidden: bool,
     is_favorite: bool,
+    favorite_order: i32,
+    size: String,
+    sort_order: i32,
+}
+
+const OVERRIDE_COLS: &str =
+    "entity_id, display_name, custom_icon, area_id, hidden, is_favorite, favorite_order, size, sort_order";
+
+fn row_to_override(r: &sqlx::postgres::PgRow) -> OverrideRow {
+    OverrideRow {
+        entity_id: r.get("entity_id"),
+        display_name: r.get("display_name"),
+        custom_icon: r.get("custom_icon"),
+        area_id: r.get("area_id"),
+        hidden: r.get("hidden"),
+        is_favorite: r.get("is_favorite"),
+        favorite_order: r.get("favorite_order"),
+        size: r.get("size"),
+        sort_order: r.get("sort_order"),
+    }
 }
 
 async fn load_overrides(pool: &sqlx::PgPool, instance_id: Uuid) -> Result<Vec<OverrideRow>, AppError> {
-    let rows = sqlx::query(
-        "SELECT entity_id, display_name, custom_icon, hidden, is_favorite \
-         FROM entity_overrides WHERE instance_id = $1",
-    )
+    let rows = sqlx::query(&format!(
+        "SELECT {OVERRIDE_COLS} FROM entity_overrides WHERE instance_id = $1"
+    ))
     .bind(instance_id)
     .fetch_all(pool)
     .await?;
-    Ok(rows
-        .into_iter()
-        .map(|r| OverrideRow {
-            entity_id: r.get("entity_id"),
-            display_name: r.get("display_name"),
-            custom_icon: r.get("custom_icon"),
-            hidden: r.get("hidden"),
-            is_favorite: r.get("is_favorite"),
-        })
-        .collect())
+    Ok(rows.iter().map(row_to_override).collect())
 }
 
 // ─── List entities ────────────────────────────────────────────────────────────
@@ -121,22 +140,15 @@ pub async fn get(
         .ok_or_else(|| AppError::not_found("entity not found"))?
         .clone();
 
-    let ov_row = sqlx::query(
-        "SELECT entity_id, display_name, custom_icon, hidden, is_favorite \
-         FROM entity_overrides WHERE instance_id = $1 AND entity_id = $2",
-    )
+    let ov_row = sqlx::query(&format!(
+        "SELECT {OVERRIDE_COLS} FROM entity_overrides WHERE instance_id = $1 AND entity_id = $2"
+    ))
     .bind(id)
     .bind(&entity_id)
     .fetch_optional(&ctx.pool)
     .await?;
 
-    let ov = ov_row.map(|r| OverrideRow {
-        entity_id: r.get("entity_id"),
-        display_name: r.get("display_name"),
-        custom_icon: r.get("custom_icon"),
-        hidden: r.get("hidden"),
-        is_favorite: r.get("is_favorite"),
-    });
+    let ov = ov_row.as_ref().map(row_to_override);
 
     Ok(Json(apply_override(state, ov.as_ref())))
 }
