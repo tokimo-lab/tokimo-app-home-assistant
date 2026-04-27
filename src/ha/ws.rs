@@ -41,7 +41,7 @@ struct StateChangedData {
 /// Run one connection attempt: connect, authenticate, bootstrap, subscribe,
 /// then loop reading events.  Returns an error on connection failure / auth
 /// failure / protocol violation. The caller handles backoff and cancellation.
-pub async fn run_connection(instance: Arc<InstanceCtx>) -> anyhow::Result<()> {
+pub async fn run_connection(instance: Arc<InstanceCtx>, pool: sqlx::PgPool) -> anyhow::Result<()> {
     // Build WS URL from base_url.
     let (base_url, access_token, verify_tls) = {
         let cfg = instance.config.read().await;
@@ -144,8 +144,15 @@ pub async fn run_connection(instance: Arc<InstanceCtx>) -> anyhow::Result<()> {
         .tx
         .send(EntityEvent::Status(Arc::new(ConnStatus::Connected)));
 
-    // Update last_connected_at in DB (best-effort; pool is not available here
-    // so caller's supervisor loop handles this after run_connection returns ok).
+    // Update last_connected_at in DB (best-effort; do not abort supervisor on
+    // failure — the live WS session is more important than the audit field).
+    if let Err(e) = sqlx::query("UPDATE instances SET last_connected_at = NOW() WHERE id = $1")
+        .bind(instance.id)
+        .execute(&pool)
+        .await
+    {
+        tracing::warn!(instance_id = %instance.id, error = %e, "HA WS: failed to update last_connected_at");
+    }
 
     // ── Event loop with ping keepalive ─────────────────────────────────────
 

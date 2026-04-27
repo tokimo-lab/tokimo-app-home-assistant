@@ -267,7 +267,7 @@ impl ConnectionPool {
 
 /// Spawn a fully detached supervisor task for `instance`.
 /// Errors are logged; the app process continues regardless.
-pub fn spawn_supervisor(instance: Arc<InstanceCtx>, _pool: PgPool) {
+pub fn spawn_supervisor(instance: Arc<InstanceCtx>, pool: PgPool) {
     tokio::spawn(async move {
         let id = instance.id;
         let current_gen = instance.generation.load(Ordering::SeqCst);
@@ -296,7 +296,7 @@ pub fn spawn_supervisor(instance: Arc<InstanceCtx>, _pool: PgPool) {
                 .tx
                 .send(EntityEvent::Status(Arc::new(ConnStatus::Connecting)));
 
-            match ws::run_connection(Arc::clone(&instance)).await {
+            match ws::run_connection(Arc::clone(&instance), pool.clone()).await {
                 Ok(()) => {
                     // Clean cancellation — exit.
                     info!(instance_id = %id, "supervisor: clean exit");
