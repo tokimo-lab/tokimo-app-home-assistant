@@ -21,21 +21,20 @@ export function createRoom(
 }
 
 export function updateRoom(
-  instanceId: string,
+  _instanceId: string,
   roomId: string,
   dto: UpdateRoomDto,
 ): Promise<HaRoom> {
-  return apiFetch(
-    `/instances/${encodeURIComponent(instanceId)}/rooms/${encodeURIComponent(roomId)}`,
-    { method: "PATCH", body: JSON.stringify(dto) },
-  );
+  return apiFetch(`/rooms/${encodeURIComponent(roomId)}`, {
+    method: "PATCH",
+    body: JSON.stringify(dto),
+  });
 }
 
-export function deleteRoom(instanceId: string, roomId: string): Promise<void> {
-  return apiFetch(
-    `/instances/${encodeURIComponent(instanceId)}/rooms/${encodeURIComponent(roomId)}`,
-    { method: "DELETE" },
-  );
+export function deleteRoom(_instanceId: string, roomId: string): Promise<void> {
+  return apiFetch(`/rooms/${encodeURIComponent(roomId)}`, {
+    method: "DELETE",
+  });
 }
 
 export function syncAreas(instanceId: string): Promise<SyncAreasResult> {
@@ -45,24 +44,30 @@ export function syncAreas(instanceId: string): Promise<SyncAreasResult> {
   );
 }
 
+interface AddEntityResp {
+  room_id: string;
+  entity_id: string;
+  sort_order: number;
+}
+
 export function addEntityToRoom(
-  instanceId: string,
+  _instanceId: string,
   roomId: string,
   entityId: string,
-): Promise<HaRoom> {
-  return apiFetch(
-    `/instances/${encodeURIComponent(instanceId)}/rooms/${encodeURIComponent(roomId)}/entities`,
-    { method: "POST", body: JSON.stringify({ entity_id: entityId }) },
-  );
+): Promise<AddEntityResp> {
+  return apiFetch(`/rooms/${encodeURIComponent(roomId)}/entities`, {
+    method: "POST",
+    body: JSON.stringify({ entity_id: entityId }),
+  });
 }
 
 export function removeEntityFromRoom(
-  instanceId: string,
+  _instanceId: string,
   roomId: string,
   entityId: string,
 ): Promise<void> {
   return apiFetch(
-    `/instances/${encodeURIComponent(instanceId)}/rooms/${encodeURIComponent(roomId)}/entities/${encodeURIComponent(entityId)}`,
+    `/rooms/${encodeURIComponent(roomId)}/entities/${encodeURIComponent(entityId)}`,
     { method: "DELETE" },
   );
 }

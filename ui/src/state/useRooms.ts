@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import {
-  createRoom,
-  deleteRoom,
+  addEntityToRoom,
+  createRoom as apiCreateRoom,
+  deleteRoom as apiDeleteRoom,
   listRooms,
-  syncAreas,
+  removeEntityFromRoom,
+  syncAreas as apiSyncAreas,
   updateRoom,
 } from "../api/rooms";
 import type {
@@ -39,10 +41,11 @@ export function useRooms(instanceId: string | null) {
     void load();
   }, [load]);
 
-  const addRoom = useCallback(
-    async (dto: CreateRoomDto): Promise<HaRoom> => {
+  const createRoom = useCallback(
+    async (name: string, dto?: Partial<CreateRoomDto>): Promise<HaRoom> => {
       if (!instanceId) throw new Error("No instance");
-      const room = await createRoom(instanceId, dto);
+      const payload: CreateRoomDto = { name, ...dto };
+      const room = await apiCreateRoom(instanceId, payload);
       setRooms((prev) => [...prev, room]);
       return room;
     },
@@ -59,30 +62,50 @@ export function useRooms(instanceId: string | null) {
     [instanceId],
   );
 
-  const removeRoom = useCallback(
+  const deleteRoom = useCallback(
     async (roomId: string): Promise<void> => {
       if (!instanceId) throw new Error("No instance");
-      await deleteRoom(instanceId, roomId);
+      await apiDeleteRoom(instanceId, roomId);
       setRooms((prev) => prev.filter((r) => r.id !== roomId));
     },
     [instanceId],
   );
 
-  const sync = useCallback(async (): Promise<SyncAreasResult> => {
+  const syncAreas = useCallback(async (): Promise<SyncAreasResult> => {
     if (!instanceId) throw new Error("No instance");
-    const result = await syncAreas(instanceId);
+    const result = await apiSyncAreas(instanceId);
     await load();
     return result;
   }, [instanceId, load]);
+
+  const addEntity = useCallback(
+    async (roomId: string, entityId: string): Promise<void> => {
+      if (!instanceId) throw new Error("No instance");
+      await addEntityToRoom(instanceId, roomId, entityId);
+      await load();
+    },
+    [instanceId, load],
+  );
+
+  const removeEntity = useCallback(
+    async (roomId: string, entityId: string): Promise<void> => {
+      if (!instanceId) throw new Error("No instance");
+      await removeEntityFromRoom(instanceId, roomId, entityId);
+      await load();
+    },
+    [instanceId, load],
+  );
 
   return {
     rooms,
     loading,
     error,
     reload: load,
-    addRoom,
+    createRoom,
     editRoom,
-    removeRoom,
-    sync,
+    deleteRoom,
+    syncAreas,
+    addEntity,
+    removeEntity,
   };
 }
