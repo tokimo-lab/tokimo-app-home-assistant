@@ -9,6 +9,7 @@
 //!
 //! `AppCtx` is the shared state injected via `State<Arc<AppCtx>>`.
 
+pub mod display;
 pub mod entities;
 pub mod instances;
 pub mod rooms;

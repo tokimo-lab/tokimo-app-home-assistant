@@ -72,7 +72,7 @@ pub async fn spawn(service: &str, ctx: Arc<AppCtx>) -> anyhow::Result<DataPlaneS
 }
 
 fn build_router(ctx: Arc<AppCtx>) -> Router {
-    use handlers::{entities, instances, rooms, services, sse};
+    use handlers::{display, entities, instances, rooms, services, sse};
 
     Router::new()
         // ── Instance CRUD ─────────────────────────────────────────────────
@@ -96,6 +96,19 @@ fn build_router(ctx: Arc<AppCtx>) -> Router {
             post(entities::upsert_override),
         )
         .route("/instances/{id}/capabilities", get(entities::capabilities))
+        // ── Display / favorites / room order ─────────────────────────────
+        .route(
+            "/instances/{id}/entities/{entity_id}/display",
+            patch(display::update_display),
+        )
+        .route(
+            "/instances/{id}/rooms/reorder",
+            patch(display::reorder_rooms),
+        )
+        .route(
+            "/instances/{id}/favorites/reorder",
+            patch(display::reorder_favorites),
+        )
         // ── Services ─────────────────────────────────────────────────────
         .route(
             "/instances/{id}/services/{domain}/{service}",
