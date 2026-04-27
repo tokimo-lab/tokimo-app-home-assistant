@@ -2,6 +2,7 @@ import type { EntityState } from "../types";
 
 export function getFriendlyName(entity: EntityState): string {
   return (
+    entity.display_name ??
     entity.override?.friendly_name ??
     entity.attributes.friendly_name ??
     entity.entity_id

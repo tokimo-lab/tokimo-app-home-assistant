@@ -126,6 +126,16 @@ export interface EntityState {
   last_changed: string;
   last_updated: string;
   context?: EntityContext;
+  // Apple Home display fields (always present from backend, defaults applied)
+  display_name?: string | null;
+  custom_icon?: string | null;
+  area_id?: string | null;
+  hidden?: boolean;
+  is_favorite?: boolean;
+  favorite_order?: number;
+  sort_order?: number;
+  size?: EntitySize;
+  // legacy nested override (kept for back-compat)
   override?: EntityOverride;
 }
 
@@ -213,11 +223,12 @@ export type SseEvent =
   | SseStatusEvent
   | SseResyncEvent;
 
-export type SubPage = "home" | "rooms" | "devices";
+export type SubPage = "home" | "room";
 
 export interface ParsedRoute {
   page: "root" | "setup" | "instances" | SubPage;
   instanceId?: string;
+  roomId?: string;
 }
 
 export interface CallParams {
