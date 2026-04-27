@@ -1,5 +1,6 @@
-//! Apple Home–style display attributes: per-entity size/favorite/hidden/name,
-//! plus batch reorder endpoints for rooms and Favorites.
+//! Apple Home–style display attributes scoped per HA instance:
+//! per-entity size/favorite/hidden/name/icon/area, plus batch reorder
+//! endpoints for rooms and Favorites.
 //!
 //! Routes:
 //!   PATCH /instances/:id/entities/:entity_id/display
@@ -48,24 +49,36 @@ impl EntitySize {
     }
 }
 
-/// Patch payload. `Option<Option<T>>` lets the client distinguish
-/// "absent" (don't change) from `null` (clear).
-#[derive(Debug, Deserialize)]
+/// Patch payload. Nullable fields use `Option<Option<T>>` so the client can
+/// distinguish "absent" (don't change) from `null` (clear).
+#[derive(Debug, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub struct EntityDisplayUpdate {
     pub size: Option<EntitySize>,
     pub is_favorite: Option<bool>,
     pub favorite_order: Option<i32>,
     pub hidden: Option<bool>,
-    #[serde(default, deserialize_with = "deserialize_double_option")]
+    pub sort_order: Option<i32>,
+    #[serde(default, deserialize_with = "deserialize_double_option_string")]
     pub display_name: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_double_option_string")]
+    pub custom_icon: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_double_option_uuid")]
+    pub area_id: Option<Option<Uuid>>,
 }
 
-fn deserialize_double_option<'de, D>(deserializer: D) -> Result<Option<Option<String>>, D::Error>
+fn deserialize_double_option_string<'de, D>(deserializer: D) -> Result<Option<Option<String>>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
     Option::<String>::deserialize(deserializer).map(Some)
+}
+
+fn deserialize_double_option_uuid<'de, D>(deserializer: D) -> Result<Option<Option<Uuid>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Option::<Uuid>::deserialize(deserializer).map(Some)
 }
 
 #[derive(Debug, Serialize)]
@@ -77,7 +90,10 @@ pub struct EntityDisplayDto {
     pub is_favorite: bool,
     pub favorite_order: i32,
     pub hidden: bool,
+    pub sort_order: i32,
     pub display_name: Option<String>,
+    pub custom_icon: Option<String>,
+    pub area_id: Option<Uuid>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -122,41 +138,58 @@ pub async fn update_display(
 ) -> Result<Json<EntityDisplayDto>, AppError> {
     ensure_instance(&ctx.pool, instance_id).await?;
 
-    // display_name maps onto the existing custom_name column.
-    // Patch semantics:
-    //   - field absent  → leave column unchanged
-    //   - field present → overwrite (incl. setting to NULL for display_name)
+    // For nullable patch fields we pass (set_flag, value): when the flag is
+    // false the column stays untouched on UPDATE; on INSERT it falls back to
+    // the column default (NULL for these). For non-nullable fields we just
+    // COALESCE the optional payload.
     let set_display_name = req.display_name.is_some();
     let display_name_value = req.display_name.unwrap_or(None);
+    let set_custom_icon = req.custom_icon.is_some();
+    let custom_icon_value = req.custom_icon.unwrap_or(None);
+    let set_area_id = req.area_id.is_some();
+    let area_id_value = req.area_id.unwrap_or(None);
     let size_str = req.size.map(|s| s.as_db());
 
     let r = sqlx::query(
         r#"INSERT INTO entity_overrides (
-                entity_id, custom_name, hidden, size, is_favorite, favorite_order
+                instance_id, entity_id,
+                display_name, custom_icon, area_id,
+                hidden, size, is_favorite, favorite_order, sort_order
            ) VALUES (
-                $1,
-                $3,
-                COALESCE($4, FALSE),
-                COALESCE($5, 'small'),
-                COALESCE($6, FALSE),
-                COALESCE($7, 0)
+                $1, $2,
+                $4, $6, $8,
+                COALESCE($9, FALSE),
+                COALESCE($10, 'small'),
+                COALESCE($11, FALSE),
+                COALESCE($12, 0),
+                COALESCE($13, 0)
            )
-           ON CONFLICT (entity_id) DO UPDATE SET
-                custom_name    = CASE WHEN $2 THEN $3 ELSE entity_overrides.custom_name END,
-                hidden         = COALESCE($4, entity_overrides.hidden),
-                size           = COALESCE($5, entity_overrides.size),
-                is_favorite    = COALESCE($6, entity_overrides.is_favorite),
-                favorite_order = COALESCE($7, entity_overrides.favorite_order),
+           ON CONFLICT (instance_id, entity_id) DO UPDATE SET
+                display_name   = CASE WHEN $3 THEN $4  ELSE entity_overrides.display_name END,
+                custom_icon    = CASE WHEN $5 THEN $6  ELSE entity_overrides.custom_icon  END,
+                area_id        = CASE WHEN $7 THEN $8  ELSE entity_overrides.area_id      END,
+                hidden         = COALESCE($9,  entity_overrides.hidden),
+                size           = COALESCE($10, entity_overrides.size),
+                is_favorite    = COALESCE($11, entity_overrides.is_favorite),
+                favorite_order = COALESCE($12, entity_overrides.favorite_order),
+                sort_order     = COALESCE($13, entity_overrides.sort_order),
                 updated_at     = NOW()
-           RETURNING entity_id, custom_name, hidden, size, is_favorite, favorite_order"#,
+           RETURNING entity_id, display_name, custom_icon, area_id,
+                     hidden, size, is_favorite, favorite_order, sort_order"#,
     )
+    .bind(instance_id)
     .bind(&entity_id)
     .bind(set_display_name)
     .bind(&display_name_value)
+    .bind(set_custom_icon)
+    .bind(&custom_icon_value)
+    .bind(set_area_id)
+    .bind(area_id_value)
     .bind(req.hidden)
     .bind(size_str)
     .bind(req.is_favorite)
     .bind(req.favorite_order)
+    .bind(req.sort_order)
     .fetch_one(&ctx.pool)
     .await?;
 
@@ -168,7 +201,10 @@ pub async fn update_display(
         is_favorite: r.get("is_favorite"),
         favorite_order: r.get("favorite_order"),
         hidden: r.get("hidden"),
-        display_name: r.get("custom_name"),
+        sort_order: r.get("sort_order"),
+        display_name: r.get("display_name"),
+        custom_icon: r.get("custom_icon"),
+        area_id: r.get("area_id"),
     }))
 }
 
@@ -189,17 +225,13 @@ pub async fn reorder_rooms(
 
     // Verify every room belongs to this instance up-front, so we 404 cleanly
     // instead of silently no-op'ing on a foreign room_id.
-    let owned: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM rooms WHERE instance_id = $1 AND id = ANY($2)",
-    )
-    .bind(instance_id)
-    .bind(&ids)
-    .fetch_one(&ctx.pool)
-    .await?;
+    let owned: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM rooms WHERE instance_id = $1 AND id = ANY($2)")
+        .bind(instance_id)
+        .bind(&ids)
+        .fetch_one(&ctx.pool)
+        .await?;
     if (owned as usize) != items.len() {
-        return Err(AppError::not_found(
-            "one or more rooms do not belong to this instance",
-        ));
+        return Err(AppError::not_found("one or more rooms do not belong to this instance"));
     }
 
     let mut tx = ctx.pool.begin().await?;
@@ -242,15 +274,16 @@ pub async fn reorder_favorites(
     // at the requested position. Existing rows only get favorite_order updated
     // (don't toggle is_favorite — reordering shouldn't pin/unpin).
     let res = sqlx::query(
-        r#"INSERT INTO entity_overrides (entity_id, is_favorite, favorite_order)
-           SELECT u.eid, TRUE, u.fo
+        r#"INSERT INTO entity_overrides (instance_id, entity_id, is_favorite, favorite_order)
+           SELECT $3, u.eid, TRUE, u.fo
              FROM UNNEST($1::text[], $2::int[]) AS u(eid, fo)
-           ON CONFLICT (entity_id) DO UPDATE SET
+           ON CONFLICT (instance_id, entity_id) DO UPDATE SET
                 favorite_order = EXCLUDED.favorite_order,
                 updated_at     = NOW()"#,
     )
     .bind(&entity_ids)
     .bind(&orders)
+    .bind(instance_id)
     .execute(&mut *tx)
     .await?;
     tx.commit().await?;
@@ -293,10 +326,7 @@ mod tests {
     #[test]
     fn entity_size_rejects_unknown() {
         let err = serde_json::from_str::<EntitySize>("\"huge\"").unwrap_err();
-        assert!(
-            err.to_string().to_lowercase().contains("variant"),
-            "got: {err}"
-        );
+        assert!(err.to_string().to_lowercase().contains("variant"), "got: {err}");
     }
 
     #[test]
@@ -316,27 +346,49 @@ mod tests {
     }
 
     #[test]
-    fn display_update_omits_display_name_when_absent() {
-        let req: EntityDisplayUpdate =
-            serde_json::from_str(r#"{"size":"medium"}"#).unwrap();
-        assert!(req.display_name.is_none(), "absent → None");
+    fn display_update_omits_nullables_when_absent() {
+        let req: EntityDisplayUpdate = serde_json::from_str(r#"{"size":"medium"}"#).unwrap();
+        assert!(req.display_name.is_none(), "display_name absent → None");
+        assert!(req.custom_icon.is_none(), "custom_icon absent → None");
+        assert!(req.area_id.is_none(), "area_id absent → None");
         assert_eq!(req.size, Some(EntitySize::Medium));
     }
 
     #[test]
     fn display_update_distinguishes_null_display_name() {
-        let req: EntityDisplayUpdate =
-            serde_json::from_str(r#"{"display_name":null}"#).unwrap();
+        let req: EntityDisplayUpdate = serde_json::from_str(r#"{"display_name":null}"#).unwrap();
         assert_eq!(req.display_name, Some(None), "null → Some(None) (clear)");
     }
 
     #[test]
     fn display_update_accepts_display_name_value() {
-        let req: EntityDisplayUpdate =
-            serde_json::from_str(r#"{"display_name":"Living Room Lamp"}"#).unwrap();
-        assert_eq!(
-            req.display_name,
-            Some(Some("Living Room Lamp".to_string()))
-        );
+        let req: EntityDisplayUpdate = serde_json::from_str(r#"{"display_name":"Living Room Lamp"}"#).unwrap();
+        assert_eq!(req.display_name, Some(Some("Living Room Lamp".to_string())));
+    }
+
+    #[test]
+    fn display_update_distinguishes_null_custom_icon() {
+        let req: EntityDisplayUpdate = serde_json::from_str(r#"{"custom_icon":null}"#).unwrap();
+        assert_eq!(req.custom_icon, Some(None));
+    }
+
+    #[test]
+    fn display_update_accepts_area_id_value() {
+        let id = Uuid::new_v4();
+        let body = format!(r#"{{"area_id":"{id}"}}"#);
+        let req: EntityDisplayUpdate = serde_json::from_str(&body).unwrap();
+        assert_eq!(req.area_id, Some(Some(id)));
+    }
+
+    #[test]
+    fn display_update_distinguishes_null_area_id() {
+        let req: EntityDisplayUpdate = serde_json::from_str(r#"{"area_id":null}"#).unwrap();
+        assert_eq!(req.area_id, Some(None));
+    }
+
+    #[test]
+    fn display_update_accepts_sort_order() {
+        let req: EntityDisplayUpdate = serde_json::from_str(r#"{"sort_order":42}"#).unwrap();
+        assert_eq!(req.sort_order, Some(42));
     }
 }
