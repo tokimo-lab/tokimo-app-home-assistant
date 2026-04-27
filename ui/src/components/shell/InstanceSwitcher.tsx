@@ -11,12 +11,19 @@ interface InstanceSwitcherProps {
   t: (k: string) => string;
 }
 
-const STATUS_DOT: Record<ConnStatus, string> = {
+const STATUS_DOT: Record<
+  "connected" | "disconnected" | "connecting" | "error",
+  string
+> = {
   connected: "bg-green-400",
   disconnected: "bg-gray-500",
   connecting: "bg-yellow-400 animate-pulse",
   error: "bg-red-400",
 };
+
+function statusDot(status: ConnStatus): string {
+  return STATUS_DOT[typeof status === "string" ? status : "error"];
+}
 
 export function InstanceSwitcher({
   instances,
@@ -38,7 +45,7 @@ export function InstanceSwitcher({
       >
         {active && (
           <span
-            className={`h-2 w-2 flex-shrink-0 rounded-full ${STATUS_DOT[active.status]}`}
+            className={`h-2 w-2 flex-shrink-0 rounded-full ${statusDot(active.status)}`}
           />
         )}
         <span className="flex-1 truncate text-sm font-medium text-[var(--text-primary)]">
@@ -70,7 +77,7 @@ export function InstanceSwitcher({
                 }}
               >
                 <span
-                  className={`h-2 w-2 flex-shrink-0 rounded-full ${STATUS_DOT[inst.status]}`}
+                  className={`h-2 w-2 flex-shrink-0 rounded-full ${statusDot(inst.status)}`}
                 />
                 <span className="flex-1 truncate text-[var(--text-primary)]">
                   {inst.name}

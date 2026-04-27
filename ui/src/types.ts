@@ -1,4 +1,8 @@
-export type ConnStatus = "connected" | "disconnected" | "connecting" | "error";
+export type ConnStatus =
+  | "connected"
+  | "disconnected"
+  | "connecting"
+  | { error: string };
 
 export interface HaInstance {
   id: string;

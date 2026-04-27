@@ -14,7 +14,8 @@ use std::time::Duration;
 
 use chrono::{DateTime, Utc};
 use dashmap::DashMap;
-use serde::{Deserialize, Serialize};
+use serde::ser::SerializeMap;
+use serde::{Deserialize, Serialize, Serializer};
 use sqlx::PgPool;
 use tokio::sync::{Notify, RwLock, broadcast};
 use tracing::{info, warn};
@@ -94,8 +95,14 @@ pub enum EntityEvent {
 }
 
 /// Current connection status of one instance's WS supervisor.
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "snake_case", tag = "state")]
+///
+/// Serializes to a frontend-friendly shape:
+///   - `"connecting"` / `"connected"` / `"disconnected"` for transient states
+///   - `{"error": "<reason>"}` for `Failed`
+///
+/// `Disconnected { since, reason }` collapses to the bare `"disconnected"`
+/// string; the structured info is kept only for backend logging / future use.
+#[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub enum ConnStatus {
     Connecting,
@@ -105,6 +112,21 @@ pub enum ConnStatus {
         reason: String,
     },
     Failed(String),
+}
+
+impl Serialize for ConnStatus {
+    fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        match self {
+            ConnStatus::Connecting => s.serialize_str("connecting"),
+            ConnStatus::Connected => s.serialize_str("connected"),
+            ConnStatus::Disconnected { .. } => s.serialize_str("disconnected"),
+            ConnStatus::Failed(msg) => {
+                let mut m = s.serialize_map(Some(1))?;
+                m.serialize_entry("error", msg)?;
+                m.end()
+            }
+        }
+    }
 }
 
 // ─── Instance config (read-locked, cheap Arc clone on hot path) ───────────────

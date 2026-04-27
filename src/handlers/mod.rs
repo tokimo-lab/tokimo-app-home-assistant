@@ -56,7 +56,22 @@ pub struct InstanceDto {
     pub base_url: String,
     pub access_token: MaskedToken,
     pub verify_tls: bool,
+    /// Live connection status from the supervisor pool. Same shape as the SSE
+    /// `status` event payload (string variants or `{"error": "..."}`).
+    pub status: serde_json::Value,
     pub last_connected_at: Option<chrono::DateTime<chrono::Utc>>,
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+/// Read the current connection status for `id` from the pool.
+/// Returns `"connecting"` (the initial state) when no supervisor exists yet
+/// — e.g. the row is in the DB but `add_instance` hasn't been called.
+pub async fn instance_status_value(ctx: &AppCtx, id: uuid::Uuid) -> serde_json::Value {
+    if let Some(entry) = ctx.conn_pool.instances.get(&id) {
+        let status = entry.value().status.read().await;
+        serde_json::to_value(&**status).unwrap_or_else(|_| serde_json::Value::String("connecting".to_string()))
+    } else {
+        serde_json::Value::String("connecting".to_string())
+    }
 }

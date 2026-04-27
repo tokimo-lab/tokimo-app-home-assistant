@@ -11,7 +11,7 @@ use uuid::Uuid;
 
 use crate::error::AppError;
 use crate::state::{InstanceConfig, InstanceCtx};
-use super::{AppCtx, InstanceDto, MaskedToken};
+use super::{AppCtx, InstanceDto, MaskedToken, instance_status_value};
 
 // ─── List ─────────────────────────────────────────────────────────────────────
 
@@ -25,19 +25,21 @@ pub async fn list(
     .fetch_all(&ctx.pool)
     .await?;
 
-    let instances: Vec<InstanceDto> = rows
-        .into_iter()
-        .map(|r| InstanceDto {
-            id: r.get("id"),
+    let mut instances: Vec<InstanceDto> = Vec::with_capacity(rows.len());
+    for r in rows {
+        let id: Uuid = r.get("id");
+        instances.push(InstanceDto {
+            id,
             name: r.get("name"),
             base_url: r.get("base_url"),
             access_token: MaskedToken(r.get("access_token")),
             verify_tls: r.get("verify_tls"),
+            status: instance_status_value(&ctx, id).await,
             last_connected_at: r.get("last_connected_at"),
             created_at: r.get("created_at"),
             updated_at: r.get("updated_at"),
-        })
-        .collect();
+        });
+    }
 
     Ok(Json(instances))
 }
@@ -62,6 +64,7 @@ pub async fn get(
         base_url: r.get("base_url"),
         access_token: MaskedToken(r.get("access_token")),
         verify_tls: r.get("verify_tls"),
+        status: instance_status_value(&ctx, id).await,
         last_connected_at: r.get("last_connected_at"),
         created_at: r.get("created_at"),
         updated_at: r.get("updated_at"),
@@ -119,6 +122,7 @@ pub async fn create(
         base_url: r.get("base_url"),
         access_token: MaskedToken(r.get("access_token")),
         verify_tls: r.get("verify_tls"),
+        status: instance_status_value(&ctx, id).await,
         last_connected_at: r.get("last_connected_at"),
         created_at: r.get("created_at"),
         updated_at: r.get("updated_at"),
@@ -200,6 +204,7 @@ pub async fn update(
         base_url: r.get("base_url"),
         access_token: MaskedToken(r.get("access_token")),
         verify_tls: r.get("verify_tls"),
+        status: instance_status_value(&ctx, id).await,
         last_connected_at: r.get("last_connected_at"),
         created_at: r.get("created_at"),
         updated_at: r.get("updated_at"),

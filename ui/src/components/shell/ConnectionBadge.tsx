@@ -6,9 +6,11 @@ interface ConnectionBadgeProps {
   t: (k: string) => string;
 }
 
+type StatusKey = "connected" | "disconnected" | "connecting" | "error";
+
 const STATUS_CONFIG: Record<
-  ConnStatus,
-  { color: string; dotColor: string; label: keyof Record<string, string> }
+  StatusKey,
+  { color: string; dotColor: string; label: string }
 > = {
   connected: {
     color: "text-green-400",
@@ -32,16 +34,22 @@ const STATUS_CONFIG: Record<
   },
 };
 
+function statusKey(status: ConnStatus): StatusKey {
+  if (typeof status === "string") return status;
+  return "error";
+}
+
 export function ConnectionBadge({ status, t }: ConnectionBadgeProps) {
-  const cfg = STATUS_CONFIG[status];
+  const key = statusKey(status);
+  const cfg = STATUS_CONFIG[key];
 
   return (
     <div className={`flex items-center gap-2 px-3 py-2 text-xs ${cfg.color}`}>
       <span
-        className={`h-2 w-2 rounded-full ${cfg.dotColor} ${status === "connecting" ? "animate-pulse" : ""}`}
+        className={`h-2 w-2 rounded-full ${cfg.dotColor} ${key === "connecting" ? "animate-pulse" : ""}`}
       />
       <span>{t(cfg.label)}</span>
-      {status === "connected" ? (
+      {key === "connected" ? (
         <Wifi size={12} />
       ) : (
         <WifiOff size={12} className="opacity-50" />
