@@ -11,6 +11,7 @@
 
 pub mod entities;
 pub mod instances;
+pub mod pages;
 pub mod rooms;
 pub mod services;
 pub mod sse;
