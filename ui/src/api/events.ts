@@ -14,7 +14,7 @@ export function createInstanceEventStream(
   onStatus: StatusHandler,
 ): () => void {
   const url = sseUrl(
-    `/data/instances/${encodeURIComponent(instanceId)}/events`,
+    `/instances/${encodeURIComponent(instanceId)}/events`,
   );
   let es: EventSource | null = new EventSource(url, { withCredentials: true });
   let closed = false;

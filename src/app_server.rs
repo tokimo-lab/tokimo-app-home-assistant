@@ -27,7 +27,7 @@
 //!   DELETE /rooms/:room_id/entities/:entity_id
 //!
 //! Data plane (SSE):
-//!   GET    /data/instances/:id/events
+//!   GET    /instances/:id/events
 
 use std::{path::PathBuf, sync::Arc};
 
@@ -131,7 +131,7 @@ fn build_router(ctx: Arc<AppCtx>) -> Router {
             delete(rooms::remove_entity),
         )
         // ── SSE data plane ───────────────────────────────────────────────
-        .route("/data/instances/{id}/events", get(sse::events))
+        .route("/instances/{id}/events", get(sse::events))
         // ── Static assets ────────────────────────────────────────────────
         .route("/assets/{*path}", get(assets::serve))
         .with_state(ctx)
