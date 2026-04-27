@@ -8,7 +8,11 @@ import {
   updateInstance,
 } from "../api/instances";
 import { useInstances } from "../state/useInstances";
-import type { CreateInstanceDto, HaInstance, UpdateInstanceDto } from "../types";
+import type {
+  CreateInstanceDto,
+  HaInstance,
+  UpdateInstanceDto,
+} from "../types";
 
 interface InstancesPageProps {
   t: (k: string) => string;

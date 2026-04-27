@@ -3,9 +3,9 @@ import {
   addEntityToRoom,
   createRoom as apiCreateRoom,
   deleteRoom as apiDeleteRoom,
+  syncAreas as apiSyncAreas,
   listRooms,
   removeEntityFromRoom,
-  syncAreas as apiSyncAreas,
   updateRoom,
 } from "../api/rooms";
 import type {
