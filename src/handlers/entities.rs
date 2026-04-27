@@ -26,10 +26,10 @@ pub struct EntityDto {
     pub last_changed: String,
     pub last_updated: String,
     pub context: Option<serde_json::Value>,
-    pub custom_name: Option<String>,
+    pub display_name: Option<String>,
     pub custom_icon: Option<String>,
     pub hidden: bool,
-    pub favourite: bool,
+    pub is_favorite: bool,
 }
 
 fn apply_override(state: EntityState, ov: Option<&OverrideRow>) -> EntityDto {
@@ -40,33 +40,37 @@ fn apply_override(state: EntityState, ov: Option<&OverrideRow>) -> EntityDto {
         last_changed: state.last_changed,
         last_updated: state.last_updated,
         context: state.context,
-        custom_name: ov.and_then(|o| o.custom_name.clone()),
+        display_name: ov.and_then(|o| o.display_name.clone()),
         custom_icon: ov.and_then(|o| o.custom_icon.clone()),
         hidden: ov.map(|o| o.hidden).unwrap_or(false),
-        favourite: ov.map(|o| o.favourite).unwrap_or(false),
+        is_favorite: ov.map(|o| o.is_favorite).unwrap_or(false),
     }
 }
 
 struct OverrideRow {
     entity_id: String,
-    custom_name: Option<String>,
+    display_name: Option<String>,
     custom_icon: Option<String>,
     hidden: bool,
-    favourite: bool,
+    is_favorite: bool,
 }
 
-async fn load_overrides(pool: &sqlx::PgPool) -> Result<Vec<OverrideRow>, AppError> {
-    let rows = sqlx::query("SELECT entity_id, custom_name, custom_icon, hidden, favourite FROM entity_overrides")
-        .fetch_all(pool)
-        .await?;
+async fn load_overrides(pool: &sqlx::PgPool, instance_id: Uuid) -> Result<Vec<OverrideRow>, AppError> {
+    let rows = sqlx::query(
+        "SELECT entity_id, display_name, custom_icon, hidden, is_favorite \
+         FROM entity_overrides WHERE instance_id = $1",
+    )
+    .bind(instance_id)
+    .fetch_all(pool)
+    .await?;
     Ok(rows
         .into_iter()
         .map(|r| OverrideRow {
             entity_id: r.get("entity_id"),
-            custom_name: r.get("custom_name"),
+            display_name: r.get("display_name"),
             custom_icon: r.get("custom_icon"),
             hidden: r.get("hidden"),
-            favourite: r.get("favourite"),
+            is_favorite: r.get("is_favorite"),
         })
         .collect())
 }
@@ -82,7 +86,7 @@ pub async fn list(State(ctx): State<Arc<AppCtx>>, Path(id): Path<Uuid>) -> Resul
         .value()
         .clone();
 
-    let overrides = load_overrides(&ctx.pool).await?;
+    let overrides = load_overrides(&ctx.pool, id).await?;
     let ov_map: std::collections::HashMap<String, OverrideRow> =
         overrides.into_iter().map(|o| (o.entity_id.clone(), o)).collect();
 
@@ -118,19 +122,20 @@ pub async fn get(
         .clone();
 
     let ov_row = sqlx::query(
-        "SELECT entity_id, custom_name, custom_icon, hidden, favourite
-         FROM entity_overrides WHERE entity_id = $1",
+        "SELECT entity_id, display_name, custom_icon, hidden, is_favorite \
+         FROM entity_overrides WHERE instance_id = $1 AND entity_id = $2",
     )
+    .bind(id)
     .bind(&entity_id)
     .fetch_optional(&ctx.pool)
     .await?;
 
     let ov = ov_row.map(|r| OverrideRow {
         entity_id: r.get("entity_id"),
-        custom_name: r.get("custom_name"),
+        display_name: r.get("display_name"),
         custom_icon: r.get("custom_icon"),
         hidden: r.get("hidden"),
-        favourite: r.get("favourite"),
+        is_favorite: r.get("is_favorite"),
     });
 
     Ok(Json(apply_override(state, ov.as_ref())))
@@ -141,52 +146,53 @@ pub async fn get(
 #[derive(Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct OverrideReq {
-    pub custom_name: Option<String>,
+    pub display_name: Option<String>,
     pub custom_icon: Option<String>,
     pub hidden: Option<bool>,
-    pub favourite: Option<bool>,
+    pub is_favorite: Option<bool>,
 }
 
 #[derive(Serialize)]
 pub struct OverrideResp {
     entity_id: String,
-    custom_name: Option<String>,
+    display_name: Option<String>,
     custom_icon: Option<String>,
     hidden: bool,
-    favourite: bool,
+    is_favorite: bool,
     updated_at: DateTime<Utc>,
 }
 
 pub async fn upsert_override(
     State(ctx): State<Arc<AppCtx>>,
-    Path((_id, entity_id)): Path<(Uuid, String)>,
+    Path((instance_id, entity_id)): Path<(Uuid, String)>,
     Json(req): Json<OverrideReq>,
 ) -> Result<Json<OverrideResp>, AppError> {
     let r = sqlx::query(
-        r#"INSERT INTO entity_overrides(entity_id, custom_name, custom_icon, hidden, favourite)
-           VALUES ($1, $2, $3, COALESCE($4, FALSE), COALESCE($5, FALSE))
-           ON CONFLICT (entity_id) DO UPDATE SET
-               custom_name  = COALESCE($2, entity_overrides.custom_name),
-               custom_icon  = COALESCE($3, entity_overrides.custom_icon),
-               hidden       = COALESCE($4, entity_overrides.hidden),
-               favourite    = COALESCE($5, entity_overrides.favourite),
+        r#"INSERT INTO entity_overrides(instance_id, entity_id, display_name, custom_icon, hidden, is_favorite)
+           VALUES ($1, $2, $3, $4, COALESCE($5, FALSE), COALESCE($6, FALSE))
+           ON CONFLICT (instance_id, entity_id) DO UPDATE SET
+               display_name = COALESCE($3, entity_overrides.display_name),
+               custom_icon  = COALESCE($4, entity_overrides.custom_icon),
+               hidden       = COALESCE($5, entity_overrides.hidden),
+               is_favorite  = COALESCE($6, entity_overrides.is_favorite),
                updated_at   = NOW()
-           RETURNING entity_id, custom_name, custom_icon, hidden, favourite, updated_at"#,
+           RETURNING entity_id, display_name, custom_icon, hidden, is_favorite, updated_at"#,
     )
+    .bind(instance_id)
     .bind(&entity_id)
-    .bind(&req.custom_name)
+    .bind(&req.display_name)
     .bind(&req.custom_icon)
     .bind(req.hidden)
-    .bind(req.favourite)
+    .bind(req.is_favorite)
     .fetch_one(&ctx.pool)
     .await?;
 
     Ok(Json(OverrideResp {
         entity_id: r.get("entity_id"),
-        custom_name: r.get("custom_name"),
+        display_name: r.get("display_name"),
         custom_icon: r.get("custom_icon"),
         hidden: r.get("hidden"),
-        favourite: r.get("favourite"),
+        is_favorite: r.get("is_favorite"),
         updated_at: r.get("updated_at"),
     }))
 }
