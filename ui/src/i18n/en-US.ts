@@ -32,6 +32,7 @@ export const enUS: Record<string, string> = {
   instancesDeleteConfirm: "Delete this connection?",
   instancesUrlPlaceholder: "http://homeassistant.local:8123",
   instancesTokenPlaceholder: "eyJ0eXAiOiJKV1Q…",
+  instancesTokenKeepPlaceholder: "Leave blank to keep current token",
   instancesNamePlaceholder: "My Home",
   instancesAddTitle: "Add Connection",
   instancesEditTitle: "Edit Connection",

@@ -32,6 +32,7 @@ export const zhCN: Record<string, string> = {
   instancesDeleteConfirm: "确定删除此连接？",
   instancesUrlPlaceholder: "http://homeassistant.local:8123",
   instancesTokenPlaceholder: "eyJ0eXAiOiJKV1Q…",
+  instancesTokenKeepPlaceholder: "留空保持原 Token 不变",
   instancesNamePlaceholder: "我的家",
   instancesAddTitle: "添加连接",
   instancesEditTitle: "编辑连接",

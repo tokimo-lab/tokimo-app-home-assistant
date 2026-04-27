@@ -8,7 +8,7 @@ import {
   updateInstance,
 } from "../api/instances";
 import { useInstances } from "../state/useInstances";
-import type { CreateInstanceDto, HaInstance } from "../types";
+import type { CreateInstanceDto, HaInstance, UpdateInstanceDto } from "../types";
 
 interface InstancesPageProps {
   t: (k: string) => string;
@@ -54,15 +54,24 @@ export function InstancesPage({ t, onSelectInstance }: InstancesPageProps) {
     setSaving(true);
     setFormError(null);
     try {
-      const dto: CreateInstanceDto = {
-        name: name.trim(),
-        base_url: url.trim(),
-        access_token: token.trim(),
-        verify_tls: verifyTls,
-      };
       if (editing) {
+        const dto: UpdateInstanceDto = {
+          name: name.trim(),
+          base_url: url.trim(),
+          verify_tls: verifyTls,
+        };
+        const trimmedToken = token.trim();
+        if (trimmedToken !== "") {
+          dto.access_token = trimmedToken;
+        }
         await updateInstance(editing.id, dto);
       } else {
+        const dto: CreateInstanceDto = {
+          name: name.trim(),
+          base_url: url.trim(),
+          access_token: token.trim(),
+          verify_tls: verifyTls,
+        };
         await createInstance(dto);
       }
       setShowForm(false);
@@ -223,7 +232,7 @@ export function InstancesPage({ t, onSelectInstance }: InstancesPageProps) {
                   onChange={(e) => setToken(e.target.value)}
                   placeholder={
                     editing
-                      ? "Leave blank to keep existing"
+                      ? t("instancesTokenKeepPlaceholder")
                       : t("instancesTokenPlaceholder")
                   }
                 />
