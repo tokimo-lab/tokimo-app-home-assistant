@@ -237,6 +237,12 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
           onOpenSettings={() => {
             // TODO R7p: open AnimatedSettingsPane for this instance.
           }}
+          onToggleEdit={() => {
+            // TODO R6p: enter Home edit mode.
+          }}
+          onReorderRooms={() => {
+            // TODO R6p: enter Reorder Sections mode.
+          }}
           t={t}
         />
       )}

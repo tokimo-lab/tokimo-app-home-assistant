@@ -1,4 +1,3 @@
-import { MoreHorizontal } from "lucide-react";
 import { getDomain } from "../../lib/domain";
 import type {
   CallParams,
@@ -9,6 +8,7 @@ import type {
 } from "../../types";
 import { EmptyState } from "../EmptyState";
 import { FlowGrid } from "./FlowGrid";
+import { HomeMenu } from "./HomeMenu";
 import { StatusBadgesRow } from "./StatusBadgesRow";
 
 interface HomeViewProps {
@@ -19,8 +19,12 @@ interface HomeViewProps {
   onCall: (params: CallParams) => void;
   onOpenRoom: (roomId: string) => void;
   onOpenSettings: () => void;
+  onToggleEdit?: () => void;
+  onReorderRooms?: () => void;
   t: (k: string) => string;
 }
+
+const noop = () => {};
 
 const RENDERABLE_DOMAINS = new Set([
   "light",
@@ -60,8 +64,19 @@ export function HomeView({
   onCall,
   onOpenRoom,
   onOpenSettings,
+  onToggleEdit,
+  onReorderRooms,
   t,
 }: HomeViewProps) {
+  const headerProps = {
+    instance,
+    rooms,
+    t,
+    onOpenSettings,
+    onToggleEdit: onToggleEdit ?? noop,
+    onReorderRooms: onReorderRooms ?? noop,
+    onOpenRoom,
+  };
   const allEntities = Array.from(entities.values()).filter(isRenderable);
 
   // Favorites
@@ -97,7 +112,7 @@ export function HomeView({
   if (allEntities.length === 0) {
     return (
       <div className="flex h-full flex-col">
-        <HomeHeader instance={instance} onOpenSettings={onOpenSettings} />
+        <HomeHeader {...headerProps} />
         <div className="flex flex-1 items-center justify-center">
           <EmptyState title={t("homeEmpty")} />
         </div>
@@ -107,7 +122,7 @@ export function HomeView({
 
   return (
     <div className="flex h-full flex-col gap-6 overflow-auto px-6 py-6">
-      <HomeHeader instance={instance} onOpenSettings={onOpenSettings} />
+      <HomeHeader {...headerProps} />
 
       <StatusBadgesRow entities={allEntities} t={t} />
 
@@ -171,25 +186,34 @@ export function HomeView({
 
 function HomeHeader({
   instance,
+  rooms,
+  t,
   onOpenSettings,
+  onToggleEdit,
+  onReorderRooms,
+  onOpenRoom,
 }: {
   instance: HaInstance;
+  rooms: HaRoom[];
+  t: (k: string) => string;
   onOpenSettings: () => void;
+  onToggleEdit: () => void;
+  onReorderRooms: () => void;
+  onOpenRoom: (roomId: string) => void;
 }) {
   return (
     <div className="flex items-center justify-between">
       <h1 className="text-2xl font-semibold text-[var(--text-primary)]">
         {instance.name}
       </h1>
-      {/* TODO R8p: replace placeholder with proper dropdown menu */}
-      <button
-        type="button"
-        onClick={onOpenSettings}
-        className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-[var(--text-secondary)] transition hover:bg-white/[0.06]"
-        aria-label="menu"
-      >
-        <MoreHorizontal size={20} />
-      </button>
+      <HomeMenu
+        rooms={rooms}
+        t={t}
+        onOpenSettings={onOpenSettings}
+        onToggleEdit={onToggleEdit}
+        onReorderRooms={onReorderRooms}
+        onOpenRoom={onOpenRoom}
+      />
     </div>
   );
 }
