@@ -57,9 +57,10 @@ pub async fn events(
                             "type": "snapshot",
                             "entities": states,
                         }),
-                        EntityEvent::Updated(state) => serde_json::json!({
+                        EntityEvent::Updated { entity, context_id } => serde_json::json!({
                             "type": "updated",
-                            "entity": state,
+                            "entity": entity,
+                            "context_id": context_id,
                         }),
                         EntityEvent::Removed(entity_id) => serde_json::json!({
                             "type": "removed",

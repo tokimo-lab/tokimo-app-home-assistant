@@ -222,6 +222,13 @@ fn handle_event_msg(instance: &Arc<InstanceCtx>, msg: WsMsg) {
         return;
     }
 
+    // HA wraps the inner event with `context.id` at the top level.
+    let context_id = event_val
+        .get("context")
+        .and_then(|c| c.get("id"))
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+
     let data = event_val.get("data").cloned().unwrap_or(serde_json::Value::Null);
     match serde_json::from_value::<StateChangedData>(data) {
         Ok(changed) => {
@@ -230,7 +237,10 @@ fn handle_event_msg(instance: &Arc<InstanceCtx>, msg: WsMsg) {
                     .store
                     .states
                     .insert(new_state.entity_id.clone(), new_state.clone());
-                let _ = instance.store.tx.send(EntityEvent::Updated(Box::new(new_state)));
+                let _ = instance.store.tx.send(EntityEvent::Updated {
+                    entity: Box::new(new_state),
+                    context_id,
+                });
             } else {
                 instance.store.states.remove(&changed.entity_id);
                 let _ = instance.store.tx.send(EntityEvent::Removed(changed.entity_id));

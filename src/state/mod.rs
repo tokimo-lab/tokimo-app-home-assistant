@@ -87,7 +87,13 @@ pub enum EntityEvent {
     /// Full state dump on (re-)connect.
     Snapshot(Vec<EntityState>),
     /// A single entity was added or changed.
-    Updated(Box<EntityState>),
+    Updated {
+        entity: Box<EntityState>,
+        /// `event.context.id` from the HA `state_changed` event, if present.
+        /// The frontend uses this to ack-reconcile pending optimistic
+        /// `call_service` updates.
+        context_id: Option<String>,
+    },
     /// An entity was removed.
     Removed(String),
     /// Connection status changed.
