@@ -29,8 +29,6 @@
 //! Data plane (SSE):
 //!   GET    /instances/:id/events
 
-#[cfg(unix)]
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use axum::{
@@ -43,39 +41,8 @@ use tracing::{error, info};
 
 use crate::{assets, handlers, handlers::AppCtx};
 
-#[cfg(unix)]
-fn default_socket_path(service: &str) -> anyhow::Result<PathBuf> {
-    let bus = std::env::var("TOKIMO_BUS_SOCKET").map_err(|_| anyhow::anyhow!("TOKIMO_BUS_SOCKET not set"))?;
-    let parent = PathBuf::from(&bus)
-        .parent()
-        .ok_or_else(|| anyhow::anyhow!("TOKIMO_BUS_SOCKET has no parent"))?
-        .to_path_buf();
-    let apps_dir = parent.join("apps");
-    std::fs::create_dir_all(&apps_dir)?;
-    Ok(apps_dir.join(format!("{service}.sock")))
-}
-
-#[cfg(windows)]
-fn default_pipe_name(service: &str) -> String {
-    format!("tokimo-app-{}-{}", service, std::process::id())
-}
-
 pub async fn spawn(service: &str, ctx: Arc<AppCtx>) -> anyhow::Result<DataPlaneSocket> {
-    #[cfg(unix)]
-    let socket = {
-        let path = default_socket_path(service)?;
-        let _ = std::fs::remove_file(&path);
-        DataPlaneSocket::Unix {
-            path: path.to_string_lossy().into_owned(),
-        }
-    };
-
-    #[cfg(windows)]
-    let socket = DataPlaneSocket::NamedPipe {
-        name: default_pipe_name(service),
-    };
-
-    let mut listener = BusListener::bind(&socket)?;
+    let (mut listener, socket) = BusListener::bind_for_app(service)?;
     info!(?socket, "home-assistant: app server listening");
 
     let app = build_router(ctx).into_make_service();
