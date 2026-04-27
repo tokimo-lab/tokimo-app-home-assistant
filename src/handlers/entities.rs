@@ -72,15 +72,10 @@ async fn load_overrides(pool: &sqlx::PgPool) -> Result<Vec<OverrideRow>, AppErro
 
 // ─── List entities ────────────────────────────────────────────────────────────
 
-#[derive(Serialize)]
-pub struct EntitiesListResp {
-    entities: Vec<EntityDto>,
-}
-
 pub async fn list(
     State(ctx): State<Arc<AppCtx>>,
     Path(id): Path<Uuid>,
-) -> Result<Json<EntitiesListResp>, AppError> {
+) -> Result<Json<Vec<EntityDto>>, AppError> {
     let instance = ctx
         .conn_pool
         .instances
@@ -93,14 +88,14 @@ pub async fn list(
     let ov_map: std::collections::HashMap<String, OverrideRow> =
         overrides.into_iter().map(|o| (o.entity_id.clone(), o)).collect();
 
-    let entities = instance
+    let entities: Vec<EntityDto> = instance
         .store
         .states
         .iter()
         .map(|e| apply_override(e.value().clone(), ov_map.get(e.key())))
         .collect();
 
-    Ok(Json(EntitiesListResp { entities }))
+    Ok(Json(entities))
 }
 
 // ─── Get single entity ────────────────────────────────────────────────────────

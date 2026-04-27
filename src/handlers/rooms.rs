@@ -74,17 +74,12 @@ async fn load_rooms(pool: &sqlx::PgPool) -> Result<Vec<RoomDto>, AppError> {
 
 // ─── List rooms ───────────────────────────────────────────────────────────────
 
-#[derive(Serialize)]
-pub struct RoomsListResp {
-    rooms: Vec<RoomDto>,
-}
-
 pub async fn list(
     State(ctx): State<Arc<AppCtx>>,
     Path(_id): Path<Uuid>,
-) -> Result<Json<RoomsListResp>, AppError> {
+) -> Result<Json<Vec<RoomDto>>, AppError> {
     let rooms = load_rooms(&ctx.pool).await?;
-    Ok(Json(RoomsListResp { rooms }))
+    Ok(Json(rooms))
 }
 
 // ─── Create room ──────────────────────────────────────────────────────────────

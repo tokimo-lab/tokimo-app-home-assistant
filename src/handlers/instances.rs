@@ -15,14 +15,9 @@ use super::{AppCtx, InstanceDto, MaskedToken};
 
 // ─── List ─────────────────────────────────────────────────────────────────────
 
-#[derive(serde::Serialize)]
-pub struct InstancesListResp {
-    instances: Vec<InstanceDto>,
-}
-
 pub async fn list(
     State(ctx): State<Arc<AppCtx>>,
-) -> Result<Json<InstancesListResp>, AppError> {
+) -> Result<Json<Vec<InstanceDto>>, AppError> {
     let rows = sqlx::query(
         "SELECT id, name, base_url, access_token, verify_tls, last_connected_at, created_at, updated_at
          FROM instances ORDER BY created_at",
@@ -30,7 +25,7 @@ pub async fn list(
     .fetch_all(&ctx.pool)
     .await?;
 
-    let instances = rows
+    let instances: Vec<InstanceDto> = rows
         .into_iter()
         .map(|r| InstanceDto {
             id: r.get("id"),
@@ -44,7 +39,7 @@ pub async fn list(
         })
         .collect();
 
-    Ok(Json(InstancesListResp { instances }))
+    Ok(Json(instances))
 }
 
 // ─── Get ──────────────────────────────────────────────────────────────────────
