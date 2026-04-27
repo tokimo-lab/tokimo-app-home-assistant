@@ -71,6 +71,8 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
     reload: reloadInstances,
   } = useInstances();
 
+  const effectiveInstanceId = instanceId ?? instances[0]?.id ?? null;
+
   // ── Live entity stream ───────────────────────────────────────────────────
   const { entities, connStatus } = useEntities(instanceId);
 
@@ -184,7 +186,7 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
     return (
       <AppShell
         instances={instances}
-        activeInstanceId={instanceId}
+        activeInstanceId={effectiveInstanceId}
         subPage="instances"
         connStatus={connStatus}
         t={t}
@@ -213,7 +215,7 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
   return (
     <AppShell
       instances={instances}
-      activeInstanceId={instanceId}
+      activeInstanceId={effectiveInstanceId}
       subPage="home"
       connStatus={connStatus}
       t={t}
