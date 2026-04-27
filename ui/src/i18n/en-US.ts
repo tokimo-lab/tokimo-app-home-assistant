@@ -8,6 +8,8 @@ export const enUS: Record<string, string> = {
   navRooms: "Rooms",
   navDevices: "All Devices",
   navInstances: "Connections",
+  addInstance: "Add Connection",
+  manageInstances: "Manage Connections",
 
   // Setup
   setupTitle: "Connect Home Assistant",

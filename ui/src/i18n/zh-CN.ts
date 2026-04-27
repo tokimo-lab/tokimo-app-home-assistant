@@ -8,6 +8,8 @@ export const zhCN: Record<string, string> = {
   navRooms: "房间",
   navDevices: "所有设备",
   navInstances: "连接",
+  addInstance: "添加连接",
+  manageInstances: "连接管理",
 
   // Setup
   setupTitle: "连接 Home Assistant",
