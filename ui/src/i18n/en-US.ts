@@ -72,21 +72,21 @@ export const enUS: Record<string, string> = {
   vacuumState_error: "Error",
 
   // Domains
-  domainLight: "Light",
-  domainSwitch: "Switch",
-  domainCover: "Cover",
+  domainLight: "Lights",
+  domainSwitch: "Switches",
+  domainCover: "Covers",
   domainClimate: "Climate",
-  domainFan: "Fan",
-  domainLock: "Lock",
-  domainMediaPlayer: "Media Player",
-  domainScene: "Scene",
-  domainScript: "Script",
-  domainBinarySensor: "Sensor",
-  domainSensor: "Sensor",
-  domainCamera: "Camera",
-  domainVacuum: "Vacuum",
-  domainAutomation: "Automation",
-  domainInputBoolean: "Helper",
+  domainFan: "Fans",
+  domainLock: "Locks",
+  domainMediaPlayer: "Media",
+  domainScene: "Scenes",
+  domainScript: "Scripts",
+  domainBinarySensor: "Binary sensors",
+  domainSensor: "Sensors",
+  domainCamera: "Cameras",
+  domainVacuum: "Vacuums",
+  domainAutomation: "Automations",
+  domainInputBoolean: "Input booleans",
 
   // Tile actions
   tileBrightness: "Brightness",
@@ -132,9 +132,17 @@ export const enUS: Record<string, string> = {
   favouritesTitle: "Favourites",
   favouritesEmpty: "No favourite entities yet",
 
-  // Home
+  // Home (Apple Home layout)
   homeAllRooms: "All Rooms",
   homeEmpty: "No entities in this view",
+  sectionFavorites: "Favorites",
+  sectionUnassigned: "Unassigned",
+  aggLightsOn: "{count} light on",
+  aggSwitchesOn: "{count} switch on",
+  aggMediaPlaying: "{count} media playing",
+  aggClimateRange: "Climate {min}–{max}°",
+  roomBack: "Back",
+  domainOther: "Other",
 
   // Errors
   errorLoad: "Failed to load",

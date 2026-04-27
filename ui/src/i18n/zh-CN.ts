@@ -74,19 +74,19 @@ export const zhCN: Record<string, string> = {
   // Domains
   domainLight: "灯光",
   domainSwitch: "开关",
-  domainCover: "遮帘",
+  domainCover: "窗帘",
   domainClimate: "空调",
   domainFan: "风扇",
-  domainLock: "锁",
-  domainMediaPlayer: "媒体播放器",
+  domainLock: "门锁",
+  domainMediaPlayer: "音乐&电视",
   domainScene: "场景",
   domainScript: "脚本",
-  domainBinarySensor: "传感器",
+  domainBinarySensor: "二元传感器",
   domainSensor: "传感器",
   domainCamera: "摄像头",
   domainVacuum: "扫地机",
   domainAutomation: "自动化",
-  domainInputBoolean: "辅助开关",
+  domainInputBoolean: "输入开关",
 
   // Tile actions
   tileBrightness: "亮度",
@@ -132,9 +132,17 @@ export const zhCN: Record<string, string> = {
   favouritesTitle: "收藏",
   favouritesEmpty: "还没有收藏的实体",
 
-  // Home
+  // Home (Apple Home layout)
   homeAllRooms: "所有房间",
   homeEmpty: "此视图中没有实体",
+  sectionFavorites: "最爱",
+  sectionUnassigned: "未分组",
+  aggLightsOn: "灯光 已开 {count}",
+  aggSwitchesOn: "开关 已开 {count}",
+  aggMediaPlaying: "音响&电视 {count} 在播",
+  aggClimateRange: "空调 {min}–{max}°",
+  roomBack: "返回",
+  domainOther: "其他",
 
   // Errors
   errorLoad: "加载失败",
