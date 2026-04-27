@@ -26,16 +26,6 @@
 //!   POST   /rooms/:room_id/entities
 //!   DELETE /rooms/:room_id/entities/:entity_id
 //!
-//! Pages & widgets:
-//!   GET    /instances/:instance_id/pages
-//!   POST   /instances/:instance_id/pages
-//!   PATCH  /pages/:page_id
-//!   DELETE /pages/:page_id
-//!   GET    /pages/:page_id/widgets
-//!   POST   /pages/:page_id/widgets
-//!   PATCH  /widgets/:widget_id
-//!   DELETE /widgets/:widget_id
-//!
 //! Data plane (SSE):
 //!   GET    /data/instances/:id/events
 
@@ -82,7 +72,7 @@ pub async fn spawn(service: &str, ctx: Arc<AppCtx>) -> anyhow::Result<DataPlaneS
 }
 
 fn build_router(ctx: Arc<AppCtx>) -> Router {
-    use handlers::{entities, instances, pages, rooms, services, sse};
+    use handlers::{entities, instances, rooms, services, sse};
 
     Router::new()
         // ── Instance CRUD ─────────────────────────────────────────────────
@@ -127,23 +117,6 @@ fn build_router(ctx: Arc<AppCtx>) -> Router {
         .route(
             "/rooms/{room_id}/entities/{entity_id}",
             delete(rooms::remove_entity),
-        )
-        // ── Pages ────────────────────────────────────────────────────────
-        .route(
-            "/instances/{instance_id}/pages",
-            get(pages::list).post(pages::create),
-        )
-        .route(
-            "/pages/{page_id}",
-            patch(pages::update).delete(pages::delete),
-        )
-        .route(
-            "/pages/{page_id}/widgets",
-            get(pages::list_widgets).post(pages::create_widget),
-        )
-        .route(
-            "/widgets/{widget_id}",
-            patch(pages::update_widget).delete(pages::delete_widget),
         )
         // ── SSE data plane ───────────────────────────────────────────────
         .route("/data/instances/{id}/events", get(sse::events))
