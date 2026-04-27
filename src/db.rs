@@ -18,6 +18,10 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "0003_entity_display",
         include_str!("../migrations/0003_entity_display.sql"),
     ),
+    (
+        "0004_entity_overrides_multi_instance",
+        include_str!("../migrations/0004_entity_overrides_multi_instance.sql"),
+    ),
 ];
 
 pub async fn init_pool() -> anyhow::Result<PgPool> {
