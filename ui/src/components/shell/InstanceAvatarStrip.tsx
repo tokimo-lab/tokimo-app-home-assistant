@@ -44,6 +44,8 @@ interface InstanceAvatarStripProps {
   isManaging: boolean;
   onSelectInstance: (id: string) => void;
   onManageInstances: () => void;
+  onOpenSettings: () => void;
+  onContextMenuInstance: (id: string) => void;
   t: (k: string) => string;
 }
 
@@ -54,6 +56,8 @@ export function InstanceAvatarStrip({
   isManaging,
   onSelectInstance,
   onManageInstances,
+  onOpenSettings,
+  onContextMenuInstance,
   t,
 }: InstanceAvatarStripProps) {
   return (
@@ -71,6 +75,10 @@ export function InstanceAvatarStrip({
               type="button"
               title={inst.name}
               onClick={() => onSelectInstance(inst.id)}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                onContextMenuInstance(inst.id);
+              }}
               className={`relative flex size-10 cursor-pointer items-center justify-center rounded-xl transition-all ${
                 isActive
                   ? "bg-white/[0.08] ring-2 ring-[var(--accent,#6366f1)]"
@@ -90,6 +98,16 @@ export function InstanceAvatarStrip({
       </div>
 
       <div className="flex flex-col items-center gap-1 pt-2">
+        {instances.length > 0 && (
+          <button
+            type="button"
+            title={t("settingsTitle")}
+            onClick={onOpenSettings}
+            className="flex size-9 cursor-pointer items-center justify-center rounded-lg text-[var(--text-muted,#9ca3af)] transition-all hover:bg-white/[0.08] hover:text-[var(--text-secondary)]"
+          >
+            <Settings className="size-4" />
+          </button>
+        )}
         <button
           type="button"
           title={
@@ -105,7 +123,7 @@ export function InstanceAvatarStrip({
           {instances.length === 0 ? (
             <Plus className="size-4" />
           ) : (
-            <Settings className="size-4" />
+            <Plus className="size-4" />
           )}
         </button>
       </div>
