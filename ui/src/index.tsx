@@ -12,10 +12,15 @@ import {
   enUS as uiEnUS,
   zhCN as uiZhCN,
 } from "@tokimo/ui";
-import { StrictMode, useEffect, useMemo } from "react";
+import { StrictMode, useEffect, useMemo, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { HomeView } from "./components/home/HomeView";
 import { RoomDetailView } from "./components/home/RoomDetailView";
+import {
+  SettingsPane,
+  type SettingsTab,
+} from "./components/settings/SettingsPane";
+import { AnimatedSettingsPane } from "./components/shell/AnimatedSettingsPane";
 import { AppShell } from "./components/shell/AppShell";
 import { enUS, zhCN } from "./i18n";
 import "./index.css";
@@ -80,7 +85,18 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
   const { call: onCall, getPending } = useCallService(instanceId, ctx);
 
   // ── Rooms (for HomeView grouping + room detail navigation) ───────────────
-  const { rooms } = useRooms(instanceId);
+  const { rooms, editRoom, reload: reloadRooms } = useRooms(instanceId);
+
+  // ── Settings pane ────────────────────────────────────────────────────────
+  const [settingsTab, setSettingsTab] = useState<SettingsTab | null>(null);
+  // Close the pane whenever the active instance changes (URL or list reconcile),
+  // unless we're explicitly reopening it (e.g. avatar right-click which sets
+  // both in the same React event).
+  useEffect(() => {
+    setSettingsTab(null);
+  }, []);
+  const openSettings = (tab: SettingsTab) => setSettingsTab(tab);
+  const closeSettings = () => setSettingsTab(null);
 
   // ── Sync activeInstanceStore ─────────────────────────────────────────────
   useEffect(() => {
@@ -194,6 +210,16 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
         onNavigateToInstances={() =>
           nav.navigate("/instances", t("instancesTitle"))
         }
+        onOpenSettings={() => {
+          if (effectiveInstanceId) {
+            navigateTo(`/instance/${effectiveInstanceId}/home`);
+            openSettings("family");
+          }
+        }}
+        onContextMenuInstance={(id) => {
+          navigateTo(`/instance/${id}/home`);
+          openSettings("family");
+        }}
       >
         <InstancesPage
           t={t}
@@ -223,6 +249,13 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
       onNavigateToInstances={() =>
         nav.navigate("/instances", t("instancesTitle"))
       }
+      onOpenSettings={() => openSettings("family")}
+      onContextMenuInstance={(id) => {
+        if (id !== instanceId) {
+          navigateTo(`/instance/${id}/home`);
+        }
+        openSettings("family");
+      }}
     >
       {parsed.page === "home" && activeInstance && (
         <HomeView
@@ -234,9 +267,7 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
           onOpenRoom={(rid) =>
             navigateTo(`/instance/${activeInstance.id}/room/${rid}`)
           }
-          onOpenSettings={() => {
-            // TODO R7p: open AnimatedSettingsPane for this instance.
-          }}
+          onOpenSettings={() => openSettings("family")}
           onToggleEdit={() => {
             // TODO R6p: enter Home edit mode.
           }}
@@ -258,6 +289,32 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
           t={t}
         />
       )}
+
+      <AnimatedSettingsPane open={settingsTab !== null}>
+        {settingsTab !== null && effectiveInstanceId && (
+          <SettingsPane
+            instanceId={effectiveInstanceId}
+            tab={settingsTab}
+            onTabChange={(tab) => setSettingsTab(tab)}
+            onClose={closeSettings}
+            onInstanceDeleted={() => {
+              closeSettings();
+              const remaining = instances.filter(
+                (i) => i.id !== effectiveInstanceId,
+              );
+              if (remaining.length > 0) {
+                navigateTo(`/instance/${remaining[0].id}/home`);
+              } else {
+                nav.replace("/setup", "Home Assistant");
+              }
+            }}
+            rooms={rooms}
+            onEditRoom={editRoom}
+            onReloadRooms={reloadRooms}
+            t={t}
+          />
+        )}
+      </AnimatedSettingsPane>
     </AppShell>
   );
 }

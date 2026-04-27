@@ -11,6 +11,8 @@ interface AppShellProps {
   t: (k: string) => string;
   onNavigate: (path: string) => void;
   onNavigateToInstances: () => void;
+  onOpenSettings: () => void;
+  onContextMenuInstance: (id: string) => void;
 }
 
 export function AppShell({
@@ -22,11 +24,13 @@ export function AppShell({
   t,
   onNavigate,
   onNavigateToInstances,
+  onOpenSettings,
+  onContextMenuInstance,
 }: AppShellProps) {
   const isManaging = subPage === "instances";
 
   return (
-    <div className="flex h-full w-full overflow-hidden">
+    <div className="relative flex h-full w-full overflow-hidden">
       <InstanceAvatarStrip
         instances={instances}
         activeInstanceId={activeInstanceId}
@@ -34,9 +38,11 @@ export function AppShell({
         isManaging={isManaging}
         onSelectInstance={(id) => onNavigate(`/instance/${id}/home`)}
         onManageInstances={onNavigateToInstances}
+        onOpenSettings={onOpenSettings}
+        onContextMenuInstance={onContextMenuInstance}
         t={t}
       />
-      <main className="flex-1 overflow-auto">{children}</main>
+      <main className="relative flex-1 overflow-auto">{children}</main>
     </div>
   );
 }
