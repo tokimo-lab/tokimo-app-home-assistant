@@ -14,6 +14,10 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "0002_rooms_instance_id",
         include_str!("../migrations/0002_rooms_instance_id.sql"),
     ),
+    (
+        "0003_entity_display",
+        include_str!("../migrations/0003_entity_display.sql"),
+    ),
 ];
 
 pub async fn init_pool() -> anyhow::Result<PgPool> {
