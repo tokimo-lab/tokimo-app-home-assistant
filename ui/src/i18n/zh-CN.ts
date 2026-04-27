@@ -1,0 +1,159 @@
+export const zhCN: Record<string, string> = {
+  // App
+  appTitle: "Home Assistant",
+  appSubtitle: "智能家居控制",
+
+  // Nav
+  navHome: "主页",
+  navRooms: "房间",
+  navDevices: "所有设备",
+  navInstances: "连接",
+
+  // Setup
+  setupTitle: "连接 Home Assistant",
+  setupSubtitle: "添加您的第一个 Home Assistant 实例以开始使用。",
+  setupAddButton: "添加实例",
+
+  // Instances
+  instancesTitle: "连接管理",
+  instancesAdd: "添加连接",
+  instancesEdit: "编辑",
+  instancesDelete: "删除",
+  instancesTest: "测试",
+  instancesTesting: "测试中…",
+  instancesTestOk: "连接成功",
+  instancesTestFail: "连接失败",
+  instancesName: "名称",
+  instancesUrl: "基础 URL",
+  instancesToken: "长期访问令牌",
+  instancesVerifyTls: "验证 TLS",
+  instancesSave: "保存",
+  instancesCancel: "取消",
+  instancesDeleteConfirm: "确定删除此连接？",
+  instancesUrlPlaceholder: "http://homeassistant.local:8123",
+  instancesTokenPlaceholder: "eyJ0eXAiOiJKV1Q…",
+  instancesNamePlaceholder: "我的家",
+  instancesAddTitle: "添加连接",
+  instancesEditTitle: "编辑连接",
+  instancesVersion: "版本",
+
+  // Connection status
+  connConnected: "已连接",
+  connDisconnected: "已断开",
+  connConnecting: "连接中…",
+  connError: "连接错误",
+  connReconnecting: "重连中…",
+
+  // States
+  stateOn: "开启",
+  stateOff: "关闭",
+  stateOpen: "打开",
+  stateClosed: "关闭",
+  stateOpening: "打开中",
+  stateClosing: "关闭中",
+  stateLocked: "已锁定",
+  stateUnlocked: "已解锁",
+  statePlaying: "播放中",
+  statePaused: "已暂停",
+  stateIdle: "空闲",
+  stateUnavailable: "不可用",
+  stateUnknown: "未知",
+  stateActive: "活跃",
+  stateCleaning: "清扫中",
+  stateDocked: "已停靠",
+
+  // Vacuum states
+  vacuumState_cleaning: "清扫中",
+  vacuumState_docked: "已停靠",
+  vacuumState_idle: "空闲",
+  vacuumState_paused: "已暂停",
+  vacuumState_returning: "返回中",
+  vacuumState_error: "错误",
+
+  // Domains
+  domainLight: "灯光",
+  domainSwitch: "开关",
+  domainCover: "遮帘",
+  domainClimate: "空调",
+  domainFan: "风扇",
+  domainLock: "锁",
+  domainMediaPlayer: "媒体播放器",
+  domainScene: "场景",
+  domainScript: "脚本",
+  domainBinarySensor: "传感器",
+  domainSensor: "传感器",
+  domainCamera: "摄像头",
+  domainVacuum: "扫地机",
+  domainAutomation: "自动化",
+  domainInputBoolean: "辅助开关",
+
+  // Tile actions
+  tileBrightness: "亮度",
+  tileColorTemp: "色温",
+  tilePosition: "位置",
+  tileTemperature: "温度",
+  tileTargetTemp: "目标温度",
+  tileHvacMode: "模式",
+  tileFanSpeed: "风速",
+  tileOscillate: "摆风",
+  tileVolume: "音量",
+  tileMute: "静音",
+  tileActivate: "激活",
+  tileStart: "开始",
+  tileDock: "停靠",
+  tilePause: "暂停",
+  tilePlay: "播放",
+  tileNext: "下一首",
+
+  // Rooms
+  roomsTitle: "房间管理",
+  roomsAdd: "添加房间",
+  roomsEdit: "编辑",
+  roomsDelete: "删除",
+  roomsSyncAreas: "从 HA 同步区域",
+  roomsSyncing: "同步中…",
+  roomsSyncDone: "同步完成",
+  roomsName: "房间名称",
+  roomsNamePlaceholder: "客厅",
+  roomsSave: "保存",
+  roomsCancel: "取消",
+  roomsAssignEntities: "分配实体",
+  roomsNoEntities: "暂无实体",
+  roomsDeleteConfirm: "确定删除此房间？",
+
+  // Devices
+  devicesTitle: "所有设备",
+  devicesSearch: "搜索实体…",
+  devicesFilterAll: "全部",
+  devicesNoResults: "未找到实体",
+
+  // Favourites
+  favouritesTitle: "收藏",
+  favouritesEmpty: "还没有收藏的实体",
+
+  // Home
+  homeAllRooms: "所有房间",
+  homeEmpty: "此视图中没有实体",
+
+  // Errors
+  errorLoad: "加载失败",
+  errorSave: "保存失败",
+  errorDelete: "删除失败",
+  errorTest: "连接测试失败",
+  errorCallService: "操作失败 — 已撤销",
+  errorTimeout: "无响应 — 已撤销",
+
+  // General
+  loading: "加载中…",
+  saving: "保存中…",
+  retry: "重试",
+  close: "关闭",
+  confirm: "确认",
+  cancel: "取消",
+  delete: "删除",
+  edit: "编辑",
+  add: "添加",
+  save: "保存",
+  noInstances: "尚未配置连接",
+  refresh: "刷新",
+};

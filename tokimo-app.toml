@@ -1,0 +1,22 @@
+# Tokimo app manifest
+[app]
+id          = "home-assistant"
+display     = "Home"
+version     = "0.1.0"
+description = "Connect to your Home Assistant instance with an Apple Home–inspired UI."
+
+[runtime]
+lifecycle    = "resident"
+db_schema    = "home_assistant"
+binary       = "tokimo-app-home-assistant"
+ui_dist      = "ui/dist"
+
+[ui]
+entry        = "assets/index.js"
+window_type  = "home-assistant"
+category     = "app"
+icon         = "Home"
+image        = "icon.png"
+color        = "#fb923c"
+width        = 1080
+height       = 720
