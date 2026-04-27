@@ -16,11 +16,7 @@ pub struct HaApiRoot {
 }
 
 /// Call `GET <base_url>/api/` and return version string if present.
-pub async fn test_connection(
-    http: &Client,
-    base_url: &str,
-    access_token: &str,
-) -> Result<Option<String>, AppError> {
+pub async fn test_connection(http: &Client, base_url: &str, access_token: &str) -> Result<Option<String>, AppError> {
     let url = format!("{}/api/", base_url.trim_end_matches('/'));
     debug!(%url, "HA test connection");
 
@@ -35,10 +31,7 @@ pub async fn test_connection(
         return Err(AppError::unauthorized("HA rejected the access token"));
     }
     if !resp.status().is_success() {
-        return Err(AppError::bad_gateway(format!(
-            "HA returned HTTP {}",
-            resp.status()
-        )));
+        return Err(AppError::bad_gateway(format!("HA returned HTTP {}", resp.status())));
     }
 
     let body: serde_json::Value = resp
@@ -46,10 +39,7 @@ pub async fn test_connection(
         .await
         .map_err(|e| AppError::bad_gateway(format!("HA response parse: {e}")))?;
 
-    let version = body
-        .get("version")
-        .and_then(|v| v.as_str())
-        .map(str::to_string);
+    let version = body.get("version").and_then(|v| v.as_str()).map(str::to_string);
 
     Ok(version)
 }
@@ -64,12 +54,7 @@ pub async fn call_service(
     service: &str,
     body: serde_json::Value,
 ) -> Result<serde_json::Value, AppError> {
-    let url = format!(
-        "{}/api/services/{}/{}",
-        base_url.trim_end_matches('/'),
-        domain,
-        service
-    );
+    let url = format!("{}/api/services/{}/{}", base_url.trim_end_matches('/'), domain, service);
     debug!(%url, "HA service call");
 
     let resp = http
@@ -86,9 +71,7 @@ pub async fn call_service(
     if !resp.status().is_success() {
         let status = resp.status();
         let text = resp.text().await.unwrap_or_default();
-        return Err(AppError::bad_gateway(format!(
-            "HA service call HTTP {status}: {text}"
-        )));
+        return Err(AppError::bad_gateway(format!("HA service call HTTP {status}: {text}")));
     }
 
     let value: serde_json::Value = resp
@@ -105,10 +88,7 @@ pub async fn get_area_registry(
     base_url: &str,
     access_token: &str,
 ) -> Result<serde_json::Value, AppError> {
-    let url = format!(
-        "{}/api/config/area_registry/list",
-        base_url.trim_end_matches('/')
-    );
+    let url = format!("{}/api/config/area_registry/list", base_url.trim_end_matches('/'));
     debug!(%url, "HA area registry fetch");
 
     let resp = http
@@ -123,9 +103,7 @@ pub async fn get_area_registry(
     }
     if !resp.status().is_success() {
         let status = resp.status();
-        return Err(AppError::bad_gateway(format!(
-            "HA area registry HTTP {status}"
-        )));
+        return Err(AppError::bad_gateway(format!("HA area registry HTTP {status}")));
     }
 
     let value: serde_json::Value = resp

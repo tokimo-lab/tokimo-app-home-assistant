@@ -8,8 +8,8 @@
 //! per instance. Supervisors are fully detached (errors are logged, never
 //! propagated) so one offline HA cannot block others.
 
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
@@ -113,10 +113,7 @@ pub enum EntityEvent {
 pub enum ConnStatus {
     Connecting,
     Connected,
-    Disconnected {
-        since: DateTime<Utc>,
-        reason: String,
-    },
+    Disconnected { since: DateTime<Utc>, reason: String },
     Failed(String),
 }
 
@@ -221,7 +218,11 @@ impl ConnectionPool {
         .await?;
 
         for (id, base_url, access_token, verify_tls) in rows {
-            let config = InstanceConfig { base_url, access_token, verify_tls };
+            let config = InstanceConfig {
+                base_url,
+                access_token,
+                verify_tls,
+            };
             let ctx = InstanceCtx::new(id, config);
             cp.instances.insert(id, Arc::clone(&ctx));
             spawn_supervisor(Arc::clone(&ctx), pool.clone());
@@ -317,9 +318,13 @@ pub fn spawn_supervisor(instance: Arc<InstanceCtx>, pool: PgPool) {
                             reason: reason.clone(),
                         });
                     }
-                    let _ = instance.store.tx.send(EntityEvent::Status(Arc::new(
-                        ConnStatus::Disconnected { since, reason },
-                    )));
+                    let _ = instance
+                        .store
+                        .tx
+                        .send(EntityEvent::Status(Arc::new(ConnStatus::Disconnected {
+                            since,
+                            reason,
+                        })));
 
                     // Exponential backoff capped at 30s.
                     tokio::select! {

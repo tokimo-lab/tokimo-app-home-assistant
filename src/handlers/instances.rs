@@ -3,22 +3,23 @@
 use std::net::{IpAddr, Ipv6Addr};
 use std::sync::Arc;
 
-use axum::{Json, extract::{Path, State}};
+use axum::{
+    Json,
+    extract::{Path, State},
+};
 use serde::Deserialize;
 use sqlx::Row;
 use tracing::info;
 use url::{Host, Url};
 use uuid::Uuid;
 
+use super::{AppCtx, InstanceDto, MaskedToken, instance_status_value};
 use crate::error::AppError;
 use crate::state::{InstanceConfig, InstanceCtx};
-use super::{AppCtx, InstanceDto, MaskedToken, instance_status_value};
 
 // ─── List ─────────────────────────────────────────────────────────────────────
 
-pub async fn list(
-    State(ctx): State<Arc<AppCtx>>,
-) -> Result<Json<Vec<InstanceDto>>, AppError> {
+pub async fn list(State(ctx): State<Arc<AppCtx>>) -> Result<Json<Vec<InstanceDto>>, AppError> {
     let rows = sqlx::query(
         "SELECT id, name, base_url, access_token, verify_tls, last_connected_at, created_at, updated_at
          FROM instances ORDER BY created_at",
@@ -47,10 +48,7 @@ pub async fn list(
 
 // ─── Get ──────────────────────────────────────────────────────────────────────
 
-pub async fn get(
-    State(ctx): State<Arc<AppCtx>>,
-    Path(id): Path<Uuid>,
-) -> Result<Json<InstanceDto>, AppError> {
+pub async fn get(State(ctx): State<Arc<AppCtx>>, Path(id): Path<Uuid>) -> Result<Json<InstanceDto>, AppError> {
     let r = sqlx::query(
         "SELECT id, name, base_url, access_token, verify_tls, last_connected_at, created_at, updated_at
          FROM instances WHERE id = $1",
@@ -83,10 +81,7 @@ pub struct CreateReq {
     pub verify_tls: Option<bool>,
 }
 
-pub async fn create(
-    State(ctx): State<Arc<AppCtx>>,
-    Json(req): Json<CreateReq>,
-) -> Result<Json<InstanceDto>, AppError> {
+pub async fn create(State(ctx): State<Arc<AppCtx>>, Json(req): Json<CreateReq>) -> Result<Json<InstanceDto>, AppError> {
     validate_base_url(&req.base_url).await?;
 
     let name = req.name.unwrap_or_else(|| "My Home Assistant".to_string());
@@ -151,18 +146,13 @@ pub async fn update(
     }
 
     // Fetch current values.
-    let current = sqlx::query(
-        "SELECT base_url, access_token, verify_tls FROM instances WHERE id = $1",
-    )
-    .bind(id)
-    .fetch_one(&ctx.pool)
-    .await?;
+    let current = sqlx::query("SELECT base_url, access_token, verify_tls FROM instances WHERE id = $1")
+        .bind(id)
+        .fetch_one(&ctx.pool)
+        .await?;
 
     let new_base_url = req.base_url.as_deref().unwrap_or(current.get("base_url"));
-    let new_token = req
-        .access_token
-        .as_deref()
-        .unwrap_or(current.get("access_token"));
+    let new_token = req.access_token.as_deref().unwrap_or(current.get("access_token"));
     let new_verify_tls: bool = req.verify_tls.unwrap_or(current.get("verify_tls"));
 
     let r = sqlx::query(
@@ -184,8 +174,7 @@ pub async fn update(
     .await?;
 
     // Restart supervisor when any connection-relevant field changed.
-    let conn_changed =
-        req.base_url.is_some() || req.access_token.is_some() || req.verify_tls.is_some();
+    let conn_changed = req.base_url.is_some() || req.access_token.is_some() || req.verify_tls.is_some();
     if conn_changed {
         info!(%id, "instance: config changed, restarting supervisor");
         ctx.conn_pool
@@ -220,10 +209,7 @@ pub struct DeleteResp {
     deleted: bool,
 }
 
-pub async fn delete(
-    State(ctx): State<Arc<AppCtx>>,
-    Path(id): Path<Uuid>,
-) -> Result<Json<DeleteResp>, AppError> {
+pub async fn delete(State(ctx): State<Arc<AppCtx>>, Path(id): Path<Uuid>) -> Result<Json<DeleteResp>, AppError> {
     ctx.conn_pool.remove_instance(id);
     let res = sqlx::query("DELETE FROM instances WHERE id = $1")
         .bind(id)
@@ -245,10 +231,7 @@ pub struct TestResp {
     error: Option<String>,
 }
 
-pub async fn test(
-    State(ctx): State<Arc<AppCtx>>,
-    Path(id): Path<Uuid>,
-) -> Result<Json<TestResp>, AppError> {
+pub async fn test(State(ctx): State<Arc<AppCtx>>, Path(id): Path<Uuid>) -> Result<Json<TestResp>, AppError> {
     let r = sqlx::query("SELECT base_url, access_token, verify_tls FROM instances WHERE id = $1")
         .bind(id)
         .fetch_one(&ctx.pool)
@@ -261,8 +244,16 @@ pub async fn test(
     let http = super::instance_http_client(&ctx, id, verify_tls);
 
     match crate::ha::rest::test_connection(&http, &base_url, &access_token).await {
-        Ok(version) => Ok(Json(TestResp { ok: true, version, error: None })),
-        Err(e) => Ok(Json(TestResp { ok: false, version: None, error: Some(e.message) })),
+        Ok(version) => Ok(Json(TestResp {
+            ok: true,
+            version,
+            error: None,
+        })),
+        Err(e) => Ok(Json(TestResp {
+            ok: false,
+            version: None,
+            error: Some(e.message),
+        })),
     }
 }
 
@@ -273,10 +264,7 @@ pub struct StatusResp {
     connection: serde_json::Value,
 }
 
-pub async fn status(
-    State(ctx): State<Arc<AppCtx>>,
-    Path(id): Path<Uuid>,
-) -> Result<Json<StatusResp>, AppError> {
+pub async fn status(State(ctx): State<Arc<AppCtx>>, Path(id): Path<Uuid>) -> Result<Json<StatusResp>, AppError> {
     let instance = ctx
         .conn_pool
         .instances
@@ -286,8 +274,8 @@ pub async fn status(
         .clone();
 
     let status = instance.status.read().await;
-    let connection = serde_json::to_value(&**status)
-        .map_err(|e| AppError::internal(format!("serialize status: {e}")))?;
+    let connection =
+        serde_json::to_value(&**status).map_err(|e| AppError::internal(format!("serialize status: {e}")))?;
 
     Ok(Json(StatusResp { connection }))
 }
@@ -295,8 +283,7 @@ pub async fn status(
 // ─── SSRF guard ───────────────────────────────────────────────────────────────
 
 async fn validate_base_url(raw: &str) -> Result<(), AppError> {
-    let url =
-        Url::parse(raw).map_err(|e| AppError::bad_request(format!("invalid base_url: {e}")))?;
+    let url = Url::parse(raw).map_err(|e| AppError::bad_request(format!("invalid base_url: {e}")))?;
     match url.scheme() {
         "http" | "https" => {}
         other => {
@@ -319,9 +306,7 @@ async fn validate_base_url(raw: &str) -> Result<(), AppError> {
             let port = url.port_or_known_default().unwrap_or(0);
             let addrs = tokio::net::lookup_host((domain, port))
                 .await
-                .map_err(|e| {
-                    AppError::bad_request(format!("DNS resolve failed for {domain}: {e}"))
-                })?;
+                .map_err(|e| AppError::bad_request(format!("DNS resolve failed for {domain}: {e}")))?;
             let mut any = false;
             for sa in addrs {
                 any = true;
@@ -339,9 +324,7 @@ async fn validate_base_url(raw: &str) -> Result<(), AppError> {
 
 fn ensure_ip_allowed(host: &str, ip: IpAddr) -> Result<(), AppError> {
     if is_restricted_ip(ip) {
-        return Err(AppError::bad_request(format!(
-            "URL 指向受限网络: {host} ({ip})"
-        )));
+        return Err(AppError::bad_request(format!("URL 指向受限网络: {host} ({ip})")));
     }
     Ok(())
 }

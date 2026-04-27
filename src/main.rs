@@ -27,9 +27,8 @@ use tracing::{error, info};
 async fn main() {
     tracing_subscriber::fmt()
         .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-                "info,tokimo_bus_client=info,tokimo_app_home_assistant=debug".into()
-            }),
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| "info,tokimo_bus_client=info,tokimo_app_home_assistant=debug".into()),
         )
         .init();
 

@@ -14,9 +14,9 @@ use axum::response::sse::{Event, KeepAlive, Sse};
 use futures_util::Stream;
 use uuid::Uuid;
 
+use super::AppCtx;
 use crate::error::AppError;
 use crate::state::EntityEvent;
-use super::AppCtx;
 
 pub async fn events(
     State(ctx): State<Arc<AppCtx>>,
@@ -34,12 +34,7 @@ pub async fn events(
     let mut rx = instance.store.tx.subscribe();
 
     // Build initial snapshot.
-    let snapshot: Vec<crate::state::EntityState> = instance
-        .store
-        .states
-        .iter()
-        .map(|e| e.value().clone())
-        .collect();
+    let snapshot: Vec<crate::state::EntityState> = instance.store.states.iter().map(|e| e.value().clone()).collect();
 
     let s = stream! {
         // Initial snapshot.
@@ -97,7 +92,5 @@ pub async fn events(
         }
     };
 
-    Ok(Sse::new(s).keep_alive(
-        KeepAlive::default().interval(Duration::from_secs(10)),
-    ))
+    Ok(Sse::new(s).keep_alive(KeepAlive::default().interval(Duration::from_secs(10))))
 }

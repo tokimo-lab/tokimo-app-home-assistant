@@ -105,8 +105,8 @@ pub async fn run_connection(instance: Arc<InstanceCtx>, pool: sqlx::PgPool) -> a
         anyhow::bail!("get_states returned success=false: {:?}", msg.error);
     }
     if let Some(result) = msg.result {
-        let states: Vec<EntityState> = serde_json::from_value(result)
-            .map_err(|e| anyhow::anyhow!("parse states: {e}"))?;
+        let states: Vec<EntityState> =
+            serde_json::from_value(result).map_err(|e| anyhow::anyhow!("parse states: {e}"))?;
         let snapshot = states.clone();
         instance.store.states.clear();
         for s in states {
@@ -121,8 +121,7 @@ pub async fn run_connection(instance: Arc<InstanceCtx>, pool: sqlx::PgPool) -> a
     let id_subscribe: u64 = 2;
     stream
         .send(Message::Text(
-            json!({"id": id_subscribe, "type": "subscribe_events", "event_type": "state_changed"})
-                .to_string(),
+            json!({"id": id_subscribe, "type": "subscribe_events", "event_type": "state_changed"}).to_string(),
         ))
         .await
         .map_err(|e| anyhow::anyhow!("WS send subscribe_events: {e}"))?;
@@ -220,10 +219,7 @@ fn handle_event_msg(instance: &Arc<InstanceCtx>, msg: WsMsg) {
     }
     let Some(event_val) = msg.event else { return };
 
-    let event_type = event_val
-        .get("event_type")
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
+    let event_type = event_val.get("event_type").and_then(|v| v.as_str()).unwrap_or("");
 
     if event_type != "state_changed" {
         return;
@@ -266,8 +262,8 @@ where
             None => anyhow::bail!("WS stream closed unexpectedly"),
             Some(Err(e)) => anyhow::bail!("WS read: {e}"),
             Some(Ok(Message::Text(text))) => {
-                let msg: WsMsg = serde_json::from_str(&text)
-                    .map_err(|e| anyhow::anyhow!("WS parse: {e} — raw: {text}"))?;
+                let msg: WsMsg =
+                    serde_json::from_str(&text).map_err(|e| anyhow::anyhow!("WS parse: {e} — raw: {text}"))?;
                 return Ok(msg);
             }
             Some(Ok(Message::Close(_))) => anyhow::bail!("WS closed"),

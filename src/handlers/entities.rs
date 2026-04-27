@@ -2,15 +2,18 @@
 
 use std::sync::Arc;
 
-use axum::{Json, extract::{Path, State}};
+use axum::{
+    Json,
+    extract::{Path, State},
+};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::Row;
 use uuid::Uuid;
 
+use super::AppCtx;
 use crate::error::AppError;
 use crate::state::EntityState;
-use super::AppCtx;
 
 // ─── Entity DTO (state + optional override) ───────────────────────────────────
 
@@ -53,11 +56,9 @@ struct OverrideRow {
 }
 
 async fn load_overrides(pool: &sqlx::PgPool) -> Result<Vec<OverrideRow>, AppError> {
-    let rows = sqlx::query(
-        "SELECT entity_id, custom_name, custom_icon, hidden, favourite FROM entity_overrides",
-    )
-    .fetch_all(pool)
-    .await?;
+    let rows = sqlx::query("SELECT entity_id, custom_name, custom_icon, hidden, favourite FROM entity_overrides")
+        .fetch_all(pool)
+        .await?;
     Ok(rows
         .into_iter()
         .map(|r| OverrideRow {
@@ -72,10 +73,7 @@ async fn load_overrides(pool: &sqlx::PgPool) -> Result<Vec<OverrideRow>, AppErro
 
 // ─── List entities ────────────────────────────────────────────────────────────
 
-pub async fn list(
-    State(ctx): State<Arc<AppCtx>>,
-    Path(id): Path<Uuid>,
-) -> Result<Json<Vec<EntityDto>>, AppError> {
+pub async fn list(State(ctx): State<Arc<AppCtx>>, Path(id): Path<Uuid>) -> Result<Json<Vec<EntityDto>>, AppError> {
     let instance = ctx
         .conn_pool
         .instances
@@ -219,15 +217,10 @@ pub async fn capabilities(
         .value()
         .clone();
 
-    let mut domains: std::collections::HashMap<String, DomainCapabilities> =
-        std::collections::HashMap::new();
+    let mut domains: std::collections::HashMap<String, DomainCapabilities> = std::collections::HashMap::new();
 
     for entry in instance.store.states.iter() {
-        let domain = entry
-            .key().split('.')
-            .next()
-            .unwrap_or("unknown")
-            .to_string();
+        let domain = entry.key().split('.').next().unwrap_or("unknown").to_string();
         let cap = domains.entry(domain).or_insert(DomainCapabilities {
             count: 0,
             entity_ids: Vec::new(),

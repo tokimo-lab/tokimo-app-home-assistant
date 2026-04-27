@@ -42,8 +42,7 @@ use tracing::{error, info};
 use crate::{assets, handlers, handlers::AppCtx};
 
 fn default_socket_path(service: &str) -> anyhow::Result<PathBuf> {
-    let bus = std::env::var("TOKIMO_BUS_SOCKET")
-        .map_err(|_| anyhow::anyhow!("TOKIMO_BUS_SOCKET not set"))?;
+    let bus = std::env::var("TOKIMO_BUS_SOCKET").map_err(|_| anyhow::anyhow!("TOKIMO_BUS_SOCKET not set"))?;
     let parent = PathBuf::from(&bus)
         .parent()
         .ok_or_else(|| anyhow::anyhow!("TOKIMO_BUS_SOCKET has no parent"))?

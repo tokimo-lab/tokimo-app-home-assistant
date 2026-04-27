@@ -2,14 +2,17 @@
 
 use std::sync::Arc;
 
-use axum::{Json, extract::{Path, State}};
+use axum::{
+    Json,
+    extract::{Path, State},
+};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::Row;
 use uuid::Uuid;
 
-use crate::error::AppError;
 use super::AppCtx;
+use crate::error::AppError;
 
 // ─── DTOs ─────────────────────────────────────────────────────────────────────
 
@@ -64,22 +67,20 @@ async fn load_rooms(pool: &sqlx::PgPool, instance_id: Uuid) -> Result<Vec<RoomDt
         }
         let entity_id: Option<String> = r.get("entity_id");
         if let Some(eid) = entity_id
-            && let Some(room) = rooms.last_mut() {
-                room.entities.push(RoomEntityDto {
-                    entity_id: eid,
-                    sort_order: r.get("entity_sort_order"),
-                });
-            }
+            && let Some(room) = rooms.last_mut()
+        {
+            room.entities.push(RoomEntityDto {
+                entity_id: eid,
+                sort_order: r.get("entity_sort_order"),
+            });
+        }
     }
     Ok(rooms)
 }
 
 // ─── List rooms ───────────────────────────────────────────────────────────────
 
-pub async fn list(
-    State(ctx): State<Arc<AppCtx>>,
-    Path(id): Path<Uuid>,
-) -> Result<Json<Vec<RoomDto>>, AppError> {
+pub async fn list(State(ctx): State<Arc<AppCtx>>, Path(id): Path<Uuid>) -> Result<Json<Vec<RoomDto>>, AppError> {
     let rooms = load_rooms(&ctx.pool, id).await?;
     Ok(Json(rooms))
 }
@@ -164,18 +165,17 @@ pub async fn update(
     .fetch_one(&ctx.pool)
     .await?;
 
-    let entities = sqlx::query(
-        "SELECT entity_id, sort_order FROM room_entities WHERE room_id = $1 ORDER BY sort_order",
-    )
-    .bind(room_id)
-    .fetch_all(&ctx.pool)
-    .await?
-    .into_iter()
-    .map(|e| RoomEntityDto {
-        entity_id: e.get("entity_id"),
-        sort_order: e.get("sort_order"),
-    })
-    .collect();
+    let entities =
+        sqlx::query("SELECT entity_id, sort_order FROM room_entities WHERE room_id = $1 ORDER BY sort_order")
+            .bind(room_id)
+            .fetch_all(&ctx.pool)
+            .await?
+            .into_iter()
+            .map(|e| RoomEntityDto {
+                entity_id: e.get("entity_id"),
+                sort_order: e.get("sort_order"),
+            })
+            .collect();
 
     Ok(Json(RoomDto {
         id: r.get("id"),
@@ -197,10 +197,7 @@ pub struct DeleteResp {
     deleted: bool,
 }
 
-pub async fn delete(
-    State(ctx): State<Arc<AppCtx>>,
-    Path(room_id): Path<Uuid>,
-) -> Result<Json<DeleteResp>, AppError> {
+pub async fn delete(State(ctx): State<Arc<AppCtx>>, Path(room_id): Path<Uuid>) -> Result<Json<DeleteResp>, AppError> {
     let res = sqlx::query("DELETE FROM rooms WHERE id = $1")
         .bind(room_id)
         .execute(&ctx.pool)
@@ -254,13 +251,11 @@ pub async fn remove_entity(
     State(ctx): State<Arc<AppCtx>>,
     Path((room_id, entity_id)): Path<(Uuid, String)>,
 ) -> Result<Json<DeleteResp>, AppError> {
-    let res = sqlx::query(
-        "DELETE FROM room_entities WHERE room_id = $1 AND entity_id = $2",
-    )
-    .bind(room_id)
-    .bind(&entity_id)
-    .execute(&ctx.pool)
-    .await?;
+    let res = sqlx::query("DELETE FROM room_entities WHERE room_id = $1 AND entity_id = $2")
+        .bind(room_id)
+        .bind(&entity_id)
+        .execute(&ctx.pool)
+        .await?;
     Ok(Json(DeleteResp {
         deleted: res.rows_affected() > 0,
     }))
@@ -273,10 +268,7 @@ pub struct SyncAreasResp {
     upserted: usize,
 }
 
-pub async fn sync_areas(
-    State(ctx): State<Arc<AppCtx>>,
-    Path(id): Path<Uuid>,
-) -> Result<Json<SyncAreasResp>, AppError> {
+pub async fn sync_areas(State(ctx): State<Arc<AppCtx>>, Path(id): Path<Uuid>) -> Result<Json<SyncAreasResp>, AppError> {
     let r = sqlx::query("SELECT base_url, access_token, verify_tls FROM instances WHERE id = $1")
         .bind(id)
         .fetch_one(&ctx.pool)
@@ -294,14 +286,8 @@ pub async fn sync_areas(
 
     let mut upserted = 0usize;
     for area in arr {
-        let ha_area_id = area
-            .get("area_id")
-            .and_then(|v| v.as_str())
-            .unwrap_or_default();
-        let name = area
-            .get("name")
-            .and_then(|v| v.as_str())
-            .unwrap_or(ha_area_id);
+        let ha_area_id = area.get("area_id").and_then(|v| v.as_str()).unwrap_or_default();
+        let name = area.get("name").and_then(|v| v.as_str()).unwrap_or(ha_area_id);
         if ha_area_id.is_empty() {
             continue;
         }
@@ -324,10 +310,7 @@ pub async fn sync_areas(
 
 // ─── Areas passthrough ────────────────────────────────────────────────────────
 
-pub async fn areas(
-    State(ctx): State<Arc<AppCtx>>,
-    Path(id): Path<Uuid>,
-) -> Result<Json<serde_json::Value>, AppError> {
+pub async fn areas(State(ctx): State<Arc<AppCtx>>, Path(id): Path<Uuid>) -> Result<Json<serde_json::Value>, AppError> {
     let r = sqlx::query("SELECT base_url, access_token, verify_tls FROM instances WHERE id = $1")
         .bind(id)
         .fetch_one(&ctx.pool)

@@ -2,14 +2,17 @@
 
 use std::sync::Arc;
 
-use axum::{Json, extract::{Path, State}};
+use axum::{
+    Json,
+    extract::{Path, State},
+};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sqlx::Row;
 use uuid::Uuid;
 
-use crate::error::AppError;
 use super::AppCtx;
+use crate::error::AppError;
 
 #[derive(Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
@@ -64,27 +67,18 @@ pub async fn call_service(
     };
 
     if let Some(target) = req.target
-        && let Some(entity_id) = target.entity_id {
-            let ids: Value = match entity_id {
-                EntityIdOrList::Single(s) => Value::String(s),
-                EntityIdOrList::Multiple(v) => Value::Array(
-                    v.into_iter().map(Value::String).collect(),
-                ),
-            };
-            if let Some(obj) = body.as_object_mut() {
-                obj.insert("entity_id".to_string(), ids);
-            }
+        && let Some(entity_id) = target.entity_id
+    {
+        let ids: Value = match entity_id {
+            EntityIdOrList::Single(s) => Value::String(s),
+            EntityIdOrList::Multiple(v) => Value::Array(v.into_iter().map(Value::String).collect()),
+        };
+        if let Some(obj) = body.as_object_mut() {
+            obj.insert("entity_id".to_string(), ids);
         }
+    }
 
-    let result = crate::ha::rest::call_service(
-        &http,
-        &base_url,
-        &access_token,
-        &domain,
-        &service,
-        body,
-    )
-    .await?;
+    let result = crate::ha::rest::call_service(&http, &base_url, &access_token, &domain, &service, body).await?;
 
     // Extract context.id from first item in result array (if present).
     let context_id = result

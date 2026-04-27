@@ -25,8 +25,7 @@ const MIGRATIONS: &[(&str, &str)] = &[
 ];
 
 pub async fn init_pool() -> anyhow::Result<PgPool> {
-    let url = std::env::var("DATABASE_URL")
-        .map_err(|_| anyhow::anyhow!("DATABASE_URL is required"))?;
+    let url = std::env::var("DATABASE_URL").map_err(|_| anyhow::anyhow!("DATABASE_URL is required"))?;
     let schema = std::env::var("DB_SCHEMA").unwrap_or_else(|_| "home_assistant".to_string());
 
     info!(schema = %schema, "home-assistant: connecting to postgres");
