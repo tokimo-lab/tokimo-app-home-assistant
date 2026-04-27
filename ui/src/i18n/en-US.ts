@@ -171,4 +171,27 @@ export const enUS: Record<string, string> = {
   save: "Save",
   noInstances: "No connections configured",
   refresh: "Refresh",
+
+  // Settings pane
+  settingsTitle: "Family Settings",
+  settingsRoomsTitle: "Rooms",
+  settingsFavoritesTitle: "Favorites",
+  settingsTabFamily: "Family",
+  settingsTabRooms: "Rooms",
+  settingsTabFavorites: "Favorites",
+  settingsFamilyName: "Family Name",
+  settingsFamilyUrl: "Server URL",
+  settingsFamilyToken: "Access Token",
+  settingsFamilyTokenPlaceholder:
+    "Paste a new long-lived access token (leave blank to keep current)",
+  settingsFamilyTokenSet: "Token set",
+  settingsFamilyVerifyTls: "Verify TLS certificate",
+  settingsSave: "Save",
+  settingsTest: "Test Connection",
+  settingsDelete: "Delete Family",
+  settingsDeleteConfirm: "Delete this family? This cannot be undone.",
+  settingsRoomsEmpty: "No rooms yet — sync areas from Home Assistant.",
+  settingsFavoritesEmpty: "No favorite entities yet.",
+  settingsRemoveFavorite: "Remove from favorites",
+  settingsClose: "Close",
 };
