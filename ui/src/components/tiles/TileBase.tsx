@@ -101,7 +101,7 @@ export function TileBase({
       <button
         ref={tileRef}
         type="button"
-        className={`relative h-[88px] select-none rounded-[22px] overflow-hidden transition-transform active:scale-[0.97] ${disabled ? "opacity-50" : "cursor-pointer"} ${className}`}
+        className={`relative h-full w-full select-none rounded-[22px] overflow-hidden transition-transform active:scale-[0.97] ${disabled ? "opacity-50" : "cursor-pointer"} ${className}`}
         style={{ background: gradient }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
