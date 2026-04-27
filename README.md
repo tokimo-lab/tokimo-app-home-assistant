@@ -186,6 +186,19 @@ cargo clippy  -p tokimo-app-home-assistant --all-targets -- -D warnings
 Rust 改动后 supervisor 不会自动检测 binary mtime，需要 `kill <pid>` 让 broker
 respawn 进程。
 
+### UI 构建配置：`@tokimo/app-builder`
+
+`ui/vite.config.ts` 只有 `defineTokimoApp()` 一行，完整的 library 模式 + externals
+（react / react-dom / @tokimo/ui / @tokimo/sdk）由共享预设
+[`@tokimo/app-builder`](https://github.com/tokimo-lab/tokimo)（主仓
+`packages/tokimo-app-builder/`）提供。这些 external 由主 shell 在运行时通过
+`<script type="importmap">` + `window.__TKM_DEPS__` 注入同一份实例，避免重复打包
+React 引发 hooks 跨边界失效。如需 app 自带的额外共享库走同样机制，传
+`extraExternal: [...]`。
+
+> 当前通过 `workspace:*` 在主 monorepo 内解析。脱离主仓独立开发的方案（git
+> 依赖 / dev-only assets 注册接口）由 `@tokimo/app-builder` 后续阶段补齐。
+
 ## License
 
 MIT OR Apache-2.0（与主 monorepo 内其它 Tokimo crate 一致）。
