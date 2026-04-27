@@ -7,7 +7,7 @@ use axum::{Json, extract::{Path, State}};
 use serde::Deserialize;
 use sqlx::Row;
 use tracing::info;
-use url::Url;
+use url::{Host, Url};
 use uuid::Uuid;
 
 use crate::error::AppError;
@@ -306,30 +306,32 @@ async fn validate_base_url(raw: &str) -> Result<(), AppError> {
         }
     }
     let host = url
-        .host_str()
-        .filter(|h| !h.is_empty())
-        .ok_or_else(|| AppError::bad_request("base_url must have a host"))?
-        .to_string();
+        .host()
+        .ok_or_else(|| AppError::bad_request("base_url must have a host"))?;
 
-    // If host parses directly as an IP, judge it. Otherwise resolve via DNS
+    // If host is an IP literal, judge it directly. Otherwise resolve via DNS
     // and reject if ANY answer points at a restricted network (helps mitigate
     // DNS rebinding to the extent we can without pinning resolution).
-    if let Ok(ip) = host.parse::<IpAddr>() {
-        ensure_ip_allowed(&host, ip)?;
-    } else {
-        let port = url.port_or_known_default().unwrap_or(0);
-        let addrs = tokio::net::lookup_host((host.as_str(), port))
-            .await
-            .map_err(|e| AppError::bad_request(format!("DNS resolve failed for {host}: {e}")))?;
-        let mut any = false;
-        for sa in addrs {
-            any = true;
-            ensure_ip_allowed(&host, sa.ip())?;
-        }
-        if !any {
-            return Err(AppError::bad_request(format!(
-                "DNS resolve returned no addresses for {host}"
-            )));
+    match host {
+        Host::Ipv4(v4) => ensure_ip_allowed(&v4.to_string(), IpAddr::V4(v4))?,
+        Host::Ipv6(v6) => ensure_ip_allowed(&v6.to_string(), IpAddr::V6(v6))?,
+        Host::Domain(domain) => {
+            let port = url.port_or_known_default().unwrap_or(0);
+            let addrs = tokio::net::lookup_host((domain, port))
+                .await
+                .map_err(|e| {
+                    AppError::bad_request(format!("DNS resolve failed for {domain}: {e}"))
+                })?;
+            let mut any = false;
+            for sa in addrs {
+                any = true;
+                ensure_ip_allowed(domain, sa.ip())?;
+            }
+            if !any {
+                return Err(AppError::bad_request(format!(
+                    "DNS resolve returned no addresses for {domain}"
+                )));
+            }
         }
     }
     Ok(())
@@ -349,11 +351,12 @@ fn is_restricted_ip(ip: IpAddr) -> bool {
     if ip == IpAddr::V4(std::net::Ipv4Addr::new(169, 254, 169, 254)) {
         return true;
     }
+    // Private/LAN IPs (RFC1918 IPv4 + IPv6 ULA fc00::/7) are intentionally
+    // allowed — Home Assistant typically lives on the user's local network.
     match ip {
         IpAddr::V4(v4) => {
             v4.is_loopback()        // 127.0.0.0/8
-                || v4.is_private()  // 10/8, 172.16/12, 192.168/16
-                || v4.is_link_local() // 169.254/16
+                || v4.is_link_local() // 169.254/16 (incl. cloud metadata)
                 || v4.is_unspecified() // 0.0.0.0
                 || v4.is_broadcast()
                 || v4.is_multicast()
@@ -362,13 +365,11 @@ fn is_restricted_ip(ip: IpAddr) -> bool {
             v6.is_loopback()        // ::1
                 || v6.is_unspecified() // ::
                 || is_ipv6_link_local(v6) // fe80::/10
-                || is_ipv6_unique_local(v6) // fc00::/7
                 || v6.is_multicast()
                 || v6
                     .to_ipv4_mapped()
                     .map(|v4| {
                         v4.is_loopback()
-                            || v4.is_private()
                             || v4.is_link_local()
                             || v4.is_unspecified()
                     })
@@ -379,10 +380,6 @@ fn is_restricted_ip(ip: IpAddr) -> bool {
 
 fn is_ipv6_link_local(v6: Ipv6Addr) -> bool {
     (v6.segments()[0] & 0xffc0) == 0xfe80
-}
-
-fn is_ipv6_unique_local(v6: Ipv6Addr) -> bool {
-    (v6.segments()[0] & 0xfe00) == 0xfc00
 }
 
 #[cfg(test)]
@@ -410,18 +407,23 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn rejects_rfc1918_10() {
-        assert!(validate_base_url("http://10.0.0.5:8123").await.is_err());
+    async fn allows_rfc1918_10() {
+        assert!(validate_base_url("http://10.0.0.5:8123").await.is_ok());
     }
 
     #[tokio::test]
-    async fn rejects_rfc1918_192_168() {
-        assert!(validate_base_url("http://192.168.1.1:8123").await.is_err());
+    async fn allows_rfc1918_192_168() {
+        assert!(validate_base_url("http://192.168.1.1:8123").await.is_ok());
     }
 
     #[tokio::test]
-    async fn rejects_rfc1918_172_16() {
-        assert!(validate_base_url("http://172.16.5.5:8123").await.is_err());
+    async fn allows_rfc1918_172_16() {
+        assert!(validate_base_url("http://172.16.5.5:8123").await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn allows_ipv6_ula() {
+        assert!(validate_base_url("http://[fc00::1]:8123").await.is_ok());
     }
 
     #[tokio::test]
