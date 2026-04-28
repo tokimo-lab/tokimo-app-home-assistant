@@ -1,8 +1,11 @@
+import type { AppRuntimeCtx } from "@tokimo/sdk";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { getDomain } from "../../lib/domain";
+import { useDisplayPatch } from "../../state/useDisplayPatch";
 import type {
   CallParams,
+  EntitySize,
   EntityState,
   HaInstance,
   HaRoom,
@@ -12,11 +15,13 @@ import { EmptyState } from "../EmptyState";
 import { FlowGrid } from "./FlowGrid";
 import { HomeMenu } from "./HomeMenu";
 import { StatusBadgesRow } from "./StatusBadgesRow";
+import { TileContextMenu } from "./TileContextMenu";
 
 interface HomeViewProps {
   instance: HaInstance;
   entities: ReadonlyMap<string, EntityState>;
   rooms: HaRoom[];
+  ctx: AppRuntimeCtx;
   getPending: (entityId: string) => PendingOp | undefined;
   onCall: (params: CallParams) => void;
   onOpenRoom: (roomId: string) => void;
@@ -54,16 +59,27 @@ function sortBySortOrder(a: EntityState, b: EntityState): number {
   return (a.sort_order ?? 0) - (b.sort_order ?? 0);
 }
 
+interface MenuState {
+  entity: EntityState;
+  x: number;
+  y: number;
+}
+
 export function HomeView({
   instance,
   entities,
   rooms,
+  ctx,
   getPending,
   onCall,
   onOpenRoom,
   onOpenSettings,
   t,
 }: HomeViewProps) {
+  const { patch, reorderFavoritesOptimistic, reorderRoomEntitiesOptimistic } =
+    useDisplayPatch(instance.id, ctx, t);
+  const [menu, setMenu] = useState<MenuState | null>(null);
+
   const headerProps = { instance, rooms, t, onOpenSettings, onOpenRoom };
   const allEntities = Array.from(entities.values()).filter(isRenderable);
 
@@ -96,6 +112,37 @@ export function HomeView({
 
   const unassigned = allEntities.filter((e) => !entityRoomId.has(e.entity_id));
 
+  const onContextMenu = (entity: EntityState, e: React.MouseEvent) => {
+    setMenu({ entity, x: e.clientX, y: e.clientY });
+  };
+
+  const closeMenu = () => setMenu(null);
+
+  const onSetSize = (size: EntitySize) => {
+    if (!menu) return;
+    void patch(menu.entity.entity_id, { size });
+  };
+  const onToggleFavorite = (next: boolean) => {
+    if (!menu) return;
+    void patch(menu.entity.entity_id, { is_favorite: next });
+  };
+  const onHide = () => {
+    if (!menu) return;
+    void patch(menu.entity.entity_id, { hidden: true });
+  };
+
+  const onFavoritesReorder = (orderedIds: string[]) => {
+    void reorderFavoritesOptimistic(
+      orderedIds.map((id, i) => ({ entity_id: id, favorite_order: i })),
+    );
+  };
+
+  const onRoomReorder = (orderedIds: string[]) => {
+    void reorderRoomEntitiesOptimistic(
+      orderedIds.map((id, i) => ({ entity_id: id, sort_order: i })),
+    );
+  };
+
   if (allEntities.length === 0) {
     return (
       <div className="flex h-full flex-col">
@@ -123,6 +170,8 @@ export function HomeView({
             instanceId={instance.id}
             getPending={getPending}
             onCall={onCall}
+            onContextMenu={onContextMenu}
+            onReorder={onFavoritesReorder}
             t={t}
           />
         </section>
@@ -149,6 +198,8 @@ export function HomeView({
               instanceId={instance.id}
               getPending={getPending}
               onCall={onCall}
+              onContextMenu={onContextMenu}
+              onReorder={onRoomReorder}
               t={t}
             />
           </section>
@@ -161,6 +212,20 @@ export function HomeView({
           instanceId={instance.id}
           getPending={getPending}
           onCall={onCall}
+          onContextMenu={onContextMenu}
+          t={t}
+        />
+      )}
+
+      {menu && (
+        <TileContextMenu
+          entity={menu.entity}
+          x={menu.x}
+          y={menu.y}
+          onClose={closeMenu}
+          onSetSize={onSetSize}
+          onToggleFavorite={onToggleFavorite}
+          onHide={onHide}
           t={t}
         />
       )}
@@ -173,12 +238,14 @@ function UnassignedSection({
   instanceId,
   getPending,
   onCall,
+  onContextMenu,
   t,
 }: {
   entities: EntityState[];
   instanceId: string;
   getPending: (entityId: string) => PendingOp | undefined;
   onCall: (params: CallParams) => void;
+  onContextMenu: (entity: EntityState, e: React.MouseEvent) => void;
   t: (k: string) => string;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -190,7 +257,7 @@ function UnassignedSection({
         className="mb-3 flex w-full cursor-pointer items-center gap-2 text-left text-base font-semibold text-[var(--text-primary)] transition hover:text-[var(--accent,#6366f1)]"
       >
         {expanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
-        {/* TODO(R7): i18n */}
+        {/* TODO(R7-i18n): "其他" */}
         <span>其他 ({entities.length})</span>
       </button>
       {expanded && (
@@ -199,6 +266,7 @@ function UnassignedSection({
           instanceId={instanceId}
           getPending={getPending}
           onCall={onCall}
+          onContextMenu={onContextMenu}
           t={t}
         />
       )}
