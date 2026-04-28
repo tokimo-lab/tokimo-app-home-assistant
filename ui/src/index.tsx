@@ -28,6 +28,7 @@ import { InstancesPage } from "./pages/InstancesPage";
 import { SetupPage } from "./pages/SetupPage";
 import { setActiveInstance } from "./state/activeInstanceStore";
 import { useCallService } from "./state/useCallService";
+import { useDisplayPatch } from "./state/useDisplayPatch";
 import { useEntities } from "./state/useEntities";
 import { useInstances } from "./state/useInstances";
 import { useRooms } from "./state/useRooms";
@@ -83,6 +84,16 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
 
   // ── Service calls (optimistic-UI) ────────────────────────────────────────
   const { call: onCall, getPending } = useCallService(instanceId, ctx);
+
+  // ── Display mutations (size / favorite / reorder) ────────────────────────
+  const { patch: patchDisplay } = useDisplayPatch(instanceId, ctx, t);
+
+  // ── Edit mode (R6) ───────────────────────────────────────────────────────
+  const [editMode, setEditMode] = useState(false);
+  // Reset edit mode whenever the active instance changes.
+  useEffect(() => {
+    setEditMode(false);
+  }, []);
 
   // ── Rooms (for HomeView grouping + room detail navigation) ───────────────
   const { rooms, editRoom, reload: reloadRooms } = useRooms(instanceId);
@@ -268,12 +279,12 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
             navigateTo(`/instance/${activeInstance.id}/room/${rid}`)
           }
           onOpenSettings={() => openSettings("family")}
-          onToggleEdit={() => {
-            // TODO R6p: enter Home edit mode.
-          }}
+          onToggleEdit={() => setEditMode((v) => !v)}
           onReorderRooms={() => {
             // TODO R6p: enter Reorder Sections mode.
           }}
+          editMode={editMode}
+          onPatchDisplay={patchDisplay}
           t={t}
         />
       )}

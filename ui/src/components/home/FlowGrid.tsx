@@ -3,8 +3,10 @@ import type {
   EntitySize,
   EntityState,
   PendingOp,
+  UpdateEntityDisplayDto,
 } from "../../types";
 import { resolveTile } from "../tiles";
+import { EditableTile } from "./EditableTile";
 
 interface FlowGridProps {
   entities: EntityState[];
@@ -12,6 +14,13 @@ interface FlowGridProps {
   getPending: (entityId: string) => PendingOp | undefined;
   onCall: (params: CallParams) => void;
   t: (k: string) => string;
+  editMode?: boolean;
+  onPatchDisplay?: (
+    entityId: string,
+    dto: UpdateEntityDisplayDto,
+  ) => void | Promise<void>;
+  /** When true and editMode is on, renders the favorite +/− button. Default false. */
+  enableFavoriteToggle?: boolean;
 }
 
 function spanClass(size?: EntitySize): string {
@@ -26,6 +35,9 @@ export function FlowGrid({
   getPending,
   onCall,
   t,
+  editMode = false,
+  onPatchDisplay,
+  enableFavoriteToggle = false,
 }: FlowGridProps) {
   if (entities.length === 0) return null;
   return (
@@ -37,15 +49,38 @@ export function FlowGrid({
     >
       {entities.map((entity) => {
         const Tile = resolveTile(entity);
+        const tileNode = (
+          <Tile
+            entity={entity}
+            instanceId={instanceId}
+            pending={getPending(entity.entity_id)}
+            onCall={onCall}
+            t={t}
+          />
+        );
         return (
           <div key={entity.entity_id} className={spanClass(entity.size)}>
-            <Tile
+            <EditableTile
               entity={entity}
-              instanceId={instanceId}
-              pending={getPending(entity.entity_id)}
-              onCall={onCall}
+              editMode={editMode}
+              onCycleSize={
+                onPatchDisplay
+                  ? (next) =>
+                      void onPatchDisplay(entity.entity_id, { size: next })
+                  : undefined
+              }
+              onToggleFavorite={
+                enableFavoriteToggle && onPatchDisplay
+                  ? (next) =>
+                      void onPatchDisplay(entity.entity_id, {
+                        is_favorite: next,
+                      })
+                  : undefined
+              }
               t={t}
-            />
+            >
+              {tileNode}
+            </EditableTile>
           </div>
         );
       })}

@@ -35,3 +35,14 @@
 .animate-settings-pane-out {
   animation: settings-pane-out 180ms ease-in forwards;
 }
+
+/* Apple Home–style wiggle for tiles in edit mode. */
+@keyframes ha-wiggle {
+  0%,
+  100% {
+    transform: rotate(-0.6deg);
+  }
+  50% {
+    transform: rotate(0.6deg);
+  }
+}

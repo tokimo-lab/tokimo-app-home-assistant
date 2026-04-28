@@ -5,6 +5,7 @@ import type {
   HaInstance,
   HaRoom,
   PendingOp,
+  UpdateEntityDisplayDto,
 } from "../../types";
 import { EmptyState } from "../EmptyState";
 import { FlowGrid } from "./FlowGrid";
@@ -21,6 +22,11 @@ interface HomeViewProps {
   onOpenSettings: () => void;
   onToggleEdit?: () => void;
   onReorderRooms?: () => void;
+  editMode?: boolean;
+  onPatchDisplay?: (
+    entityId: string,
+    dto: UpdateEntityDisplayDto,
+  ) => void | Promise<void>;
   t: (k: string) => string;
 }
 
@@ -66,6 +72,8 @@ export function HomeView({
   onOpenSettings,
   onToggleEdit,
   onReorderRooms,
+  editMode = false,
+  onPatchDisplay,
   t,
 }: HomeViewProps) {
   const headerProps = {
@@ -76,6 +84,7 @@ export function HomeView({
     onToggleEdit: onToggleEdit ?? noop,
     onReorderRooms: onReorderRooms ?? noop,
     onOpenRoom,
+    editMode,
   };
   const allEntities = Array.from(entities.values()).filter(isRenderable);
 
@@ -121,8 +130,18 @@ export function HomeView({
   }
 
   return (
-    <div className="flex h-full flex-col gap-6 overflow-auto px-6 py-6">
+    <div className="relative flex h-full flex-col gap-6 overflow-auto px-6 py-6">
       <HomeHeader {...headerProps} />
+
+      {editMode && (
+        <button
+          type="button"
+          onClick={onToggleEdit ?? noop}
+          className="sticky top-0 z-30 ml-auto flex h-9 cursor-pointer items-center gap-2 self-end rounded-full bg-[var(--accent,#6366f1)] px-4 text-sm font-medium text-white shadow-lg transition hover:opacity-90"
+        >
+          {t("done")}
+        </button>
+      )}
 
       <StatusBadgesRow entities={allEntities} t={t} />
 
@@ -137,6 +156,8 @@ export function HomeView({
             getPending={getPending}
             onCall={onCall}
             t={t}
+            editMode={editMode}
+            onPatchDisplay={onPatchDisplay}
           />
         </section>
       )}
@@ -161,6 +182,8 @@ export function HomeView({
               getPending={getPending}
               onCall={onCall}
               t={t}
+              editMode={editMode}
+              onPatchDisplay={onPatchDisplay}
             />
           </section>
         );
@@ -177,6 +200,8 @@ export function HomeView({
             getPending={getPending}
             onCall={onCall}
             t={t}
+            editMode={editMode}
+            onPatchDisplay={onPatchDisplay}
           />
         </section>
       )}
@@ -192,6 +217,7 @@ function HomeHeader({
   onToggleEdit,
   onReorderRooms,
   onOpenRoom,
+  editMode,
 }: {
   instance: HaInstance;
   rooms: HaRoom[];
@@ -200,11 +226,17 @@ function HomeHeader({
   onToggleEdit: () => void;
   onReorderRooms: () => void;
   onOpenRoom: (roomId: string) => void;
+  editMode: boolean;
 }) {
   return (
     <div className="flex items-center justify-between">
       <h1 className="text-2xl font-semibold text-[var(--text-primary)]">
         {instance.name}
+        {editMode && (
+          <span className="ml-3 text-sm font-normal text-[var(--text-secondary)]">
+            · {t("editHomeView")}
+          </span>
+        )}
       </h1>
       <HomeMenu
         rooms={rooms}
