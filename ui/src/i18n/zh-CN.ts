@@ -205,4 +205,12 @@ export const zhCN: Record<string, string> = {
 
   // Sortable row controls (settings tabs)
   dragHandle: "拖动排序",
+
+  // Home top-bar menu
+  menuOpen: "打开菜单",
+  menuReload: "重新加载",
+
+  // Camera tile fullscreen overlay
+  cameraCloseFullscreen: "退出全屏",
+  cameraRefresh: "刷新",
 };

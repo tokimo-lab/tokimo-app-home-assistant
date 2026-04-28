@@ -206,4 +206,12 @@ export const enUS: Record<string, string> = {
 
   // Sortable row controls (settings tabs)
   dragHandle: "Drag to reorder",
+
+  // Home top-bar menu
+  menuOpen: "Open menu",
+  menuReload: "Reload",
+
+  // Camera tile fullscreen overlay
+  cameraCloseFullscreen: "Close fullscreen",
+  cameraRefresh: "Refresh",
 };

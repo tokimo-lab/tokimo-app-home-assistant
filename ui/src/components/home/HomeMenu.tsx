@@ -60,7 +60,7 @@ export function HomeMenu({
       <button
         ref={refs.setReference}
         type="button"
-        aria-label="menu"
+        aria-label={t("menuOpen")}
         className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-[var(--text-secondary)] transition hover:bg-white/[0.06]"
         {...getReferenceProps()}
       >

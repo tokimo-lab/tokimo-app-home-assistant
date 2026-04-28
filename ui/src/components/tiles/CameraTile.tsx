@@ -11,7 +11,7 @@ function buildProxyUrl(instanceId: string, entityId: string): string {
   return `/api/apps/home-assistant/instances/${encodeURIComponent(instanceId)}/camera_proxy/${encodeURIComponent(entityId)}`;
 }
 
-export function CameraTile({ entity, instanceId, t: _t }: TileProps) {
+export function CameraTile({ entity, instanceId, t }: TileProps) {
   const { entity_id } = entity;
   const name = getFriendlyName(entity);
   const [imgSrc, setImgSrc] = useState<string>(() =>
@@ -64,7 +64,7 @@ export function CameraTile({ entity, instanceId, t: _t }: TileProps) {
             <button
               type="button"
               className="absolute right-4 top-4 cursor-pointer rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
-              aria-label="Close fullscreen"
+              aria-label={t("cameraCloseFullscreen")}
               onClick={() => setFullscreen(false)}
             >
               ✕
@@ -72,7 +72,7 @@ export function CameraTile({ entity, instanceId, t: _t }: TileProps) {
             <button
               type="button"
               className="absolute bottom-4 right-4 cursor-pointer rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
-              aria-label="Refresh"
+              aria-label={t("cameraRefresh")}
               onClick={() => {
                 setImgSrc(
                   `${buildProxyUrl(instanceId, entity_id)}?t=${Date.now()}`,
