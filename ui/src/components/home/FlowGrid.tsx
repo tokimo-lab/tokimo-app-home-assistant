@@ -8,21 +8,19 @@ import {
 } from "@dnd-kit/core";
 import {
   arrayMove,
-  SortableContext,
   rectSortingStrategy,
+  SortableContext,
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import type { CSSProperties, ReactNode } from "react";
 import type {
   CallParams,
   EntitySize,
   EntityState,
-  FavoriteReorderItem,
   PendingOp,
-  UpdateEntityDisplayDto,
 } from "../../types";
 import { resolveTile } from "../tiles";
-import { EditableTile } from "./EditableTile";
 
 interface FlowGridProps {
   entities: EntityState[];
@@ -30,15 +28,12 @@ interface FlowGridProps {
   getPending: (entityId: string) => PendingOp | undefined;
   onCall: (params: CallParams) => void;
   t: (k: string) => string;
-  editMode?: boolean;
-  onPatchDisplay?: (
-    entityId: string,
-    dto: UpdateEntityDisplayDto,
-  ) => void | Promise<void>;
-  /** When true and editMode is on, renders the favorite +/− button. Default false. */
-  enableFavoriteToggle?: boolean;
-  /** When provided AND editMode is true, tiles can be drag-reordered. */
-  onReorder?: (items: FavoriteReorderItem[]) => void | Promise<void>;
+  /** Right-click on a tile. The handler receives the entity and the
+   *  raw mouse event (so it can read clientX/clientY for popover anchor). */
+  onContextMenu?: (entity: EntityState, e: React.MouseEvent) => void;
+  /** When provided, tiles can be drag-reordered and the new order is
+   *  reported as `(entity, newIndex)` pairs. */
+  onReorder?: (orderedIds: string[]) => void | Promise<void>;
 }
 
 function spanClass(size?: EntitySize): string {
@@ -53,46 +48,38 @@ export function FlowGrid({
   getPending,
   onCall,
   t,
-  editMode = false,
-  onPatchDisplay,
-  enableFavoriteToggle = false,
+  onContextMenu,
   onReorder,
 }: FlowGridProps) {
-  const sortable = editMode && !!onReorder;
+  const sortable = !!onReorder;
+  // Require a small drag distance so plain clicks still reach the tile body.
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
   );
 
   if (entities.length === 0) return null;
 
-  const gridChildren = entities.map((entity) => {
+  const renderTile = (entity: EntityState): ReactNode => {
     const Tile = resolveTile(entity);
-    const tileNode = (
-      <EditableTile
+    return (
+      <Tile
         entity={entity}
-        editMode={editMode}
-        onCycleSize={
-          onPatchDisplay
-            ? (next) => void onPatchDisplay(entity.entity_id, { size: next })
-            : undefined
-        }
-        onToggleFavorite={
-          enableFavoriteToggle && onPatchDisplay
-            ? (next) =>
-                void onPatchDisplay(entity.entity_id, { is_favorite: next })
-            : undefined
-        }
+        instanceId={instanceId}
+        pending={getPending(entity.entity_id)}
+        onCall={onCall}
         t={t}
-      >
-        <Tile
-          entity={entity}
-          instanceId={instanceId}
-          pending={getPending(entity.entity_id)}
-          onCall={onCall}
-          t={t}
-        />
-      </EditableTile>
+      />
     );
+  };
+
+  const gridChildren = entities.map((entity) => {
+    const tile = renderTile(entity);
+    const onCtx = onContextMenu
+      ? (e: React.MouseEvent) => {
+          e.preventDefault();
+          onContextMenu(entity, e);
+        }
+      : undefined;
 
     if (sortable) {
       return (
@@ -100,15 +87,21 @@ export function FlowGrid({
           key={entity.entity_id}
           entity={entity}
           spanClassName={spanClass(entity.size)}
+          onContextMenu={onCtx}
         >
-          {tileNode}
+          {tile}
         </SortableCell>
       );
     }
 
     return (
-      <div key={entity.entity_id} className={spanClass(entity.size)}>
-        {tileNode}
+      // biome-ignore lint/a11y/noStaticElementInteractions: contextmenu is a passive enhancement; the tile inside owns its own interactive role
+      <div
+        key={entity.entity_id}
+        className={spanClass(entity.size)}
+        onContextMenu={onCtx}
+      >
+        {tile}
       </div>
     );
   });
@@ -133,11 +126,7 @@ export function FlowGrid({
     const newIndex = entities.findIndex((e) => e.entity_id === over.id);
     if (oldIndex < 0 || newIndex < 0) return;
     const reordered = arrayMove(entities, oldIndex, newIndex);
-    const items: FavoriteReorderItem[] = reordered.map((e, i) => ({
-      entity_id: e.entity_id,
-      favorite_order: i,
-    }));
-    void onReorder?.(items);
+    void onReorder?.(reordered.map((e) => e.entity_id));
   }
 
   return (
@@ -159,25 +148,35 @@ export function FlowGrid({
 function SortableCell({
   entity,
   spanClassName,
+  onContextMenu,
   children,
 }: {
   entity: EntityState;
   spanClassName: string;
-  children: React.ReactNode;
+  onContextMenu?: (e: React.MouseEvent) => void;
+  children: ReactNode;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: entity.entity_id });
-  const style: React.CSSProperties = {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: entity.entity_id });
+  const style: CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.4 : 1,
     zIndex: isDragging ? 50 : undefined,
   };
   return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: dnd-kit attributes inject role/tabindex; contextmenu is a passive enhancement
     <div
       ref={setNodeRef}
       style={style}
       className={`${spanClassName} touch-none`}
+      onContextMenu={onContextMenu}
       {...attributes}
       {...listeners}
     >
