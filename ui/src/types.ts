@@ -226,7 +226,7 @@ export type SseEvent =
 export type SubPage = "home" | "room";
 
 export interface ParsedRoute {
-  page: "root" | "setup" | "instances" | SubPage;
+  page: "root" | "setup" | SubPage;
   instanceId?: string;
   roomId?: string;
 }

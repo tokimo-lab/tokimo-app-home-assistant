@@ -24,7 +24,6 @@ import { AnimatedSettingsPane } from "./components/shell/AnimatedSettingsPane";
 import { AppShell } from "./components/shell/AppShell";
 import { enUS, zhCN } from "./i18n";
 import "./index.css";
-import { InstancesPage } from "./pages/InstancesPage";
 import { SetupPage } from "./pages/SetupPage";
 import { setActiveInstance } from "./state/activeInstanceStore";
 import { useCallService } from "./state/useCallService";
@@ -36,7 +35,6 @@ import type { ParsedRoute, RoomReorderItem } from "./types";
 
 function parseRoute(route: string): ParsedRoute {
   if (route === "/setup") return { page: "setup" };
-  if (route === "/instances") return { page: "instances" };
   const home = route.match(/^\/instance\/([^/]+)\/home$/);
   if (home) return { page: "home", instanceId: home[1] };
   const room = route.match(/^\/instance\/([^/]+)\/room\/([^/]+)$/);
@@ -135,14 +133,24 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
 
   // ── Settings pane ────────────────────────────────────────────────────────
   const [settingsTab, setSettingsTab] = useState<SettingsTab | null>(null);
+  // ── New-family editor ────────────────────────────────────────────────────
+  const [creatingFamily, setCreatingFamily] = useState(false);
   // Close the pane whenever the active instance changes (URL or list reconcile),
   // unless we're explicitly reopening it (e.g. avatar right-click which sets
   // both in the same React event).
   useEffect(() => {
     setSettingsTab(null);
   }, []);
-  const openSettings = (tab: SettingsTab) => setSettingsTab(tab);
+  const openSettings = (tab: SettingsTab) => {
+    setCreatingFamily(false);
+    setSettingsTab(tab);
+  };
   const closeSettings = () => setSettingsTab(null);
+  const openCreateFamily = () => {
+    setSettingsTab(null);
+    setCreatingFamily(true);
+  };
+  const closeCreateFamily = () => setCreatingFamily(false);
 
   // ── Sync activeInstanceStore ─────────────────────────────────────────────
   useEffect(() => {
@@ -221,13 +229,22 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
   function navigateTo(path: string) {
     const r = parseRoute(path);
     let title = "Home Assistant";
-    if (r.page === "instances") title = t("instancesTitle");
-    else if (r.page === "setup") title = t("setupTitle");
+    if (r.page === "setup") title = t("setupTitle");
     else if (r.page === "home" || r.page === "room") {
       const inst = instances.find((i) => i.id === r.instanceId);
       title = inst ? `${inst.name} · ${t("navHome")}` : "Home Assistant";
     }
     nav.navigate(path, title);
+  }
+
+  // ── Handle a successful family creation ─────────────────────────────────
+  function handleFamilyCreated(created: import("./types").HaInstance) {
+    setCreatingFamily(false);
+    void reloadInstances();
+    nav.navigate(
+      `/instance/${created.id}/home`,
+      `${created.name} · ${t("navHome")}`,
+    );
   }
 
   // ── Render ───────────────────────────────────────────────────────────────
@@ -236,49 +253,7 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
   }
 
   if (parsed.page === "setup") {
-    return (
-      <SetupPage
-        t={t}
-        onAddInstance={() => nav.navigate("/instances", t("instancesTitle"))}
-      />
-    );
-  }
-
-  if (parsed.page === "instances") {
-    return (
-      <AppShell
-        instances={instances}
-        activeInstanceId={effectiveInstanceId}
-        subPage="instances"
-        onNavigate={navigateTo}
-        onCreateInstance={() => {
-          // TODO(R2): wire up new-family editor
-          console.log("[FamilySidebar] onCreateInstance: pending R2");
-        }}
-        onOpenSettings={() => {
-          if (effectiveInstanceId) {
-            navigateTo(`/instance/${effectiveInstanceId}/home`);
-            openSettings("family");
-          }
-        }}
-        onContextMenuInstance={(id, e) => {
-          e.preventDefault();
-          navigateTo(`/instance/${id}/home`);
-          openSettings("family");
-        }}
-      >
-        <InstancesPage
-          t={t}
-          onSelectInstance={(id) => {
-            const inst = instances.find((i) => i.id === id);
-            nav.navigate(
-              `/instance/${id}/home`,
-              inst ? `${inst.name} · ${t("navHome")}` : "Home Assistant",
-            );
-          }}
-        />
-      </AppShell>
-    );
+    return <SetupPage t={t} onCreated={handleFamilyCreated} />;
   }
 
   // Instance page (home | room)
@@ -288,12 +263,9 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
     <AppShell
       instances={instances}
       activeInstanceId={effectiveInstanceId}
-      subPage="home"
+      settingsActive={settingsTab !== null || creatingFamily}
       onNavigate={navigateTo}
-      onCreateInstance={() => {
-        // TODO(R2): wire up new-family editor
-        console.log("[FamilySidebar] onCreateInstance: pending R2");
-      }}
+      onCreateInstance={openCreateFamily}
       onOpenSettings={() => openSettings("family")}
       onContextMenuInstance={(id, e) => {
         e.preventDefault();
@@ -360,6 +332,16 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
             onEditRoom={editRoom}
             onReloadRooms={reloadRooms}
             t={t}
+          />
+        )}
+      </AnimatedSettingsPane>
+
+      <AnimatedSettingsPane open={creatingFamily}>
+        {creatingFamily && (
+          <SetupPage
+            t={t}
+            onCreated={handleFamilyCreated}
+            onCancel={closeCreateFamily}
           />
         )}
       </AnimatedSettingsPane>

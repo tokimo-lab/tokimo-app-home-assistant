@@ -1,13 +1,13 @@
 import type { ReactNode } from "react";
 import { useContainerWidth } from "../../hooks/use-container-width";
 import { useSidebarCollapsed } from "../../hooks/use-sidebar-collapsed";
-import type { HaInstance, SubPage } from "../../types";
+import type { HaInstance } from "../../types";
 import { FamilySidebar } from "./FamilySidebar";
 
 interface AppShellProps {
   instances: HaInstance[];
   activeInstanceId: string | null;
-  subPage: SubPage | "instances";
+  settingsActive: boolean;
   children: ReactNode;
   onNavigate: (path: string) => void;
   onOpenSettings: () => void;
@@ -18,14 +18,13 @@ interface AppShellProps {
 export function AppShell({
   instances,
   activeInstanceId,
-  subPage,
+  settingsActive,
   children,
   onNavigate,
   onOpenSettings,
   onCreateInstance,
   onContextMenuInstance,
 }: AppShellProps) {
-  const settingsActive = subPage === "instances";
   const [containerRef, containerWidth] = useContainerWidth();
   const { collapsed, onToggleCollapse } = useSidebarCollapsed(
     "home-assistant",
