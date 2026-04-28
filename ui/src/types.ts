@@ -124,6 +124,20 @@ export interface ReorderResult {
   updated: number;
 }
 
+/**
+ * Device metadata sourced from HA's device_registry.
+ * Only populated by the per-entity GET /entities/:eid endpoint
+ * (list endpoints leave this undefined to keep payload small).
+ */
+export interface DeviceMeta {
+  manufacturer?: string | null;
+  model?: string | null;
+  sw_version?: string | null;
+  serial_number?: string | null;
+  /** Resolved device display name (prefers name_by_user, falls back to name). */
+  name?: string | null;
+}
+
 export interface EntityState {
   entity_id: string;
   state: string;
@@ -140,6 +154,8 @@ export interface EntityState {
   favorite_order?: number;
   sort_order?: number;
   size?: EntitySize;
+  /** Only populated by GET /entities/:eid single-fetch path. */
+  device?: DeviceMeta;
   // legacy nested override (kept for back-compat)
   override?: EntityOverride;
 }
