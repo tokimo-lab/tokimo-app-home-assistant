@@ -1,9 +1,17 @@
 import type { AppRuntimeCtx } from "@tokimo/sdk";
 import { Plus } from "lucide-react";
-import { type MouseEvent as ReactMouseEvent, useMemo, useState } from "react";
+import {
+  type MouseEvent as ReactMouseEvent,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { getDomain } from "../../lib/domain";
 import { useDisplayPatch } from "../../state/useDisplayPatch";
-import { useEditHomeView } from "../../state/useEditHomeView";
+import {
+  registerToggleSize,
+  useEditHomeView,
+} from "../../state/useEditHomeView";
 import {
   type ChipId,
   domainsForChip,
@@ -18,6 +26,7 @@ import type {
   PendingOp,
 } from "../../types";
 import { EmptyState } from "../EmptyState";
+import { cycleSizeFor } from "../edit/EditableTileWrapper";
 import { EditModeToolbar } from "../edit/EditModeToolbar";
 import { CamerasSection } from "./CamerasSection";
 import { DomainSummaryBadge } from "./DomainSummaryBadge";
@@ -85,6 +94,30 @@ function bySortOrder(a: EntityState, b: EntityState): number {
   return (a.sort_order ?? 0) - (b.sort_order ?? 0);
 }
 
+const MEDIUM_DEFAULT = new Set(["climate", "media_player"]);
+
+/**
+ * Mirror of TileGrid.defaultSizeFor; kept in sync so size-cycle starts
+ * from the same baseline that the grid renders. If/when this divergence
+ * becomes painful, hoist the helper into a shared module.
+ */
+function defaultSizeForEntity(entity: EntityState): EntitySize {
+  const d = getDomain(entity.entity_id);
+  if (d === "camera") return "large";
+  if (MEDIUM_DEFAULT.has(d)) return "medium";
+  if (d === "sensor") {
+    const dc = entity.attributes?.device_class;
+    if (dc === "temperature" || dc === "humidity") return "medium";
+    return "small";
+  }
+  if (d === "cover") {
+    return typeof entity.attributes?.current_position === "number"
+      ? "medium"
+      : "small";
+  }
+  return "small";
+}
+
 interface MenuState {
   entity: EntityState;
   x: number;
@@ -111,6 +144,23 @@ export function HomePage({
     () => Array.from(entities.values()).filter(isRenderable),
     [entities],
   );
+
+  // Default size resolution must match TileGrid.defaultSizeFor; we copy it
+  // here so cycleSize can fall back to the same baseline when an entity
+  // has no explicit `size` set yet.
+  useEffect(() => {
+    registerToggleSize(async (entityId: string) => {
+      const entity = entities.get(entityId);
+      if (!entity) return;
+      const current: EntitySize = entity.size ?? defaultSizeForEntity(entity);
+      const next = cycleSizeFor(entity, current);
+      if (next === current) return;
+      await patch(entityId, { size: next });
+    });
+    return () => {
+      registerToggleSize(null);
+    };
+  }, [entities, patch]);
 
   const chipDomains = useMemo<ReadonlySet<string> | null>(() => {
     if (!selectedChip) return null;

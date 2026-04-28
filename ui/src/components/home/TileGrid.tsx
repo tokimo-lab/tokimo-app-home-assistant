@@ -7,6 +7,7 @@ import type {
   EntityState,
   PendingOp,
 } from "../../types";
+import { EditableTileWrapper } from "../edit/EditableTileWrapper";
 import { resolveTile } from "../tiles";
 
 interface TileGridProps {
@@ -69,6 +70,22 @@ export function TileGrid({
       {entities.map((entity) => {
         const Tile = resolveTile(entity);
         const size = forceSize ?? entity.size ?? defaultSizeFor(entity);
+        const tile = (
+          <Tile
+            entity={entity}
+            instanceId={instanceId}
+            pending={getPending(entity.entity_id)}
+            onCall={onCall}
+            t={t}
+          />
+        );
+        if (editMode) {
+          return (
+            <div key={entity.entity_id} className={SIZE_SPAN[size]}>
+              <EditableTileWrapper entity={entity}>{tile}</EditableTileWrapper>
+            </div>
+          );
+        }
         return (
           // biome-ignore lint/a11y/noStaticElementInteractions: contextmenu is a passive enhancement; the tile inside owns its own interactive role
           <div
@@ -83,13 +100,7 @@ export function TileGrid({
                 : undefined
             }
           >
-            <Tile
-              entity={entity}
-              instanceId={instanceId}
-              pending={getPending(entity.entity_id)}
-              onCall={onCall}
-              t={t}
-            />
+            {tile}
           </div>
         );
       })}
