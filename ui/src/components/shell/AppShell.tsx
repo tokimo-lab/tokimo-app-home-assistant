@@ -1,46 +1,52 @@
 import type { ReactNode } from "react";
-import type { ConnStatus, HaInstance, SubPage } from "../../types";
-import { InstanceAvatarStrip } from "./InstanceAvatarStrip";
+import { useContainerWidth } from "../../hooks/use-container-width";
+import { useSidebarCollapsed } from "../../hooks/use-sidebar-collapsed";
+import type { HaInstance, SubPage } from "../../types";
+import { FamilySidebar } from "./FamilySidebar";
 
 interface AppShellProps {
   instances: HaInstance[];
   activeInstanceId: string | null;
   subPage: SubPage | "instances";
-  connStatus: ConnStatus;
   children: ReactNode;
-  t: (k: string) => string;
   onNavigate: (path: string) => void;
-  onNavigateToInstances: () => void;
   onOpenSettings: () => void;
-  onContextMenuInstance: (id: string) => void;
+  onCreateInstance: () => void;
+  onContextMenuInstance: (id: string, e: React.MouseEvent) => void;
 }
 
 export function AppShell({
   instances,
   activeInstanceId,
   subPage,
-  connStatus,
   children,
-  t,
   onNavigate,
-  onNavigateToInstances,
   onOpenSettings,
+  onCreateInstance,
   onContextMenuInstance,
 }: AppShellProps) {
-  const isManaging = subPage === "instances";
+  const settingsActive = subPage === "instances";
+  const [containerRef, containerWidth] = useContainerWidth();
+  const { collapsed, onToggleCollapse } = useSidebarCollapsed(
+    "home-assistant",
+    containerWidth > 0 && containerWidth < 720,
+  );
 
   return (
-    <div className="relative flex h-full w-full overflow-hidden">
-      <InstanceAvatarStrip
+    <div
+      ref={containerRef}
+      className="relative flex h-full w-full overflow-hidden"
+    >
+      <FamilySidebar
         instances={instances}
-        activeInstanceId={activeInstanceId}
-        connStatus={connStatus}
-        isManaging={isManaging}
-        onSelectInstance={(id) => onNavigate(`/instance/${id}/home`)}
-        onManageInstances={onNavigateToInstances}
-        onOpenSettings={onOpenSettings}
-        onContextMenuInstance={onContextMenuInstance}
-        t={t}
+        activeId={activeInstanceId}
+        collapsed={collapsed}
+        settingsActive={settingsActive}
+        onSelect={(id) => onNavigate(`/instance/${id}/home`)}
+        onCreateClick={onCreateInstance}
+        onSettingsClick={onOpenSettings}
+        onToggleCollapse={onToggleCollapse}
+        onContextMenuItem={onContextMenuInstance}
       />
       <main className="relative flex-1 overflow-auto">{children}</main>
     </div>

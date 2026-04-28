@@ -80,7 +80,7 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
   const effectiveInstanceId = instanceId ?? instances[0]?.id ?? null;
 
   // ── Live entity stream ───────────────────────────────────────────────────
-  const { entities, connStatus } = useEntities(instanceId);
+  const { entities } = useEntities(instanceId);
 
   // ── Service calls (optimistic-UI) ────────────────────────────────────────
   const { call: onCall, getPending } = useCallService(instanceId, ctx);
@@ -250,19 +250,19 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
         instances={instances}
         activeInstanceId={effectiveInstanceId}
         subPage="instances"
-        connStatus={connStatus}
-        t={t}
         onNavigate={navigateTo}
-        onNavigateToInstances={() =>
-          nav.navigate("/instances", t("instancesTitle"))
-        }
+        onCreateInstance={() => {
+          // TODO(R2): wire up new-family editor
+          console.log("[FamilySidebar] onCreateInstance: pending R2");
+        }}
         onOpenSettings={() => {
           if (effectiveInstanceId) {
             navigateTo(`/instance/${effectiveInstanceId}/home`);
             openSettings("family");
           }
         }}
-        onContextMenuInstance={(id) => {
+        onContextMenuInstance={(id, e) => {
+          e.preventDefault();
           navigateTo(`/instance/${id}/home`);
           openSettings("family");
         }}
@@ -289,14 +289,14 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
       instances={instances}
       activeInstanceId={effectiveInstanceId}
       subPage="home"
-      connStatus={connStatus}
-      t={t}
       onNavigate={navigateTo}
-      onNavigateToInstances={() =>
-        nav.navigate("/instances", t("instancesTitle"))
-      }
+      onCreateInstance={() => {
+        // TODO(R2): wire up new-family editor
+        console.log("[FamilySidebar] onCreateInstance: pending R2");
+      }}
       onOpenSettings={() => openSettings("family")}
-      onContextMenuInstance={(id) => {
+      onContextMenuInstance={(id, e) => {
+        e.preventDefault();
         if (id !== instanceId) {
           navigateTo(`/instance/${id}/home`);
         }
