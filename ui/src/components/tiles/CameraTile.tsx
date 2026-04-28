@@ -18,22 +18,34 @@ function CameraTileImpl({ entity, instanceId, t }: TileProps) {
     buildProxyUrl(instanceId, entity_id),
   );
   const [fullscreen, setFullscreen] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [isVisible, setIsVisible] = useState(false);
+  const tileRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    timerRef.current = setInterval(() => {
+    const el = tileRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => setIsVisible(entry.isIntersecting),
+      { threshold: 0.1, rootMargin: "200px" },
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!isVisible && !fullscreen) return;
+    const id = setInterval(() => {
       setImgSrc(`${buildProxyUrl(instanceId, entity_id)}?t=${Date.now()}`);
     }, REFRESH_INTERVAL);
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [instanceId, entity_id]);
+    return () => clearInterval(id);
+  }, [isVisible, fullscreen, instanceId, entity_id]);
 
   const gradient = "linear-gradient(135deg, #1f2937 0%, #111827 100%)";
 
   return (
     <>
-      <TileBase gradient={gradient} onClick={() => setFullscreen(true)}>
+      <div ref={tileRef}>
+        <TileBase gradient={gradient} onClick={() => setFullscreen(true)}>
         <div className="absolute inset-0 overflow-hidden rounded-[22px]">
           <img
             src={imgSrc}
@@ -51,7 +63,8 @@ function CameraTileImpl({ entity, instanceId, t }: TileProps) {
             {name}
           </p>
         </div>
-      </TileBase>
+        </TileBase>
+      </div>
 
       {fullscreen &&
         createPortal(
