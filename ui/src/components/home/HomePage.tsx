@@ -3,6 +3,7 @@ import { Plus } from "lucide-react";
 import { type MouseEvent as ReactMouseEvent, useMemo, useState } from "react";
 import { getDomain } from "../../lib/domain";
 import { useDisplayPatch } from "../../state/useDisplayPatch";
+import { useEditHomeView } from "../../state/useEditHomeView";
 import {
   type ChipId,
   domainsForChip,
@@ -17,6 +18,7 @@ import type {
   PendingOp,
 } from "../../types";
 import { EmptyState } from "../EmptyState";
+import { EditModeToolbar } from "../edit/EditModeToolbar";
 import { CamerasSection } from "./CamerasSection";
 import { DomainSummaryBadge } from "./DomainSummaryBadge";
 import { FavoritesSection } from "./FavoritesSection";
@@ -102,6 +104,7 @@ export function HomePage({
 }: HomePageProps) {
   const { selectedChip, selectChip, availableChips } = useFilterChip();
   const { patch } = useDisplayPatch(instance.id, ctx, t);
+  const { editMode, exitEditMode, enterEditMode } = useEditHomeView();
   const [menu, setMenu] = useState<MenuState | null>(null);
 
   const allEntities = useMemo(
@@ -186,14 +189,19 @@ export function HomePage({
   if (allEntities.length === 0) {
     return (
       <div className="flex h-full flex-col px-6 py-6">
-        <Header
-          title={instance.name}
-          instanceId={instance.id}
-          rooms={rooms}
-          t={t}
-          onOpenSettings={onOpenSettings}
-          onOpenRoom={onOpenRoom}
-        />
+        {editMode ? (
+          <EditModeToolbar title={instance.name} onDone={exitEditMode} t={t} />
+        ) : (
+          <Header
+            title={instance.name}
+            instanceId={instance.id}
+            rooms={rooms}
+            t={t}
+            onOpenSettings={onOpenSettings}
+            onEnterEditMode={enterEditMode}
+            onOpenRoom={onOpenRoom}
+          />
+        )}
         <div className="flex flex-1 items-center justify-center">
           <EmptyState title={t("ha.home.empty")} />
         </div>
@@ -203,14 +211,19 @@ export function HomePage({
 
   return (
     <div className="relative flex h-full flex-col gap-5 overflow-auto px-6 py-6">
-      <Header
-        title={headerTitle}
-        instanceId={instance.id}
-        rooms={rooms}
-        t={t}
-        onOpenSettings={onOpenSettings}
-        onOpenRoom={onOpenRoom}
-      />
+      {editMode ? (
+        <EditModeToolbar title={instance.name} onDone={exitEditMode} t={t} />
+      ) : (
+        <Header
+          title={headerTitle}
+          instanceId={instance.id}
+          rooms={rooms}
+          t={t}
+          onOpenSettings={onOpenSettings}
+          onEnterEditMode={enterEditMode}
+          onOpenRoom={onOpenRoom}
+        />
+      )}
 
       <FilterChipBar
         availableChips={availableChips}
@@ -289,6 +302,7 @@ function Header({
   rooms,
   t,
   onOpenSettings,
+  onEnterEditMode,
   onOpenRoom,
 }: {
   title: string;
@@ -296,6 +310,7 @@ function Header({
   rooms: HaRoom[];
   t: (k: string) => string;
   onOpenSettings: () => void;
+  onEnterEditMode: () => void;
   onOpenRoom: (roomId: string) => void;
 }) {
   return (
@@ -320,14 +335,8 @@ function Header({
           rooms={rooms}
           t={t}
           onOpenSettings={onOpenSettings}
-          onEditHomeView={() => {
-            // TODO(H9): plug in useEditHomeView.enterEditMode.
-            console.log("[HomePage] enter edit mode");
-          }}
-          onReorderSections={() => {
-            // TODO(H9): plug in section reorder mode.
-            console.log("[HomePage] reorder sections");
-          }}
+          onEditHomeView={onEnterEditMode}
+          onReorderSections={onEnterEditMode}
           onOpenRoom={onOpenRoom}
         />
       </div>
