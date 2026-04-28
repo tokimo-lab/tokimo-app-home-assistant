@@ -16,6 +16,7 @@ pub mod instances;
 pub mod rooms;
 pub mod services;
 pub mod sse;
+pub mod summary;
 
 use std::sync::{Arc, OnceLock};
 

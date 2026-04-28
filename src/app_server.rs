@@ -11,6 +11,7 @@
 //!   DELETE /instances/:id
 //!   POST   /instances/:id/test
 //!   GET    /instances/:id/status
+//!   GET    /instances/:id/summary
 //!   GET    /instances/:id/entities
 //!   GET    /instances/:id/entities/:entity_id
 //!   POST   /instances/:id/entities/:entity_id/override
@@ -75,7 +76,7 @@ pub async fn spawn(service: &str, ctx: Arc<AppCtx>) -> anyhow::Result<DataPlaneS
 }
 
 fn build_router(ctx: Arc<AppCtx>) -> Router {
-    use handlers::{camera, display, entities, instances, rooms, services, sse};
+    use handlers::{camera, display, entities, instances, rooms, services, sse, summary};
 
     Router::new()
         // ── Instance CRUD ─────────────────────────────────────────────────
@@ -91,6 +92,7 @@ fn build_router(ctx: Arc<AppCtx>) -> Router {
         )
         .route("/instances/{id}/test", post(instances::test))
         .route("/instances/{id}/status", get(instances::status))
+        .route("/instances/{id}/summary", get(summary::get_summary))
         // ── Entities ─────────────────────────────────────────────────────
         .route("/instances/{id}/entities", get(entities::list))
         .route("/instances/{id}/entities/{entity_id}", get(entities::get))
