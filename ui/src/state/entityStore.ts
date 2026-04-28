@@ -36,8 +36,15 @@ export function subscribeToSSEUpdates(cb: SseListener): () => void {
 
 // ── Mutation API ──────────────────────────────────────────────────────────
 
+let _rafPending = false;
+
 function notifyRender() {
-  for (const cb of renderListeners) cb();
+  if (_rafPending) return;
+  _rafPending = true;
+  requestAnimationFrame(() => {
+    _rafPending = false;
+    for (const cb of renderListeners) cb();
+  });
 }
 
 /** Apply a full batch from SSE "snapshot" — fires render but NOT sseListeners. */
