@@ -101,7 +101,7 @@ pub enum EntityEvent {
     Snapshot(Vec<EntityState>),
     /// A single entity was added or changed.
     Updated {
-        entity: Box<EntityState>,
+        entity: Arc<EntityState>,
         /// `event.context.id` from the HA `state_changed` event, if present.
         /// The frontend uses this to ack-reconcile pending optimistic
         /// `call_service` updates.

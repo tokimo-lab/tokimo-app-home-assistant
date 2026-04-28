@@ -237,12 +237,14 @@ fn handle_event_msg(instance: &Arc<InstanceCtx>, msg: WsMsg) {
     match serde_json::from_value::<StateChangedData>(data) {
         Ok(changed) => {
             if let Some(new_state) = changed.new_state {
+                // Build Arc once. Clone into DashMap (unavoidable), but broadcast clones only the Arc.
+                let arc_state = Arc::new(new_state);
                 instance
                     .store
                     .states
-                    .insert(new_state.entity_id.clone(), new_state.clone());
+                    .insert(arc_state.entity_id.clone(), (*arc_state).clone());
                 let _ = instance.store.tx.send(EntityEvent::Updated {
-                    entity: Box::new(new_state),
+                    entity: arc_state,
                     context_id,
                 });
             } else {

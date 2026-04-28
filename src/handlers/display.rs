@@ -221,7 +221,7 @@ pub async fn update_display(
         && let Some(state) = instance.store.states.get(&entity_id)
     {
         let _ = instance.store.tx.send(crate::state::EntityEvent::Updated {
-            entity: Box::new(state.clone()),
+            entity: Arc::new(state.clone()),
             context_id: None,
         });
     }

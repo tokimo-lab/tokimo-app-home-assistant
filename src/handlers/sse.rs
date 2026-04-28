@@ -98,7 +98,7 @@ pub async fn events(
                                 .override_cache
                                 .get(&entity.entity_id)
                                 .map(|r| r.clone());
-                            let dto = apply_override_snapshot((**entity).clone(), ov.as_ref());
+                            let dto = apply_override_snapshot((*entity.as_ref()).clone(), ov.as_ref());
                             serde_json::json!({
                                 "type": "updated",
                                 "entity": dto,
