@@ -5,6 +5,7 @@ import { reorderFavorites, updateEntityDisplay } from "../api/display";
 import type {
   EntityState,
   FavoriteReorderItem,
+  RoomEntityReorderItem,
   UpdateEntityDisplayDto,
 } from "../types";
 import { applyOptimistic, getEntitiesSnapshot, getEntity } from "./entityStore";
@@ -100,5 +101,39 @@ export function useDisplayPatch(
     [instanceId, toast, t],
   );
 
-  return { patch, reorderFavoritesOptimistic };
+  /**
+   * Optimistically reorder entities within a room (or any non-favorite group)
+   * by issuing per-entity PATCH calls with the new `sort_order`. Backend has
+   * no batch endpoint for this; one PATCH per entity is fine for typical
+   * room sizes (< 30 entities).
+   */
+  const reorderRoomEntitiesOptimistic = useCallback(
+    async (items: RoomEntityReorderItem[]): Promise<void> => {
+      if (!instanceId) return;
+      const originals: EntityState[] = [];
+      for (const it of items) {
+        const e = getEntity(it.entity_id);
+        if (e) {
+          originals.push(e);
+          applyOptimistic({ ...e, sort_order: it.sort_order });
+        }
+      }
+      try {
+        await Promise.all(
+          items.map((it) =>
+            updateEntityDisplay(instanceId, it.entity_id, {
+              sort_order: it.sort_order,
+            }),
+          ),
+        );
+      } catch (err) {
+        for (const e of originals) applyOptimistic(e);
+        const msg = err instanceof Error ? err.message : String(err);
+        toast.error(`${t("errorSave")}: ${msg}`);
+      }
+    },
+    [instanceId, toast, t],
+  );
+
+  return { patch, reorderFavoritesOptimistic, reorderRoomEntitiesOptimistic };
 }

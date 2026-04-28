@@ -115,6 +115,11 @@ export interface FavoriteReorderItem {
   favorite_order: number;
 }
 
+export interface RoomEntityReorderItem {
+  entity_id: string;
+  sort_order: number;
+}
+
 export interface ReorderResult {
   updated: number;
 }
