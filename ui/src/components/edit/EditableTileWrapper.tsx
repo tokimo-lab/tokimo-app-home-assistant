@@ -1,3 +1,5 @@
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@tokimo/ui";
 import { Maximize2 } from "lucide-react";
 import {
@@ -12,12 +14,12 @@ import type { EntitySize, EntityState } from "../../types";
 
 interface EditableTileWrapperProps {
   entity: EntityState;
-  /** Optional inline style — used by dnd-kit transform/transition (commit 3). */
-  style?: CSSProperties;
-  /** Drag-handle props from useSortable (attached in commit 3). */
-  dragHandleProps?: Record<string, unknown>;
-  /** ref forwarded by parent, also used by useSortable (commit 3). */
-  innerRef?: (el: HTMLDivElement | null) => void;
+  /**
+   * dnd-kit container id (e.g. "favorites" or "room:<room_id>"). When
+   * provided, the wrapper participates in a SortableContext and the
+   * overlay button becomes the drag handle.
+   */
+  sortableContainerId?: string;
   children: ReactNode;
 }
 
@@ -29,6 +31,8 @@ interface EditableTileWrapperProps {
  *   - When selected, shows a ring halo and the ↗ resize handle in the
  *     top-right corner that cycles through valid sizes for the entity's
  *     domain.
+ *   - When sortableContainerId is set, attaches dnd-kit useSortable so the
+ *     tile body is the drag handle and inter-section drag works.
  *
  * This component is purely presentational + interaction. The actual size
  * mutation goes through useEditHomeView.toggleSize, which dispatches to
@@ -36,13 +40,29 @@ interface EditableTileWrapperProps {
  */
 export function EditableTileWrapper({
   entity,
-  style,
-  dragHandleProps,
-  innerRef,
+  sortableContainerId,
   children,
 }: EditableTileWrapperProps) {
   const { selectedTileId, selectTile, toggleSize } = useEditHomeView();
   const selected = selectedTileId === entity.entity_id;
+
+  // useSortable is always called (Rules of Hooks); we just feed it a
+  // throwaway containerId when DnD is disabled. The disabled flag below
+  // suppresses any actual DnD wiring in that case.
+  const sortable = useSortable({
+    id: entity.entity_id,
+    data: { containerId: sortableContainerId ?? "__none__", type: "tile" },
+    disabled: !sortableContainerId,
+  });
+
+  const style: CSSProperties = sortableContainerId
+    ? {
+        transform: CSS.Transform.toString(sortable.transform),
+        transition: sortable.transition,
+        opacity: sortable.isDragging ? 0.4 : undefined,
+        zIndex: sortable.isDragging ? 50 : undefined,
+      }
+    : {};
 
   const handleSelect = useCallback(
     (e: ReactMouseEvent<HTMLElement>) => {
@@ -64,7 +84,7 @@ export function EditableTileWrapper({
 
   return (
     <div
-      ref={innerRef}
+      ref={sortableContainerId ? sortable.setNodeRef : undefined}
       data-testid="editable-tile-wrapper"
       data-selected={selected || undefined}
       data-entity-id={entity.entity_id}
@@ -79,13 +99,15 @@ export function EditableTileWrapper({
 
       {/* Click/drag overlay: swallows pointer events so the underlying tile
           ignores its own handlers while in edit mode. dnd-kit listeners
-          attach here in commit 3 so the whole tile body is the drag handle. */}
+          attach here so the whole tile body is the drag handle. */}
       <button
         type="button"
         aria-label={`Edit ${entity.entity_id}`}
         onClick={handleSelect}
         onContextMenu={(e) => e.preventDefault()}
-        {...(dragHandleProps ?? {})}
+        {...(sortableContainerId
+          ? { ...sortable.attributes, ...sortable.listeners }
+          : {})}
         className={cn(
           "absolute inset-0 cursor-grab rounded-[22px] active:cursor-grabbing",
           "bg-transparent",

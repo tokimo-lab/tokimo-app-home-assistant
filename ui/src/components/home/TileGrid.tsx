@@ -20,6 +20,12 @@ interface TileGridProps {
   forceSize?: EntitySize;
   /** Edit-mode flag for parent-driven jiggle visuals (H9 will plug in). */
   editMode?: boolean;
+  /**
+   * dnd-kit container id for SortableContext participation. When set,
+   * each tile in edit mode is wired into useSortable; otherwise tiles
+   * jiggle but cannot be dragged.
+   */
+  sortableContainerId?: string;
   t: (k: string) => string;
 }
 
@@ -56,6 +62,7 @@ export function TileGrid({
   onContextMenu,
   forceSize,
   editMode,
+  sortableContainerId,
   t,
 }: TileGridProps) {
   if (entities.length === 0) return null;
@@ -82,7 +89,12 @@ export function TileGrid({
         if (editMode) {
           return (
             <div key={entity.entity_id} className={SIZE_SPAN[size]}>
-              <EditableTileWrapper entity={entity}>{tile}</EditableTileWrapper>
+              <EditableTileWrapper
+                entity={entity}
+                sortableContainerId={sortableContainerId}
+              >
+                {tile}
+              </EditableTileWrapper>
             </div>
           );
         }

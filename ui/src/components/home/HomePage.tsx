@@ -1,7 +1,16 @@
+import {
+  closestCenter,
+  DndContext,
+  type DragEndEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
 import type { AppRuntimeCtx } from "@tokimo/sdk";
 import { Plus } from "lucide-react";
 import {
   type MouseEvent as ReactMouseEvent,
+  useCallback,
   useEffect,
   useMemo,
   useState,
@@ -30,7 +39,7 @@ import { cycleSizeFor } from "../edit/EditableTileWrapper";
 import { EditModeToolbar } from "../edit/EditModeToolbar";
 import { CamerasSection } from "./CamerasSection";
 import { DomainSummaryBadge } from "./DomainSummaryBadge";
-import { FavoritesSection } from "./FavoritesSection";
+import { FAVORITES_CONTAINER_ID, FavoritesSection } from "./FavoritesSection";
 import { FilterChipBar } from "./FilterChipBar";
 import { HomeMenu } from "./HomeMenu";
 import { RoomSection } from "./RoomSection";
@@ -136,7 +145,8 @@ export function HomePage({
   t,
 }: HomePageProps) {
   const { selectedChip, selectChip, availableChips } = useFilterChip();
-  const { patch } = useDisplayPatch(instance.id, ctx, t);
+  const { patch, reorderFavoritesOptimistic, reorderRoomEntitiesOptimistic } =
+    useDisplayPatch(instance.id, ctx, t);
   const { editMode, exitEditMode, enterEditMode } = useEditHomeView();
   const [menu, setMenu] = useState<MenuState | null>(null);
 
@@ -236,6 +246,111 @@ export function HomePage({
     void patch(menu.entity.entity_id, { hidden: true });
   };
 
+  // ── DnD: cross-section drag in edit mode ────────────────────────────────
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+  );
+
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event;
+      if (!over) return;
+      const activeId = String(active.id);
+      const sourceContainer =
+        (active.data.current?.containerId as string | undefined) ?? null;
+      // `over.id` may be either an entity_id (sortable item) or a container id
+      // (the section root via DroppableSection's useDroppable).
+      const overId = String(over.id);
+      const overContainer =
+        (over.data.current?.containerId as string | undefined) ?? overId;
+      if (!sourceContainer || !overContainer) return;
+
+      const activeEntity = entities.get(activeId);
+      if (!activeEntity) return;
+
+      // ── Same container: reorder ────────────────────────────────────────
+      if (sourceContainer === overContainer) {
+        if (activeId === overId) return;
+
+        if (sourceContainer === FAVORITES_CONTAINER_ID) {
+          const ordered = [...favorites];
+          const fromIdx = ordered.findIndex((e) => e.entity_id === activeId);
+          const toIdx = ordered.findIndex((e) => e.entity_id === overId);
+          if (fromIdx < 0 || toIdx < 0) return;
+          const [moved] = ordered.splice(fromIdx, 1);
+          if (moved) ordered.splice(toIdx, 0, moved);
+          void reorderFavoritesOptimistic(
+            ordered.map((e, i) => ({
+              entity_id: e.entity_id,
+              favorite_order: i,
+            })),
+          );
+          return;
+        }
+
+        if (sourceContainer.startsWith("room:")) {
+          const roomId = sourceContainer.slice("room:".length);
+          const list = (entitiesByRoom.get(roomId) ?? [])
+            .slice()
+            .sort(bySortOrder);
+          const fromIdx = list.findIndex((e) => e.entity_id === activeId);
+          const toIdx = list.findIndex((e) => e.entity_id === overId);
+          if (fromIdx < 0 || toIdx < 0) return;
+          const [moved] = list.splice(fromIdx, 1);
+          if (moved) list.splice(toIdx, 0, moved);
+          void reorderRoomEntitiesOptimistic(
+            list.map((e, i) => ({
+              entity_id: e.entity_id,
+              sort_order: i,
+            })),
+          );
+          return;
+        }
+        return;
+      }
+
+      // ── Cross-container ────────────────────────────────────────────────
+      // Drop INTO Favorites: just flip is_favorite=true. Source container
+      // stays as-is (an entity can be both in a room and pinned).
+      if (overContainer === FAVORITES_CONTAINER_ID) {
+        void patch(activeId, { is_favorite: true });
+        return;
+      }
+      // Drop FROM Favorites onto a room: clear is_favorite. Per spec:
+      // "保留 area" — we don't move the entity between rooms here, the
+      // entity stays where its area_id says it is.
+      if (sourceContainer === FAVORITES_CONTAINER_ID) {
+        void patch(activeId, { is_favorite: false });
+        return;
+      }
+      // Cross-room move: patch area_id to the new room.
+      // TODO(H10/backend): the spec also calls for explicit room_entities
+      // row deletion + insertion. We currently rely on area_id-based
+      // resolution in HomePage (see entityRoomId), which works for the
+      // common case but won't update an explicit override row. Once H10
+      // settles the data model, either:
+      //   (a) extend `updateEntityDisplay` to atomically rewrite
+      //       room_entities, or
+      //   (b) add a dedicated POST /rooms/:new/entities/move endpoint.
+      if (
+        sourceContainer.startsWith("room:") &&
+        overContainer.startsWith("room:")
+      ) {
+        const newRoomId = overContainer.slice("room:".length);
+        void patch(activeId, { area_id: newRoomId });
+        return;
+      }
+    },
+    [
+      entities,
+      favorites,
+      entitiesByRoom,
+      patch,
+      reorderFavoritesOptimistic,
+      reorderRoomEntitiesOptimistic,
+    ],
+  );
+
   if (allEntities.length === 0) {
     return (
       <div className="flex h-full flex-col px-6 py-6">
@@ -285,6 +400,49 @@ export function HomePage({
 
       {selectedChip ? (
         <DomainSummaryBadge chipId={selectedChip} entities={entities} t={t} />
+      ) : editMode ? (
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          {cameras.length > 0 && (
+            <CamerasSection
+              cameras={cameras}
+              instanceId={instance.id}
+              getPending={getPending}
+              onCall={onCall}
+              onContextMenu={onContextMenu}
+              t={t}
+            />
+          )}
+          <FavoritesSection
+            favorites={favorites}
+            instanceId={instance.id}
+            getPending={getPending}
+            onCall={onCall}
+            onContextMenu={onContextMenu}
+            t={t}
+          />
+          {rooms.map((room) => {
+            const list = (entitiesByRoom.get(room.id) ?? [])
+              .slice()
+              .sort(bySortOrder);
+            return (
+              <RoomSection
+                key={room.id}
+                room={room}
+                entities={list}
+                instanceId={instance.id}
+                getPending={getPending}
+                onCall={onCall}
+                onContextMenu={onContextMenu}
+                onOpenRoom={onOpenRoom}
+                t={t}
+              />
+            );
+          })}
+        </DndContext>
       ) : (
         <>
           {cameras.length > 0 && (
@@ -307,28 +465,27 @@ export function HomePage({
               t={t}
             />
           )}
+          {rooms.map((room) => {
+            const list = (entitiesByRoom.get(room.id) ?? [])
+              .slice()
+              .sort(bySortOrder);
+            if (list.length === 0) return null;
+            return (
+              <RoomSection
+                key={room.id}
+                room={room}
+                entities={list}
+                instanceId={instance.id}
+                getPending={getPending}
+                onCall={onCall}
+                onContextMenu={onContextMenu}
+                onOpenRoom={onOpenRoom}
+                t={t}
+              />
+            );
+          })}
         </>
       )}
-
-      {rooms.map((room) => {
-        const list = (entitiesByRoom.get(room.id) ?? [])
-          .slice()
-          .sort(bySortOrder);
-        if (list.length === 0) return null;
-        return (
-          <RoomSection
-            key={room.id}
-            room={room}
-            entities={list}
-            instanceId={instance.id}
-            getPending={getPending}
-            onCall={onCall}
-            onContextMenu={onContextMenu}
-            onOpenRoom={onOpenRoom}
-            t={t}
-          />
-        );
-      })}
 
       {menu && (
         <TileContextMenu
