@@ -156,6 +156,8 @@ export const zhCN: Record<string, string> = {
   aggMediaPlaying: "音响&电视 {count} 在播",
   aggClimateRange: "空调 {min}–{max}°",
   roomBack: "返回",
+  roomEnvTemperature: "温度",
+  roomEnvHumidity: "湿度",
   domainOther: "其他",
 
   // Errors

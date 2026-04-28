@@ -156,6 +156,8 @@ export const enUS: Record<string, string> = {
   aggMediaPlaying: "{count} media playing",
   aggClimateRange: "Climate {min}–{max}°",
   roomBack: "Back",
+  roomEnvTemperature: "Temperature",
+  roomEnvHumidity: "Humidity",
   domainOther: "Other",
 
   // Errors
