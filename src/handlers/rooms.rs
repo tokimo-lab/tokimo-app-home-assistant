@@ -266,6 +266,7 @@ pub async fn remove_entity(
 #[derive(Serialize)]
 pub struct SyncAreasResp {
     upserted: usize,
+    upserted_entities: usize,
 }
 
 pub async fn sync_areas(State(ctx): State<Arc<AppCtx>>, Path(id): Path<Uuid>) -> Result<Json<SyncAreasResp>, AppError> {
@@ -278,6 +279,8 @@ pub async fn sync_areas(State(ctx): State<Arc<AppCtx>>, Path(id): Path<Uuid>) ->
     let verify_tls: bool = r.get("verify_tls");
 
     let areas = crate::ha::ws::fetch_area_registry(&base_url, &access_token, verify_tls).await?;
+    let entities = crate::ha::ws::fetch_entity_registry(&base_url, &access_token, verify_tls).await?;
+    let devices = crate::ha::ws::fetch_device_registry(&base_url, &access_token, verify_tls).await?;
 
     let arr = areas
         .as_array()
@@ -304,7 +307,75 @@ pub async fn sync_areas(State(ctx): State<Arc<AppCtx>>, Path(id): Path<Uuid>) ->
         upserted += 1;
     }
 
-    Ok(Json(SyncAreasResp { upserted }))
+    // Build ha_area_id -> room.id (uuid) map for this instance.
+    let room_rows = sqlx::query("SELECT id, ha_area_id FROM rooms WHERE instance_id = $1 AND ha_area_id IS NOT NULL")
+        .bind(id)
+        .fetch_all(&ctx.pool)
+        .await?;
+    let mut area_to_room: std::collections::HashMap<String, Uuid> = std::collections::HashMap::new();
+    for row in room_rows {
+        let room_id: Uuid = row.get("id");
+        let ha_area_id: String = row.get("ha_area_id");
+        area_to_room.insert(ha_area_id, room_id);
+    }
+
+    // Build device_id -> ha_area_id map.
+    let empty_vec = Vec::new();
+    let device_arr = devices.as_array().unwrap_or(&empty_vec);
+    let mut device_area: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    for d in device_arr {
+        let Some(did) = d.get("id").and_then(|v| v.as_str()) else {
+            continue;
+        };
+        if let Some(aid) = d.get("area_id").and_then(|v| v.as_str()) {
+            device_area.insert(did.to_string(), aid.to_string());
+        }
+    }
+
+    // For each entity compute effective area and upsert into entity_overrides.
+    let entity_arr = entities.as_array().unwrap_or(&empty_vec);
+    let mut upserted_entities = 0usize;
+    for e in entity_arr {
+        let Some(entity_id) = e.get("entity_id").and_then(|v| v.as_str()) else {
+            continue;
+        };
+        if entity_id.is_empty() {
+            continue;
+        }
+        let effective_area_ha: Option<String> = e
+            .get("area_id")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
+            .or_else(|| {
+                e.get("device_id")
+                    .and_then(|v| v.as_str())
+                    .and_then(|did| device_area.get(did).cloned())
+            });
+        let Some(ha_aid) = effective_area_ha else {
+            continue;
+        };
+        let Some(room_uuid) = area_to_room.get(&ha_aid).copied() else {
+            continue;
+        };
+
+        sqlx::query(
+            r#"INSERT INTO entity_overrides(instance_id, entity_id, area_id)
+               VALUES ($1, $2, $3)
+               ON CONFLICT (instance_id, entity_id)
+               DO UPDATE SET area_id = EXCLUDED.area_id, updated_at = NOW()"#,
+        )
+        .bind(id)
+        .bind(entity_id)
+        .bind(room_uuid)
+        .execute(&ctx.pool)
+        .await?;
+        upserted_entities += 1;
+    }
+
+    Ok(Json(SyncAreasResp {
+        upserted,
+        upserted_entities,
+    }))
 }
 
 // ─── Areas passthrough ────────────────────────────────────────────────────────

@@ -273,24 +273,24 @@ where
     }
 }
 
-/// One-shot WebSocket fetch of HA's area registry.
+/// One-shot WebSocket command against HA. Opens a short-lived WS, performs
+/// auth handshake, issues a single command, returns the `result` field.
 ///
-/// HA only exposes `config/area_registry/list` over the WebSocket API — the
-/// equivalent REST path returns 404. This helper opens a short-lived WS
-/// connection, performs the standard auth handshake, issues a single command,
-/// and returns the `result` field as raw JSON.
-pub async fn fetch_area_registry(
+/// Used for registry endpoints (area / entity / device) that HA only exposes
+/// over the WebSocket API — the equivalent REST paths return 404.
+async fn ws_command(
     base_url: &str,
     access_token: &str,
     verify_tls: bool,
+    command_type: &'static str,
 ) -> Result<serde_json::Value, AppError> {
     let ws_url = to_ws_url(base_url).map_err(|e| AppError::bad_gateway(format!("HA WS url: {e}")))?;
-    debug!(%ws_url, verify_tls, "HA WS one-shot: fetch_area_registry");
+    debug!(%ws_url, verify_tls, command_type, "HA WS one-shot");
 
     let connector = crate::tls::ws_connector(verify_tls);
     let overall = Duration::from_secs(10);
 
-    let result = timeout(overall, async move {
+    timeout(overall, async move {
         let (mut stream, _) = connect_async_tls_with_config(&ws_url, None, false, connector)
             .await
             .map_err(|e| AppError::bad_gateway(format!("HA WS connect: {e}")))?;
@@ -331,29 +331,29 @@ pub async fn fetch_area_registry(
         let cmd_id: u64 = 1;
         stream
             .send(Message::Text(
-                json!({"id": cmd_id, "type": "config/area_registry/list"}).to_string(),
+                json!({"id": cmd_id, "type": command_type}).to_string(),
             ))
             .await
-            .map_err(|e| AppError::bad_gateway(format!("HA WS send command: {e}")))?;
+            .map_err(|e| AppError::bad_gateway(format!("HA WS send {command_type}: {e}")))?;
 
         let msg = read_msg(&mut stream)
             .await
-            .map_err(|e| AppError::bad_gateway(format!("HA WS read result: {e}")))?;
+            .map_err(|e| AppError::bad_gateway(format!("HA WS read {command_type} result: {e}")))?;
         if msg.id != Some(cmd_id) || msg.kind != "result" {
             return Err(AppError::bad_gateway(format!(
-                "HA WS unexpected response (kind={}, id={:?})",
+                "HA WS unexpected response to {command_type} (kind={}, id={:?})",
                 msg.kind, msg.id
             )));
         }
         if msg.success != Some(true) {
             return Err(AppError::bad_gateway(format!(
-                "HA WS area_registry/list failed: {:?}",
+                "HA WS {command_type} failed: {:?}",
                 msg.error
             )));
         }
         let result = msg
             .result
-            .ok_or_else(|| AppError::bad_gateway("HA WS area_registry/list missing result"))?;
+            .ok_or_else(|| AppError::bad_gateway(format!("HA WS {command_type} missing result")))?;
 
         // Best-effort close.
         let _ = stream.send(Message::Close(None)).await;
@@ -361,9 +361,36 @@ pub async fn fetch_area_registry(
         Ok::<serde_json::Value, AppError>(result)
     })
     .await
-    .map_err(|_| AppError::bad_gateway("HA WS area_registry/list timed out"))?;
+    .map_err(|_| AppError::bad_gateway(format!("HA WS {command_type} timed out")))?
+}
 
-    result
+/// One-shot WebSocket fetch of HA's area registry.
+pub async fn fetch_area_registry(
+    base_url: &str,
+    access_token: &str,
+    verify_tls: bool,
+) -> Result<serde_json::Value, AppError> {
+    ws_command(base_url, access_token, verify_tls, "config/area_registry/list").await
+}
+
+/// One-shot WebSocket fetch of HA's entity registry. Each entry contains
+/// `entity_id`, `area_id` (nullable), `device_id` (nullable), and more.
+pub async fn fetch_entity_registry(
+    base_url: &str,
+    access_token: &str,
+    verify_tls: bool,
+) -> Result<serde_json::Value, AppError> {
+    ws_command(base_url, access_token, verify_tls, "config/entity_registry/list").await
+}
+
+/// One-shot WebSocket fetch of HA's device registry. Each entry contains
+/// `id` and `area_id` (nullable), used to resolve entity area inheritance.
+pub async fn fetch_device_registry(
+    base_url: &str,
+    access_token: &str,
+    verify_tls: bool,
+) -> Result<serde_json::Value, AppError> {
+    ws_command(base_url, access_token, verify_tls, "config/device_registry/list").await
 }
 
 /// Convert `http://host/...` → `ws://host/api/websocket` (strips any existing path).
