@@ -1,10 +1,11 @@
 import { Fan } from "lucide-react";
+import { memo } from "react";
 import { getTileGradient } from "../../lib/colors";
 import { getFriendlyName } from "../../lib/format";
-import type { TileProps } from "./_types";
+import { tilePropsEqual, type TileProps } from "./_types";
 import { TileBase } from "./TileBase";
 
-export function FanTile({ entity, t, onCall }: TileProps) {
+function FanTileImpl({ entity, t, onCall }: TileProps) {
   const { entity_id, state, attributes } = entity;
   const isOn = state === "on";
   const gradient = getTileGradient("fan", state);
@@ -103,3 +104,5 @@ export function FanTile({ entity, t, onCall }: TileProps) {
     </TileBase>
   );
 }
+
+export const FanTile = memo(FanTileImpl, tilePropsEqual);

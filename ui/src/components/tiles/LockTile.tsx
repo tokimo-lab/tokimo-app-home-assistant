@@ -1,10 +1,11 @@
 import { Lock, LockOpen } from "lucide-react";
+import { memo } from "react";
 import { getTileGradient } from "../../lib/colors";
 import { getFriendlyName } from "../../lib/format";
-import type { TileProps } from "./_types";
+import { tilePropsEqual, type TileProps } from "./_types";
 import { TileBase } from "./TileBase";
 
-export function LockTile({ entity, t, onCall }: TileProps) {
+function LockTileImpl({ entity, t, onCall }: TileProps) {
   const { entity_id, state } = entity;
   const isLocked = state === "locked";
   const gradient = getTileGradient("lock", state);
@@ -36,3 +37,5 @@ export function LockTile({ entity, t, onCall }: TileProps) {
     </TileBase>
   );
 }
+
+export const LockTile = memo(LockTileImpl, tilePropsEqual);

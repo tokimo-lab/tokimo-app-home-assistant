@@ -1,9 +1,10 @@
 import { Radio } from "lucide-react";
+import { memo } from "react";
 import { getFriendlyName } from "../../lib/format";
-import type { TileProps } from "./_types";
+import { tilePropsEqual, type TileProps } from "./_types";
 import { TileBase } from "./TileBase";
 
-export function SensorTile({ entity, t: _t }: TileProps) {
+function SensorTileImpl({ entity, t: _t }: TileProps) {
   const { state, attributes } = entity;
   const name = getFriendlyName(entity);
   const unit = attributes.unit_of_measurement ?? "";
@@ -27,3 +28,5 @@ export function SensorTile({ entity, t: _t }: TileProps) {
     </TileBase>
   );
 }
+
+export const SensorTile = memo(SensorTileImpl, tilePropsEqual);

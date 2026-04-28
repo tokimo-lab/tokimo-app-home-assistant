@@ -1,11 +1,12 @@
 import { Zap } from "lucide-react";
+import { memo } from "react";
 import { formatState, getFriendlyName } from "../../lib/format";
-import type { TileProps } from "./_types";
+import { tilePropsEqual, type TileProps } from "./_types";
 import { TileBase } from "./TileBase";
 
 // Binary sensor active = motion/door/window open → orange
 // inactive = neutral
-export function BinarySensorTile({ entity, t }: TileProps) {
+function BinarySensorTileImpl({ entity, t }: TileProps) {
   const { state } = entity;
   const isActive = state === "on";
   const name = getFriendlyName(entity);
@@ -24,3 +25,5 @@ export function BinarySensorTile({ entity, t }: TileProps) {
     </TileBase>
   );
 }
+
+export const BinarySensorTile = memo(BinarySensorTileImpl, tilePropsEqual);

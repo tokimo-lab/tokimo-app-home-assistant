@@ -1,10 +1,11 @@
 import { Power } from "lucide-react";
+import { memo } from "react";
 import { getTileGradient } from "../../lib/colors";
 import { getFriendlyName } from "../../lib/format";
-import type { TileProps } from "./_types";
+import { tilePropsEqual, type TileProps } from "./_types";
 import { TileBase } from "./TileBase";
 
-export function SwitchTile({ entity, t, onCall }: TileProps) {
+function SwitchTileImpl({ entity, t, onCall }: TileProps) {
   const { entity_id, state } = entity;
   const isOn = state === "on";
   const gradient = getTileGradient("switch", state);
@@ -32,3 +33,5 @@ export function SwitchTile({ entity, t, onCall }: TileProps) {
     </TileBase>
   );
 }
+
+export const SwitchTile = memo(SwitchTileImpl, tilePropsEqual);

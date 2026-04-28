@@ -1,8 +1,8 @@
 import { Camera, Maximize2, RefreshCw } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { getFriendlyName } from "../../lib/format";
-import type { TileProps } from "./_types";
+import { tilePropsEqual, type TileProps } from "./_types";
 import { TileBase } from "./TileBase";
 
 const REFRESH_INTERVAL = 10_000;
@@ -11,7 +11,7 @@ function buildProxyUrl(instanceId: string, entityId: string): string {
   return `/api/apps/home-assistant/instances/${encodeURIComponent(instanceId)}/camera_proxy/${encodeURIComponent(entityId)}`;
 }
 
-export function CameraTile({ entity, instanceId, t }: TileProps) {
+function CameraTileImpl({ entity, instanceId, t }: TileProps) {
   const { entity_id } = entity;
   const name = getFriendlyName(entity);
   const [imgSrc, setImgSrc] = useState<string>(() =>
@@ -87,3 +87,5 @@ export function CameraTile({ entity, instanceId, t }: TileProps) {
     </>
   );
 }
+
+export const CameraTile = memo(CameraTileImpl, tilePropsEqual);

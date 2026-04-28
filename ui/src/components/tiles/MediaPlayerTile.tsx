@@ -1,10 +1,11 @@
 import { Pause, Play, SkipForward, Volume2, VolumeX } from "lucide-react";
+import { memo } from "react";
 import { getTileGradient } from "../../lib/colors";
 import { getFriendlyName } from "../../lib/format";
-import type { TileProps } from "./_types";
+import { tilePropsEqual, type TileProps } from "./_types";
 import { TileBase } from "./TileBase";
 
-export function MediaPlayerTile({ entity, t, onCall }: TileProps) {
+function MediaPlayerTileImpl({ entity, t, onCall }: TileProps) {
   const { entity_id, state, attributes } = entity;
   const isPlaying = state === "playing";
   const gradient = getTileGradient("media_player", state);
@@ -115,3 +116,5 @@ export function MediaPlayerTile({ entity, t, onCall }: TileProps) {
     </TileBase>
   );
 }
+
+export const MediaPlayerTile = memo(MediaPlayerTileImpl, tilePropsEqual);

@@ -1,10 +1,11 @@
 import { Battery, Wind } from "lucide-react";
+import { memo } from "react";
 import { getTileGradient } from "../../lib/colors";
 import { getFriendlyName } from "../../lib/format";
-import type { TileProps } from "./_types";
+import { tilePropsEqual, type TileProps } from "./_types";
 import { TileBase } from "./TileBase";
 
-export function VacuumTile({ entity, t, onCall }: TileProps) {
+function VacuumTileImpl({ entity, t, onCall }: TileProps) {
   const { entity_id, state, attributes } = entity;
   const isCleaning = state === "cleaning";
   const gradient = getTileGradient("vacuum", state);
@@ -88,3 +89,5 @@ export function VacuumTile({ entity, t, onCall }: TileProps) {
     </TileBase>
   );
 }
+
+export const VacuumTile = memo(VacuumTileImpl, tilePropsEqual);

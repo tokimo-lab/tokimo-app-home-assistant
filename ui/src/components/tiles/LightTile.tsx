@@ -1,17 +1,18 @@
 import { Lightbulb } from "lucide-react";
+import { memo } from "react";
 import { getTileGradient } from "../../lib/colors";
 import {
   brightnessToPercent,
   getFriendlyName,
   percentToBrightness,
 } from "../../lib/format";
-import type { TileProps } from "./_types";
+import { tilePropsEqual, type TileProps } from "./_types";
 import { TileBase } from "./TileBase";
 
 const SUPPORTS_BRIGHTNESS = 1;
 const SUPPORTS_COLOR = 16;
 
-export function LightTile({ entity, t, onCall }: TileProps) {
+function LightTileImpl({ entity, t, onCall }: TileProps) {
   const { entity_id, state, attributes } = entity;
   const isOn = state === "on";
   const gradient = getTileGradient("light", state);
@@ -123,3 +124,5 @@ function hexToRgb(hex: string): [number, number, number] {
   const n = parseInt(hex.slice(1), 16);
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
+
+export const LightTile = memo(LightTileImpl, tilePropsEqual);

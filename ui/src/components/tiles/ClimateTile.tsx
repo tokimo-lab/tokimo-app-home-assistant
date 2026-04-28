@@ -1,10 +1,11 @@
 import { Thermometer } from "lucide-react";
+import { memo } from "react";
 import { getTileGradient } from "../../lib/colors";
 import { getFriendlyName } from "../../lib/format";
-import type { TileProps } from "./_types";
+import { tilePropsEqual, type TileProps } from "./_types";
 import { TileBase } from "./TileBase";
 
-export function ClimateTile({ entity, t, onCall }: TileProps) {
+function ClimateTileImpl({ entity, t, onCall }: TileProps) {
   const { entity_id, state, attributes } = entity;
   const gradient = getTileGradient("climate", state);
   const name = getFriendlyName(entity);
@@ -97,3 +98,5 @@ export function ClimateTile({ entity, t, onCall }: TileProps) {
     </TileBase>
   );
 }
+
+export const ClimateTile = memo(ClimateTileImpl, tilePropsEqual);

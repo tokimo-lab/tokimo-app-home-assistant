@@ -13,7 +13,7 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import type { CSSProperties, ReactNode } from "react";
+import { memo, type CSSProperties, type ReactNode } from "react";
 import type {
   CallParams,
   EntitySize,
@@ -145,42 +145,45 @@ export function FlowGrid({
   );
 }
 
-function SortableCell({
-  entity,
-  spanClassName,
-  onContextMenu,
-  children,
-}: {
-  entity: EntityState;
-  spanClassName: string;
-  onContextMenu?: (e: React.MouseEvent) => void;
-  children: ReactNode;
-}) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: entity.entity_id });
-  const style: CSSProperties = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.4 : 1,
-    zIndex: isDragging ? 50 : undefined,
-  };
-  return (
-    // biome-ignore lint/a11y/noStaticElementInteractions: dnd-kit attributes inject role/tabindex; contextmenu is a passive enhancement
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={`${spanClassName} touch-none`}
-      onContextMenu={onContextMenu}
-      {...attributes}
-      {...listeners}
-    >
-      {children}
-    </div>
-  );
-}
+const SortableCell = memo(
+  function SortableCell({
+    entity,
+    spanClassName,
+    onContextMenu,
+    children,
+  }: {
+    entity: EntityState;
+    spanClassName: string;
+    onContextMenu?: (e: React.MouseEvent) => void;
+    children: ReactNode;
+  }) {
+    const {
+      attributes,
+      listeners,
+      setNodeRef,
+      transform,
+      transition,
+      isDragging,
+    } = useSortable({ id: entity.entity_id });
+    const style: CSSProperties = {
+      transform: CSS.Transform.toString(transform),
+      transition,
+      opacity: isDragging ? 0.4 : 1,
+      zIndex: isDragging ? 50 : undefined,
+    };
+    return (
+      // biome-ignore lint/a11y/noStaticElementInteractions: dnd-kit attributes inject role/tabindex; contextmenu is a passive enhancement
+      <div
+        ref={setNodeRef}
+        style={style}
+        className={`${spanClassName} touch-none`}
+        onContextMenu={onContextMenu}
+        {...attributes}
+        {...listeners}
+      >
+        {children}
+      </div>
+    );
+  },
+  (prev, next) => prev.entity === next.entity && prev.onContextMenu === next.onContextMenu,
+);

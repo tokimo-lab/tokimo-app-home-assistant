@@ -1,10 +1,11 @@
 import { Blinds } from "lucide-react";
+import { memo } from "react";
 import { getTileGradient } from "../../lib/colors";
 import { getFriendlyName } from "../../lib/format";
-import type { TileProps } from "./_types";
+import { tilePropsEqual, type TileProps } from "./_types";
 import { TileBase } from "./TileBase";
 
-export function CoverTile({ entity, t, onCall }: TileProps) {
+function CoverTileImpl({ entity, t, onCall }: TileProps) {
   const { entity_id, state, attributes } = entity;
   const isOpen = state === "open";
   const gradient = getTileGradient("cover", state);
@@ -107,3 +108,5 @@ export function CoverTile({ entity, t, onCall }: TileProps) {
     </TileBase>
   );
 }
+
+export const CoverTile = memo(CoverTileImpl, tilePropsEqual);

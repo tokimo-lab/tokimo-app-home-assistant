@@ -1,10 +1,11 @@
 import { PlaySquare } from "lucide-react";
+import { memo } from "react";
 import { getTileGradient } from "../../lib/colors";
 import { getFriendlyName } from "../../lib/format";
-import type { TileProps } from "./_types";
+import { tilePropsEqual, type TileProps } from "./_types";
 import { TileBase } from "./TileBase";
 
-export function SceneTile({ entity, t, onCall }: TileProps) {
+function SceneTileImpl({ entity, t, onCall }: TileProps) {
   const { entity_id } = entity;
   const gradient = getTileGradient("scene", "on");
   const name = getFriendlyName(entity);
@@ -28,3 +29,5 @@ export function SceneTile({ entity, t, onCall }: TileProps) {
     </TileBase>
   );
 }
+
+export const SceneTile = memo(SceneTileImpl, tilePropsEqual);
