@@ -1,14 +1,16 @@
+import type { AppRuntimeCtx } from "@tokimo/sdk";
 import { Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { reorderFavorites, updateEntityDisplay } from "../../api/display";
 import { getDomain } from "../../lib/domain";
 import { getEntitiesSnapshot, subscribeRender } from "../../state/entityStore";
+import { useDisplayPatch } from "../../state/useDisplayPatch";
 import type { EntityState, FavoriteReorderItem } from "../../types";
 import { EntityIcon } from "../EntityIcon";
 import { SortableList, SortableRow } from "./SortableRow";
 
 interface FavoritesTabProps {
   instanceId: string;
+  ctx: AppRuntimeCtx;
   t: (k: string) => string;
 }
 
@@ -16,7 +18,13 @@ function entityLabel(e: EntityState): string {
   return e.display_name ?? e.attributes.friendly_name ?? e.entity_id;
 }
 
-export function FavoritesTab({ instanceId, t }: FavoritesTabProps) {
+export function FavoritesTab({ instanceId, ctx, t }: FavoritesTabProps) {
+  const { patch, reorderFavoritesOptimistic } = useDisplayPatch(
+    instanceId,
+    ctx,
+    t,
+  );
+
   // Read from the shared entity store (parent already opened the SSE stream).
   const entities = useSyncExternalStore(
     subscribeRender,
@@ -55,11 +63,7 @@ export function FavoritesTab({ instanceId, t }: FavoritesTabProps) {
       entity_id: id,
       favorite_order: i,
     }));
-    try {
-      await reorderFavorites(instanceId, items);
-    } catch (e) {
-      console.warn("[ha:favorites] reorder failed", e);
-    }
+    await reorderFavoritesOptimistic(items);
   }
 
   function move(idx: number, dir: -1 | 1) {
@@ -74,11 +78,7 @@ export function FavoritesTab({ instanceId, t }: FavoritesTabProps) {
 
   async function unfavorite(entityId: string) {
     setOrderIds((prev) => prev.filter((id) => id !== entityId));
-    try {
-      await updateEntityDisplay(instanceId, entityId, { is_favorite: false });
-    } catch (e) {
-      console.warn("[ha:favorites] unfavorite failed", e);
-    }
+    await patch(entityId, { is_favorite: false });
   }
 
   if (orderedFavorites.length === 0) {

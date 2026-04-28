@@ -116,7 +116,7 @@ export function SettingsPane({
               />
             )}
             {tab === "favorites" && (
-              <FavoritesTab instanceId={instance.id} t={t} />
+              <FavoritesTab instanceId={instance.id} ctx={ctx} t={t} />
             )}
           </>
         )}
