@@ -148,8 +148,9 @@ pub async fn update(
     // Fetch current values.
     let current = sqlx::query("SELECT base_url, access_token, verify_tls FROM instances WHERE id = $1")
         .bind(id)
-        .fetch_one(&ctx.pool)
-        .await?;
+        .fetch_optional(&ctx.pool)
+        .await?
+        .ok_or_else(|| AppError::not_found(format!("instance not found: {id}")))?;
 
     let new_base_url = req.base_url.as_deref().unwrap_or(current.get("base_url"));
     let new_token = req.access_token.as_deref().unwrap_or(current.get("access_token"));
@@ -215,8 +216,11 @@ pub async fn delete(State(ctx): State<Arc<AppCtx>>, Path(id): Path<Uuid>) -> Res
         .bind(id)
         .execute(&ctx.pool)
         .await?;
+    if res.rows_affected() == 0 {
+        return Err(AppError::not_found(format!("instance not found: {id}")));
+    }
     Ok(Json(DeleteResp {
-        deleted: res.rows_affected() > 0,
+        deleted: true,
     }))
 }
 
