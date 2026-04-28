@@ -31,7 +31,7 @@ export function CamerasSection({
         }}
         className="mb-3 flex cursor-pointer items-center gap-1 text-base font-semibold text-[var(--text-primary)] transition hover:text-[var(--accent,#6366f1)]"
       >
-        <span>{t("ha.section.cameras")}</span>
+        <span>{t("sectionCameras")}</span>
         <ChevronRight size={18} />
       </button>
       <TileGrid

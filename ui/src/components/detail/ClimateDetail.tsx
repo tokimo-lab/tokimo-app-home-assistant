@@ -157,7 +157,7 @@ export function ClimateDetail({ entity, onCall, t }: DomainDetailProps) {
       <div
         role="slider"
         tabIndex={0}
-        aria-label={t("ha.detail.climate.target")}
+        aria-label={t("detailClimateTarget")}
         aria-valuemin={minTemp}
         aria-valuemax={maxTemp}
         aria-valuenow={target}
@@ -172,7 +172,7 @@ export function ClimateDetail({ entity, onCall, t }: DomainDetailProps) {
           onPointerDown={onPointerDown}
           aria-hidden="true"
         >
-          <title>{t("ha.detail.climate.target")}</title>
+          <title>{t("detailClimateTarget")}</title>
           <g
             transform={`rotate(${ARC_START_DEG - 90} ${SIZE / 2} ${SIZE / 2})`}
           >
@@ -227,7 +227,7 @@ export function ClimateDetail({ entity, onCall, t }: DomainDetailProps) {
               dominantBaseline="middle"
               className="fill-zinc-500 text-sm dark:fill-zinc-400"
             >
-              {t("ha.detail.climate.current")}: {current}
+              {t("detailClimateCurrent")}: {current}
               {unit}
             </text>
           )}
@@ -237,7 +237,7 @@ export function ClimateDetail({ entity, onCall, t }: DomainDetailProps) {
       {hvacModes.length > 0 && (
         <div className="flex w-full flex-col gap-2">
           <span className="text-sm text-zinc-500 dark:text-zinc-400">
-            {t("ha.detail.climate.mode")}
+            {t("detailClimateMode")}
           </span>
           <div className="flex flex-wrap gap-2">
             {hvacModes.map((mode) => {
@@ -254,10 +254,11 @@ export function ClimateDetail({ entity, onCall, t }: DomainDetailProps) {
                       : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
                   }`}
                 >
-                  {t(`ha.detail.climate.hvac.${mode}`) ===
-                  `ha.detail.climate.hvac.${mode}`
-                    ? mode
-                    : t(`ha.detail.climate.hvac.${mode}`)}
+                  {(() => {
+                    const key = `detailClimateHvac${mode.charAt(0).toUpperCase()}${mode.slice(1).replace(/_([a-z])/g, (_, c) => c.toUpperCase())}`;
+                    const v = t(key);
+                    return v === key ? mode : v;
+                  })()}
                 </button>
               );
             })}

@@ -23,7 +23,7 @@ export function CameraDetail({ entity, t }: DomainDetailProps) {
         {src && (
           <img
             src={src}
-            alt={t("ha.detail.camera.preview")}
+            alt={t("detailCameraPreview")}
             className={`h-full w-full object-cover transition-opacity duration-200 ${
               status === "loaded" ? "opacity-100" : "opacity-0"
             }`}
@@ -40,12 +40,12 @@ export function CameraDetail({ entity, t }: DomainDetailProps) {
         {status === "error" && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-zinc-400 dark:text-zinc-500">
             <CameraOff size={32} />
-            <p className="text-sm">{t("ha.detail.camera.unavailable")}</p>
+            <p className="text-sm">{t("detailCameraUnavailable")}</p>
           </div>
         )}
       </div>
       <p className="text-center text-xs text-zinc-500 dark:text-zinc-400">
-        {t("ha.detail.camera.snapshotNote")}
+        {t("detailCameraSnapshotNote")}
       </p>
     </div>
   );

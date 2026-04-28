@@ -29,7 +29,7 @@ export function FavoritesSection({
 
   const header = (
     <h2 className="mb-3 text-base font-semibold text-[var(--text-primary)]">
-      {t("ha.section.favorites")}
+      {t("sectionFavorites")}
     </h2>
   );
 

@@ -30,7 +30,11 @@ export function VacuumDetail({ entity, onCall, t }: DomainDetailProps) {
             </span>
           </div>
           <p className="text-sm text-zinc-500 dark:text-zinc-400">
-            {t(`ha.detail.vacuum.state.${state}`) || state}
+            {(() => {
+              const key = `detailVacuumState${state.charAt(0).toUpperCase()}${state.slice(1)}`;
+              const v = t(key);
+              return v === key ? state : v;
+            })()}
           </p>
         </div>
       )}
@@ -39,7 +43,7 @@ export function VacuumDetail({ entity, onCall, t }: DomainDetailProps) {
         <button
           type="button"
           onClick={() => call("start", "cleaning")}
-          aria-label={t("ha.detail.vacuum.start")}
+          aria-label={t("detailVacuumStart")}
           className={`flex h-16 w-16 cursor-pointer items-center justify-center rounded-full shadow transition active:scale-95 ${
             isCleaning
               ? "bg-emerald-500 text-white"
@@ -51,7 +55,7 @@ export function VacuumDetail({ entity, onCall, t }: DomainDetailProps) {
         <button
           type="button"
           onClick={() => call("pause", "paused")}
-          aria-label={t("ha.detail.vacuum.pause")}
+          aria-label={t("detailVacuumPause")}
           className="flex h-16 w-16 cursor-pointer items-center justify-center rounded-full bg-zinc-100 text-zinc-700 shadow transition hover:bg-zinc-200 active:scale-95 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
         >
           <Pause size={24} fill="currentColor" />
@@ -59,7 +63,7 @@ export function VacuumDetail({ entity, onCall, t }: DomainDetailProps) {
         <button
           type="button"
           onClick={() => call("return_to_base", "returning")}
-          aria-label={t("ha.detail.vacuum.returnToBase")}
+          aria-label={t("detailVacuumReturnToBase")}
           className="flex h-16 w-16 cursor-pointer items-center justify-center rounded-full bg-zinc-100 text-zinc-700 shadow transition hover:bg-zinc-200 active:scale-95 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
         >
           <Home size={22} />

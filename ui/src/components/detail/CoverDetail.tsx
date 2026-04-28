@@ -39,7 +39,7 @@ export function CoverDetail({ entity, onCall, t }: DomainDetailProps) {
         onChangeEnd={commit}
         fillClassName="bg-gradient-to-t from-sky-500 to-sky-400"
         trackClassName="bg-zinc-200 dark:bg-zinc-800"
-        ariaLabel={t("ha.detail.cover.position")}
+        ariaLabel={t("detailCoverPosition")}
       >
         <span className="font-semibold text-2xl text-zinc-900 dark:text-zinc-100">
           {pos}%
@@ -59,7 +59,7 @@ export function CoverDetail({ entity, onCall, t }: DomainDetailProps) {
           }
           className="cursor-pointer rounded-full bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
         >
-          {t("ha.detail.cover.open")}
+          {t("detailCoverOpen")}
         </button>
         <button
           type="button"
@@ -74,7 +74,7 @@ export function CoverDetail({ entity, onCall, t }: DomainDetailProps) {
           }
           className="cursor-pointer rounded-full bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
         >
-          {t("ha.detail.cover.close")}
+          {t("detailCoverClose")}
         </button>
         <button
           type="button"
@@ -88,7 +88,7 @@ export function CoverDetail({ entity, onCall, t }: DomainDetailProps) {
           }
           className="cursor-pointer rounded-full bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
         >
-          {t("ha.detail.cover.stop")}
+          {t("detailCoverStop")}
         </button>
       </div>
     </div>

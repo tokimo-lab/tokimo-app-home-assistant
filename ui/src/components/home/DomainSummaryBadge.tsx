@@ -51,8 +51,8 @@ function climateBadges(
       icon: Thermometer,
       label:
         Math.abs(max - min) < 0.1
-          ? `${t("ha.summary.temperature")} ${min.toFixed(1)}°`
-          : `${t("ha.summary.temperature")} ${min.toFixed(1)}–${max.toFixed(1)}°`,
+          ? `${t("summaryTemperature")} ${min.toFixed(1)}°`
+          : `${t("summaryTemperature")} ${min.toFixed(1)}–${max.toFixed(1)}°`,
     });
   }
   if (hums.length > 0) {
@@ -63,8 +63,8 @@ function climateBadges(
       icon: Thermometer,
       label:
         Math.abs(max - min) < 0.5
-          ? `${t("ha.summary.humidity")} ${Math.round(min)}%`
-          : `${t("ha.summary.humidity")} ${Math.round(min)}–${Math.round(max)}%`,
+          ? `${t("summaryHumidity")} ${Math.round(min)}%`
+          : `${t("summaryHumidity")} ${Math.round(min)}–${Math.round(max)}%`,
     });
   }
   return out;
@@ -83,7 +83,7 @@ function lightsBadges(
     {
       key: "lights",
       icon: Lightbulb,
-      label: `${on} ${t("ha.summary.lightsOn")}`,
+      label: `${on} ${t("summaryLightsOn")}`,
     },
   ];
 }
@@ -112,18 +112,18 @@ function securityBadges(
     out.push({
       key: "unlocked",
       icon: Lock,
-      label: `${unlocked} ${t("ha.summary.unlocked")}`,
+      label: `${unlocked} ${t("summaryUnlocked")}`,
     });
   }
   if (alerts > 0) {
     out.push({
       key: "alerts",
       icon: Lock,
-      label: `${alerts} ${t("ha.summary.alerts")}`,
+      label: `${alerts} ${t("summaryAlerts")}`,
     });
   }
   if (out.length === 0) {
-    out.push({ key: "secure", icon: Lock, label: t("ha.summary.secure") });
+    out.push({ key: "secure", icon: Lock, label: t("summarySecure") });
   }
   return out;
 }
@@ -143,7 +143,7 @@ function speakersBadges(
     {
       key: "playing",
       icon: Speaker,
-      label: `${playing} ${t("ha.summary.playing")}`,
+      label: `${playing} ${t("summaryPlaying")}`,
     },
   ];
 }
@@ -161,7 +161,7 @@ function coversBadges(
     {
       key: "open",
       icon: Blinds,
-      label: `${open} ${t("ha.summary.coversOpen")}`,
+      label: `${open} ${t("summaryCoversOpen")}`,
     },
   ];
 }
@@ -177,7 +177,7 @@ function switchesBadges(
   }
   if (on === 0) return [];
   return [
-    { key: "on", icon: Lock, label: `${on} ${t("ha.summary.switchesOn")}` },
+    { key: "on", icon: Lock, label: `${on} ${t("summarySwitchesOn")}` },
   ];
 }
 
@@ -191,7 +191,7 @@ function fansBadges(
   }
   if (on === 0) return [];
   return [
-    { key: "fans", icon: Wind, label: `${on} ${t("ha.summary.fansOn")}` },
+    { key: "fans", icon: Wind, label: `${on} ${t("summaryFansOn")}` },
   ];
 }
 

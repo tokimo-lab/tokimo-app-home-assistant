@@ -18,13 +18,13 @@ export function SceneDetail({ entity, onCall, t }: DomainDetailProps) {
       <button
         type="button"
         onClick={trigger}
-        aria-label={t("ha.detail.scene.activate")}
+        aria-label={t("detailSceneActivate")}
         className="flex h-40 w-40 cursor-pointer items-center justify-center rounded-full bg-gradient-to-br from-fuchsia-500 to-amber-400 text-white shadow-lg transition hover:brightness-110 active:scale-95"
       >
         <Sparkles size={64} strokeWidth={1.5} />
       </button>
       <p className="font-medium text-base text-zinc-900 dark:text-zinc-100">
-        {t("ha.detail.scene.tapToActivate")}
+        {t("detailSceneTapToActivate")}
       </p>
     </div>
   );

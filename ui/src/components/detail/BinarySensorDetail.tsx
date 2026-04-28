@@ -7,7 +7,7 @@ function formatRelative(iso: string, t: (k: string) => string): string {
   const diffMs = Date.now() - ts;
   if (diffMs < 0) return "";
   const sec = Math.floor(diffMs / 1000);
-  if (sec < 60) return t("ha.detail.binary_sensor.justNow");
+  if (sec < 60) return t("detailBinarySensorJustNow");
   const min = Math.floor(sec / 60);
   if (min < 60) return `${min}m`;
   const hr = Math.floor(min / 60);
@@ -80,7 +80,7 @@ export function BinarySensorDetail({ entity, t }: DomainDetailProps) {
       )}
       {changed && (
         <p className="text-sm text-zinc-500 dark:text-zinc-400">
-          {t("ha.detail.binary_sensor.lastChanged")}: {changed}
+          {t("detailBinarySensorLastChanged")}: {changed}
         </p>
       )}
     </div>

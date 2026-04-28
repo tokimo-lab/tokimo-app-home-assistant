@@ -85,7 +85,7 @@ export function MediaPlayerDetail({ entity, onCall, t }: DomainDetailProps) {
         </div>
         <div className="min-w-0 flex-1">
           <p className="truncate font-semibold text-base text-zinc-900 dark:text-zinc-100">
-            {title || t("ha.detail.media_player.nothingPlaying")}
+            {title || t("detailMediaPlayerNothingPlaying")}
           </p>
           {artist && (
             <p className="truncate text-sm text-zinc-500 dark:text-zinc-400">
@@ -106,7 +106,7 @@ export function MediaPlayerDetail({ entity, onCall, t }: DomainDetailProps) {
           type="button"
           onClick={() => call("media_previous_track")}
           disabled={isOff}
-          aria-label={t("ha.detail.media_player.previous")}
+          aria-label={t("detailMediaPlayerPrevious")}
           className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-full bg-zinc-100 text-zinc-700 transition hover:bg-zinc-200 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
         >
           <SkipBack size={20} />
@@ -118,8 +118,8 @@ export function MediaPlayerDetail({ entity, onCall, t }: DomainDetailProps) {
           aria-pressed={isPlaying}
           aria-label={
             isPlaying
-              ? t("ha.detail.media_player.pause")
-              : t("ha.detail.media_player.play")
+              ? t("detailMediaPlayerPause")
+              : t("detailMediaPlayerPlay")
           }
           className="flex h-16 w-16 cursor-pointer items-center justify-center rounded-full bg-amber-400 text-white shadow-lg transition hover:bg-amber-500 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
         >
@@ -133,7 +133,7 @@ export function MediaPlayerDetail({ entity, onCall, t }: DomainDetailProps) {
           type="button"
           onClick={() => call("media_next_track")}
           disabled={isOff}
-          aria-label={t("ha.detail.media_player.next")}
+          aria-label={t("detailMediaPlayerNext")}
           className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-full bg-zinc-100 text-zinc-700 transition hover:bg-zinc-200 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
         >
           <SkipForward size={20} />
@@ -149,8 +149,8 @@ export function MediaPlayerDetail({ entity, onCall, t }: DomainDetailProps) {
           aria-pressed={muted}
           aria-label={
             muted
-              ? t("ha.detail.media_player.unmute")
-              : t("ha.detail.media_player.mute")
+              ? t("detailMediaPlayerUnmute")
+              : t("detailMediaPlayerMute")
           }
           className="flex h-9 w-9 flex-shrink-0 cursor-pointer items-center justify-center rounded-full text-zinc-600 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-40 dark:text-zinc-300 dark:hover:bg-zinc-800"
         >
@@ -163,7 +163,7 @@ export function MediaPlayerDetail({ entity, onCall, t }: DomainDetailProps) {
           disabled={isOff}
           onChange={setVolume}
           onChangeEnd={commitVolume}
-          ariaLabel={t("ha.detail.media_player.volume")}
+          ariaLabel={t("detailMediaPlayerVolume")}
           fillClassName="bg-amber-400"
           trackClassName="bg-zinc-200 dark:bg-zinc-800"
           heightClassName="h-2"
@@ -181,7 +181,7 @@ export function MediaPlayerDetail({ entity, onCall, t }: DomainDetailProps) {
           className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-zinc-100 px-4 py-3 font-medium text-sm text-zinc-700 transition hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
         >
           <ExternalLink size={16} />
-          {t("ha.detail.media_player.openAppleTv")}
+          {t("detailMediaPlayerOpenAppleTv")}
         </button>
       )}
     </div>

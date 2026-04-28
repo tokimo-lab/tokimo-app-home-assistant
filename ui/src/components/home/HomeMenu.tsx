@@ -73,7 +73,7 @@ export function HomeMenu({
       <button
         ref={refs.setReference}
         type="button"
-        aria-label={t("ha.menu.open")}
+        aria-label={t("menuOpen")}
         className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-[var(--text-secondary)] transition hover:bg-white/[0.06]"
         {...getReferenceProps()}
       >
@@ -102,20 +102,20 @@ export function HomeMenu({
 
             <MenuItem
               icon={<Settings size={16} />}
-              label={t("ha.menu.homeSettings")}
+              label={t("menuHomeSettings")}
               onClick={handle(onOpenSettings)}
             />
             {onEditHomeView && (
               <MenuItem
                 icon={<LayoutGrid size={16} />}
-                label={t("ha.menu.editHomeView")}
+                label={t("menuEditHomeView")}
                 onClick={handle(onEditHomeView)}
               />
             )}
             {onReorderSections && (
               <MenuItem
                 icon={<Rows size={16} />}
-                label={t("ha.menu.reorderSections")}
+                label={t("menuReorderSections")}
                 onClick={handle(onReorderSections)}
               />
             )}
@@ -124,7 +124,7 @@ export function HomeMenu({
               <>
                 <div className="my-1 h-px bg-white/[0.08]" />
                 <div className="px-3 py-1 text-xs text-white/40">
-                  {t("ha.menu.roomsHeading")}
+                  {t("menuRoomsHeading")}
                 </div>
                 {rooms.map((room) => (
                   <MenuItem

@@ -111,7 +111,7 @@ export function DetailOverlay({
             />
           ) : (
             <p className="py-12 text-center text-sm text-zinc-500 dark:text-zinc-400">
-              {t("ha.detail.entityMissing")}
+              {t("detailEntityMissing")}
             </p>
           )}
         </div>
@@ -120,7 +120,7 @@ export function DetailOverlay({
           type="button"
           onClick={() => onOpenSettings(currentEntity.entityId)}
           className="absolute right-4 bottom-4 flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-zinc-100 text-zinc-600 shadow-md transition hover:bg-zinc-200 hover:text-zinc-900 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700 dark:hover:text-zinc-100"
-          aria-label={t("ha.detail.openSettings")}
+          aria-label={t("detailOpenSettings")}
         >
           <Settings size={18} />
         </button>

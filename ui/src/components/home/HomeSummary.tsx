@@ -62,10 +62,10 @@ export function HomeSummary({
       </span>
       <span className="flex-1">
         <span className="block text-sm font-medium text-[var(--text-primary)]">
-          {count} {t("ha.summary.accessories")}
+          {count} {t("summaryAccessories")}
         </span>
         <span className="block text-xs text-[var(--text-secondary)]">
-          {t("ha.summary.noResponse")}
+          {t("summaryNoResponse")}
         </span>
       </span>
       <ChevronRight

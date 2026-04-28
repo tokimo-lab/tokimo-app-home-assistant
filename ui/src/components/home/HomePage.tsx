@@ -111,6 +111,16 @@ function bySortOrder(a: EntityState, b: EntityState): number {
 
 const MEDIUM_DEFAULT = new Set(["climate", "media_player"]);
 
+const CHIP_LABEL_KEY: Record<ChipId, string> = {
+  climate: "chipClimate",
+  lights: "chipLights",
+  security: "chipSecurity",
+  speakers_tvs: "chipSpeakersTvs",
+  covers: "chipCovers",
+  switches: "chipSwitches",
+  fans: "chipFans",
+};
+
 /**
  * Mirror of TileGrid.defaultSizeFor; kept in sync so size-cycle starts
  * from the same baseline that the grid renders. If/when this divergence
@@ -237,7 +247,7 @@ export function HomePage({
 
   const headerTitle = useMemo(() => {
     if (!selectedChip) return instance.name;
-    return t(`ha.chip.${selectedChip}` as const);
+    return t(CHIP_LABEL_KEY[selectedChip]);
   }, [selectedChip, instance.name, t]);
 
   const onContextMenu = (entity: EntityState, e: ReactMouseEvent) => {
@@ -409,7 +419,7 @@ export function HomePage({
           />
         )}
         <div className="flex flex-1 items-center justify-center">
-          <EmptyState title={t("ha.home.empty")} />
+          <EmptyState title={t("homeEmpty")} />
         </div>
       </div>
     );
@@ -603,7 +613,7 @@ function Header({
       <div className="flex items-center gap-1">
         <button
           type="button"
-          aria-label={t("ha.home.add")}
+          aria-label={t("homeAdd")}
           onClick={() => {
             // TODO(H7+): wire add-accessory flow.
             console.log("[HomePage] add accessory clicked");

@@ -61,7 +61,7 @@ export function FanDetail({ entity, onCall, t }: DomainDetailProps) {
         max={100}
         onChange={setPct}
         onChangeEnd={commitPct}
-        ariaLabel={t("ha.detail.fan.speed")}
+        ariaLabel={t("detailFanSpeed")}
         fillClassName="bg-sky-400"
         trackClassName="bg-zinc-200 dark:bg-zinc-800"
       >
@@ -81,7 +81,7 @@ export function FanDetail({ entity, onCall, t }: DomainDetailProps) {
         onClick={togglePower}
         aria-pressed={isOn}
         aria-label={
-          isOn ? t("ha.detail.fan.turnOff") : t("ha.detail.fan.turnOn")
+          isOn ? t("detailFanTurnOff") : t("detailFanTurnOn")
         }
         className={`flex h-12 w-12 cursor-pointer items-center justify-center rounded-full shadow transition active:scale-95 ${
           isOn
@@ -95,7 +95,7 @@ export function FanDetail({ entity, onCall, t }: DomainDetailProps) {
       {presetModes.length > 0 && (
         <div className="flex w-full flex-col gap-2">
           <p className="text-center text-xs font-medium text-zinc-500 uppercase tracking-wide dark:text-zinc-400">
-            {t("ha.detail.fan.presetMode")}
+            {t("detailFanPresetMode")}
           </p>
           <div className="flex flex-wrap items-center justify-center gap-2">
             {presetModes.map((mode) => {

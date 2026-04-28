@@ -31,13 +31,13 @@ interface ChipMeta {
 }
 
 const CHIP_META: Record<ChipId, ChipMeta> = {
-  climate: { icon: Thermometer, labelKey: "ha.chip.climate" },
-  lights: { icon: Lightbulb, labelKey: "ha.chip.lights" },
-  security: { icon: Shield, labelKey: "ha.chip.security" },
-  speakers_tvs: { icon: Speaker, labelKey: "ha.chip.speakersTvs" },
-  covers: { icon: Blinds, labelKey: "ha.chip.covers" },
-  switches: { icon: Power, labelKey: "ha.chip.switches" },
-  fans: { icon: Wind, labelKey: "ha.chip.fans" },
+  climate: { icon: Thermometer, labelKey: "chipClimate" },
+  lights: { icon: Lightbulb, labelKey: "chipLights" },
+  security: { icon: Shield, labelKey: "chipSecurity" },
+  speakers_tvs: { icon: Speaker, labelKey: "chipSpeakersTvs" },
+  covers: { icon: Blinds, labelKey: "chipCovers" },
+  switches: { icon: Power, labelKey: "chipSwitches" },
+  fans: { icon: Wind, labelKey: "chipFans" },
 };
 
 const ENV_SENSOR_CLASSES = new Set(["temperature", "humidity"]);
@@ -71,15 +71,15 @@ function chipSummary(
   if (chip === "lights") {
     const on = list.filter((e) => e.state === "on").length;
     return on > 0
-      ? `${on} ${t("ha.chip.summary.on")}`
-      : t("ha.chip.summary.allOff");
+      ? `${on} ${t("chipSummaryOn")}`
+      : t("chipSummaryAllOff");
   }
 
   if (chip === "switches" || chip === "fans") {
     const on = list.filter((e) => e.state === "on").length;
     return on > 0
-      ? `${on} ${t("ha.chip.summary.on")}`
-      : t("ha.chip.summary.allOff");
+      ? `${on} ${t("chipSummaryOn")}`
+      : t("chipSummaryAllOff");
   }
 
   if (chip === "climate") {
@@ -107,16 +107,16 @@ function chipSummary(
       (e) => getDomain(e.entity_id) === "lock" && e.state === "unlocked",
     ).length;
     if (unlocked > 0) {
-      return `${unlocked} ${t("ha.chip.summary.unlocked")}`;
+      return `${unlocked} ${t("chipSummaryUnlocked")}`;
     }
-    return t("ha.chip.summary.secure");
+    return t("chipSummarySecure");
   }
 
   if (chip === "speakers_tvs") {
     const playing = list.filter((e) => e.state === "playing").length;
     return playing > 0
-      ? `${playing} ${t("ha.chip.summary.playing")}`
-      : t("ha.chip.summary.idle");
+      ? `${playing} ${t("chipSummaryPlaying")}`
+      : t("chipSummaryIdle");
   }
 
   if (chip === "covers") {
@@ -124,8 +124,8 @@ function chipSummary(
       (e) => e.state === "open" || e.state === "opening",
     ).length;
     return open > 0
-      ? `${open} ${t("ha.chip.summary.open")}`
-      : t("ha.chip.summary.closed");
+      ? `${open} ${t("chipSummaryOpen")}`
+      : t("chipSummaryClosed");
   }
 
   return null;

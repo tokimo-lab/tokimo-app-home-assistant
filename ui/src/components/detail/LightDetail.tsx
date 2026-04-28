@@ -103,7 +103,7 @@ export function LightDetail({ entity, onCall, t }: DomainDetailProps) {
           onChangeEnd={commitBrightness}
           fillClassName="bg-gradient-to-t from-amber-300 to-amber-200"
           trackClassName="bg-zinc-200 dark:bg-zinc-800"
-          ariaLabel={t("ha.detail.light.brightness")}
+          ariaLabel={t("detailLightBrightness")}
         >
           <span className="font-semibold text-2xl text-zinc-900 dark:text-zinc-100">
             {pct}%
@@ -134,7 +134,7 @@ export function LightDetail({ entity, onCall, t }: DomainDetailProps) {
       {hasColor && (
         <div className="flex w-full flex-col gap-2">
           <span className="text-sm text-zinc-500 dark:text-zinc-400">
-            {t("ha.detail.light.color")}
+            {t("detailLightColor")}
           </span>
           <div className="flex flex-wrap gap-3">
             {SWATCHES.map(([hex, rgb]) => {
@@ -166,7 +166,7 @@ export function LightDetail({ entity, onCall, t }: DomainDetailProps) {
         <div className="flex w-full flex-col gap-2">
           <div className="flex items-center justify-between text-sm">
             <span className="text-zinc-500 dark:text-zinc-400">
-              {t("ha.detail.light.colorTemp")}
+              {t("detailLightColorTemp")}
             </span>
             <span className="font-medium text-zinc-900 dark:text-zinc-100">
               {currentK}K
@@ -180,7 +180,7 @@ export function LightDetail({ entity, onCall, t }: DomainDetailProps) {
             value={currentK}
             onChange={(e) => setColorTemp(Number(e.target.value))}
             className="w-full cursor-pointer"
-            aria-label={t("ha.detail.light.colorTemp")}
+            aria-label={t("detailLightColorTemp")}
           />
         </div>
       )}

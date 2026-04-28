@@ -22,7 +22,7 @@ export function LockDetail({ entity, onCall, t }: DomainDetailProps) {
         onClick={toggle}
         aria-pressed={isLocked}
         aria-label={
-          isLocked ? t("ha.detail.lock.unlock") : t("ha.detail.lock.lock")
+          isLocked ? t("detailLockUnlock") : t("detailLockLock")
         }
         className={`flex h-40 w-40 cursor-pointer items-center justify-center rounded-full shadow-lg transition active:scale-95 ${
           isLocked
