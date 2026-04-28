@@ -1,24 +1,52 @@
-import { Check, Pencil } from "lucide-react";
+import type { AppRuntimeCtx } from "@tokimo/sdk";
+import { useShellToast } from "@tokimo/sdk/react";
+import { Check, Pencil, RefreshCw } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { reorderRooms } from "../../api/display";
-import type { HaRoom, RoomReorderItem, UpdateRoomDto } from "../../types";
+import type {
+  HaRoom,
+  RoomReorderItem,
+  SyncAreasResult,
+  UpdateRoomDto,
+} from "../../types";
 import { SortableList, SortableRow } from "./SortableRow";
 
 interface RoomsTabProps {
   instanceId: string;
   rooms: HaRoom[];
+  ctx: AppRuntimeCtx;
   onEditRoom: (roomId: string, dto: UpdateRoomDto) => Promise<unknown>;
   onReloadRooms: () => Promise<unknown> | undefined;
+  onSyncAreas: () => Promise<SyncAreasResult>;
   t: (k: string) => string;
 }
 
 export function RoomsTab({
   instanceId,
   rooms,
+  ctx,
   onEditRoom,
   onReloadRooms,
+  onSyncAreas,
   t,
 }: RoomsTabProps) {
+  const toast = useShellToast(ctx);
+  const [syncing, setSyncing] = useState(false);
+
+  async function runSync() {
+    if (syncing) return;
+    setSyncing(true);
+    try {
+      const r = await onSyncAreas();
+      // TODO(R7-i18n): toast text
+      toast.success(`${t("roomsSyncDone")} (+${r.created} / ~${r.updated})`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   // Local optimistic ordering — sourced from rooms by id.
   const [orderIds, setOrderIds] = useState<string[]>([]);
   useEffect(() => {
@@ -64,33 +92,140 @@ export function RoomsTab({
   }
 
   if (orderedRooms.length === 0) {
-    return <p className="text-sm text-white/60">{t("settingsRoomsEmpty")}</p>;
+    return (
+      <div className="flex flex-col gap-3">
+        <SyncBar t={t} syncing={syncing} onSync={runSync} />
+        <p className="text-sm text-white/60">{t("settingsRoomsEmpty")}</p>
+      </div>
+    );
   }
 
   return (
-    <SortableList
-      items={orderedRooms}
-      onReorder={(ids) => void commitOrder(ids)}
-      renderRow={(room) => {
-        const idx = orderedRooms.findIndex((r) => r.id === room.id);
-        return (
-          <SortableRow
-            key={room.id}
-            id={room.id}
-            isFirst={idx === 0}
-            isLast={idx === orderedRooms.length - 1}
-            onMoveUp={() => move(idx, -1)}
-            onMoveDown={() => move(idx, 1)}
-            t={t}
-          >
-            <RoomNameEditor
-              room={room}
-              onRename={(name) => onEditRoom(room.id, { name })}
-            />
-          </SortableRow>
-        );
-      }}
-    />
+    <div className="flex flex-col gap-3">
+      <SyncBar t={t} syncing={syncing} onSync={runSync} />
+      <SortableList
+        items={orderedRooms}
+        onReorder={(ids) => void commitOrder(ids)}
+        renderRow={(room) => {
+          const idx = orderedRooms.findIndex((r) => r.id === room.id);
+          return (
+            <SortableRow
+              key={room.id}
+              id={room.id}
+              isFirst={idx === 0}
+              isLast={idx === orderedRooms.length - 1}
+              onMoveUp={() => move(idx, -1)}
+              onMoveDown={() => move(idx, 1)}
+              t={t}
+            >
+              <RoomIconEditor
+                room={room}
+                onChange={(icon) => onEditRoom(room.id, { icon })}
+              />
+              <RoomNameEditor
+                room={room}
+                onRename={(name) => onEditRoom(room.id, { name })}
+              />
+            </SortableRow>
+          );
+        }}
+      />
+    </div>
+  );
+}
+
+function SyncBar({
+  t,
+  syncing,
+  onSync,
+}: {
+  t: (k: string) => string;
+  syncing: boolean;
+  onSync: () => void;
+}) {
+  return (
+    <div className="flex items-center justify-between">
+      {/* TODO(R7-i18n) */}
+      <p className="text-xs text-white/50">
+        从 Home Assistant 同步区域为房间，并管理排序与图标
+      </p>
+      <button
+        type="button"
+        onClick={onSync}
+        disabled={syncing}
+        className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-1.5 text-xs text-white/80 transition hover:bg-white/[0.08] hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        <RefreshCw size={12} className={syncing ? "animate-spin" : undefined} />
+        {syncing ? t("roomsSyncing") : t("roomsSyncAreas")}
+      </button>
+    </div>
+  );
+}
+
+function RoomIconEditor({
+  room,
+  onChange,
+}: {
+  room: HaRoom;
+  onChange: (icon: string) => Promise<unknown>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(room.icon ?? "");
+
+  useEffect(() => setDraft(room.icon ?? ""), [room.icon]);
+
+  async function commit() {
+    const trimmed = draft.trim();
+    if (trimmed === (room.icon ?? "")) {
+      setEditing(false);
+      return;
+    }
+    try {
+      await onChange(trimmed);
+    } catch (e) {
+      console.warn("[ha:rooms] icon update failed", e);
+      setDraft(room.icon ?? "");
+    } finally {
+      setEditing(false);
+    }
+  }
+
+  if (editing) {
+    return (
+      <input
+        // biome-ignore lint/a11y/noAutofocus: explicit edit affordance
+        autoFocus
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") commit();
+          if (e.key === "Escape") {
+            setDraft(room.icon ?? "");
+            setEditing(false);
+          }
+        }}
+        // TODO(R7-i18n) placeholder
+        placeholder="🏠 或 mdi:sofa"
+        className="w-24 shrink-0 rounded bg-white/[0.08] px-2 py-1 text-sm text-white outline-none ring-1 ring-blue-400/60"
+      />
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => setEditing(true)}
+      // TODO(R7-i18n) title
+      title="点击编辑图标"
+      className="flex h-7 w-9 shrink-0 cursor-pointer items-center justify-center rounded border border-white/[0.06] bg-white/[0.02] text-sm text-white/70 transition hover:border-white/20 hover:text-white"
+    >
+      {room.icon && room.icon.length > 0 ? (
+        <span className="truncate">{room.icon}</span>
+      ) : (
+        <Pencil size={11} className="text-white/30" />
+      )}
+    </button>
   );
 }
 

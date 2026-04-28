@@ -1,6 +1,12 @@
+import type { AppRuntimeCtx } from "@tokimo/sdk";
 import { X } from "lucide-react";
 import type { ReactNode } from "react";
-import type { HaInstance, HaRoom, UpdateRoomDto } from "../../types";
+import type {
+  HaInstance,
+  HaRoom,
+  SyncAreasResult,
+  UpdateRoomDto,
+} from "../../types";
 import { FamilyTab } from "./FamilyTab";
 import { FavoritesTab } from "./FavoritesTab";
 import { RoomsTab } from "./RoomsTab";
@@ -10,6 +16,7 @@ export type SettingsTab = "family" | "rooms" | "favorites";
 interface SettingsPaneProps {
   instance: HaInstance | null;
   tab: SettingsTab;
+  ctx: AppRuntimeCtx;
   onTabChange: (tab: SettingsTab) => void;
   onClose: () => void;
   onInstanceUpdated?: () => void;
@@ -17,12 +24,14 @@ interface SettingsPaneProps {
   rooms: HaRoom[];
   onEditRoom: (roomId: string, dto: UpdateRoomDto) => Promise<unknown>;
   onReloadRooms: () => Promise<unknown> | undefined;
+  onSyncAreas: () => Promise<SyncAreasResult>;
   t: (k: string) => string;
 }
 
 export function SettingsPane({
   instance,
   tab,
+  ctx,
   onTabChange,
   onClose,
   onInstanceUpdated,
@@ -30,6 +39,7 @@ export function SettingsPane({
   rooms,
   onEditRoom,
   onReloadRooms,
+  onSyncAreas,
   t,
 }: SettingsPaneProps) {
   const titleKey =
@@ -98,8 +108,10 @@ export function SettingsPane({
               <RoomsTab
                 instanceId={instance.id}
                 rooms={rooms}
+                ctx={ctx}
                 onEditRoom={onEditRoom}
                 onReloadRooms={onReloadRooms}
+                onSyncAreas={onSyncAreas}
                 t={t}
               />
             )}
