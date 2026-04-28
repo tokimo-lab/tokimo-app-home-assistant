@@ -34,6 +34,13 @@ pub struct EntityDto {
     pub favorite_order: i32,
     pub size: String,
     pub sort_order: i32,
+    /// Device metadata (manufacturer / model / sw_version / serial_number /
+    /// name) sourced from HA's device registry. Only populated by the
+    /// per-entity `GET /entities/:eid` endpoint — list endpoints leave this
+    /// `None` to keep the snapshot payload small. `None` when the entity
+    /// has no associated device or the registry cache is not ready.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub device: Option<crate::state::DeviceMeta>,
 }
 
 pub(crate) fn apply_override(state: EntityState, ov: Option<&OverrideRow>) -> EntityDto {
@@ -52,6 +59,7 @@ pub(crate) fn apply_override(state: EntityState, ov: Option<&OverrideRow>) -> En
         favorite_order: ov.map(|o| o.favorite_order).unwrap_or(0),
         size: ov.map(|o| o.size.clone()).unwrap_or_else(|| "small".to_string()),
         sort_order: ov.map(|o| o.sort_order).unwrap_or(0),
+        device: None,
     }
 }
 
@@ -75,6 +83,7 @@ pub(crate) fn apply_override_snapshot(
         favorite_order: ov.map(|o| o.favorite_order).unwrap_or(0),
         size: ov.map(|o| o.size.clone()).unwrap_or_else(|| "small".to_string()),
         sort_order: ov.map(|o| o.sort_order).unwrap_or(0),
+        device: None,
     }
 }
 
@@ -235,8 +244,11 @@ pub async fn get(
         .clone();
 
     let ov = fetch_override(&ctx.pool, id, &entity_id).await?;
+    let device = instance.device_for_entity(&entity_id).await;
 
-    Ok(Json(apply_override(state, ov.as_ref())))
+    let mut dto = apply_override(state, ov.as_ref());
+    dto.device = device;
+    Ok(Json(dto))
 }
 
 // ─── Upsert override ──────────────────────────────────────────────────────────
