@@ -36,7 +36,7 @@ pub struct EntityDto {
     pub sort_order: i32,
 }
 
-fn apply_override(state: EntityState, ov: Option<&OverrideRow>) -> EntityDto {
+pub(crate) fn apply_override(state: EntityState, ov: Option<&OverrideRow>) -> EntityDto {
     EntityDto {
         entity_id: state.entity_id,
         state: state.state,
@@ -55,22 +55,22 @@ fn apply_override(state: EntityState, ov: Option<&OverrideRow>) -> EntityDto {
     }
 }
 
-struct OverrideRow {
-    entity_id: String,
-    display_name: Option<String>,
-    custom_icon: Option<String>,
-    area_id: Option<Uuid>,
-    hidden: bool,
-    is_favorite: bool,
-    favorite_order: i32,
-    size: String,
-    sort_order: i32,
+pub(crate) struct OverrideRow {
+    pub entity_id: String,
+    pub display_name: Option<String>,
+    pub custom_icon: Option<String>,
+    pub area_id: Option<Uuid>,
+    pub hidden: bool,
+    pub is_favorite: bool,
+    pub favorite_order: i32,
+    pub size: String,
+    pub sort_order: i32,
 }
 
-const OVERRIDE_COLS: &str =
+pub(crate) const OVERRIDE_COLS: &str =
     "entity_id, display_name, custom_icon, area_id, hidden, is_favorite, favorite_order, size, sort_order";
 
-fn row_to_override(r: &sqlx::postgres::PgRow) -> OverrideRow {
+pub(crate) fn row_to_override(r: &sqlx::postgres::PgRow) -> OverrideRow {
     OverrideRow {
         entity_id: r.get("entity_id"),
         display_name: r.get("display_name"),
@@ -84,7 +84,7 @@ fn row_to_override(r: &sqlx::postgres::PgRow) -> OverrideRow {
     }
 }
 
-async fn load_overrides(pool: &sqlx::PgPool, instance_id: Uuid) -> Result<Vec<OverrideRow>, AppError> {
+pub(crate) async fn load_overrides(pool: &sqlx::PgPool, instance_id: Uuid) -> Result<Vec<OverrideRow>, AppError> {
     let rows = sqlx::query(&format!(
         "SELECT {OVERRIDE_COLS} FROM entity_overrides WHERE instance_id = $1"
     ))
@@ -96,6 +96,42 @@ async fn load_overrides(pool: &sqlx::PgPool, instance_id: Uuid) -> Result<Vec<Ov
 
 // ─── List entities ────────────────────────────────────────────────────────────
 
+/// Build a fresh snapshot of all entities for an instance with overrides
+/// merged in. Shared by GET `/entities` and the SSE handler so both paths
+/// emit identical `EntityDto` shapes.
+pub(crate) async fn snapshot_entities(
+    pool: &sqlx::PgPool,
+    instance: &Arc<crate::state::InstanceCtx>,
+    instance_id: Uuid,
+) -> Result<Vec<EntityDto>, AppError> {
+    let overrides = load_overrides(pool, instance_id).await?;
+    let ov_map: std::collections::HashMap<String, OverrideRow> =
+        overrides.into_iter().map(|o| (o.entity_id.clone(), o)).collect();
+
+    Ok(instance
+        .store
+        .states
+        .iter()
+        .map(|e| apply_override(e.value().clone(), ov_map.get(e.key())))
+        .collect())
+}
+
+/// Fetch a single override row by entity_id (used by SSE per-entity updates).
+pub(crate) async fn fetch_override(
+    pool: &sqlx::PgPool,
+    instance_id: Uuid,
+    entity_id: &str,
+) -> Result<Option<OverrideRow>, AppError> {
+    let row = sqlx::query(&format!(
+        "SELECT {OVERRIDE_COLS} FROM entity_overrides WHERE instance_id = $1 AND entity_id = $2"
+    ))
+    .bind(instance_id)
+    .bind(entity_id)
+    .fetch_optional(pool)
+    .await?;
+    Ok(row.as_ref().map(row_to_override))
+}
+
 pub async fn list(State(ctx): State<Arc<AppCtx>>, Path(id): Path<Uuid>) -> Result<Json<Vec<EntityDto>>, AppError> {
     let instance = ctx
         .conn_pool
@@ -105,17 +141,7 @@ pub async fn list(State(ctx): State<Arc<AppCtx>>, Path(id): Path<Uuid>) -> Resul
         .value()
         .clone();
 
-    let overrides = load_overrides(&ctx.pool, id).await?;
-    let ov_map: std::collections::HashMap<String, OverrideRow> =
-        overrides.into_iter().map(|o| (o.entity_id.clone(), o)).collect();
-
-    let entities: Vec<EntityDto> = instance
-        .store
-        .states
-        .iter()
-        .map(|e| apply_override(e.value().clone(), ov_map.get(e.key())))
-        .collect();
-
+    let entities = snapshot_entities(&ctx.pool, &instance, id).await?;
     Ok(Json(entities))
 }
 
@@ -140,15 +166,7 @@ pub async fn get(
         .ok_or_else(|| AppError::not_found("entity not found"))?
         .clone();
 
-    let ov_row = sqlx::query(&format!(
-        "SELECT {OVERRIDE_COLS} FROM entity_overrides WHERE instance_id = $1 AND entity_id = $2"
-    ))
-    .bind(id)
-    .bind(&entity_id)
-    .fetch_optional(&ctx.pool)
-    .await?;
-
-    let ov = ov_row.as_ref().map(row_to_override);
+    let ov = fetch_override(&ctx.pool, id, &entity_id).await?;
 
     Ok(Json(apply_override(state, ov.as_ref())))
 }

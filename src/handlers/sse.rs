@@ -15,6 +15,7 @@ use futures_util::Stream;
 use uuid::Uuid;
 
 use super::AppCtx;
+use super::entities::{apply_override, fetch_override, snapshot_entities};
 use crate::error::AppError;
 use crate::state::EntityEvent;
 
@@ -65,8 +66,11 @@ pub async fn events(
         }
     }
 
-    // Build initial snapshot.
-    let snapshot: Vec<crate::state::EntityState> = instance.store.states.iter().map(|e| e.value().clone()).collect();
+    // Build initial snapshot with overrides merged so the client receives a
+    // single consistent `EntityDto` shape (area_id/is_favorite/size/...).
+    let snapshot = snapshot_entities(&ctx.pool, &instance, id).await?;
+    let pool = ctx.pool.clone();
+    let instance_for_stream = instance.clone();
 
     let s = stream! {
         // Initial snapshot.
@@ -80,15 +84,51 @@ pub async fn events(
             match rx.recv().await {
                 Ok(event) => {
                     let data = match &event {
-                        EntityEvent::Snapshot(states) => serde_json::json!({
-                            "type": "snapshot",
-                            "entities": states,
-                        }),
-                        EntityEvent::Updated { entity, context_id } => serde_json::json!({
-                            "type": "updated",
-                            "entity": entity,
-                            "context_id": context_id,
-                        }),
+                        EntityEvent::Snapshot(states) => {
+                            // Re-merge overrides for the broadcast snapshot
+                            // (e.g. on WS reconnect). Fall back to raw states
+                            // if the override query fails — losing overrides
+                            // for one frame is better than dropping the
+                            // snapshot entirely.
+                            let merged = match snapshot_entities(&pool, &instance_for_stream, id).await {
+                                Ok(dtos) => dtos,
+                                Err(e) => {
+                                    tracing::warn!(
+                                        instance_id = %id,
+                                        error = %e.message,
+                                        "SSE: failed to load overrides for broadcast snapshot; emitting unmerged states"
+                                    );
+                                    states
+                                        .iter()
+                                        .map(|s| apply_override(s.clone(), None))
+                                        .collect()
+                                }
+                            };
+                            serde_json::json!({
+                                "type": "snapshot",
+                                "entities": merged,
+                            })
+                        }
+                        EntityEvent::Updated { entity, context_id } => {
+                            let ov = match fetch_override(&pool, id, &entity.entity_id).await {
+                                Ok(o) => o,
+                                Err(e) => {
+                                    tracing::warn!(
+                                        instance_id = %id,
+                                        entity_id = %entity.entity_id,
+                                        error = %e.message,
+                                        "SSE: failed to load override for entity update; emitting unmerged"
+                                    );
+                                    None
+                                }
+                            };
+                            let dto = apply_override((**entity).clone(), ov.as_ref());
+                            serde_json::json!({
+                                "type": "updated",
+                                "entity": dto,
+                                "context_id": context_id,
+                            })
+                        }
                         EntityEvent::Removed(entity_id) => serde_json::json!({
                             "type": "removed",
                             "entity_id": entity_id,
@@ -104,12 +144,22 @@ pub async fn events(
                     // Client fell behind — send resync then fresh snapshot.
                     yield Ok(Event::default().data(r#"{"type":"resync"}"#));
 
-                    let fresh: Vec<crate::state::EntityState> = instance
-                        .store
-                        .states
-                        .iter()
-                        .map(|e| e.value().clone())
-                        .collect();
+                    let fresh = match snapshot_entities(&pool, &instance_for_stream, id).await {
+                        Ok(dtos) => dtos,
+                        Err(e) => {
+                            tracing::warn!(
+                                instance_id = %id,
+                                error = %e.message,
+                                "SSE: failed to load overrides for resync snapshot; emitting unmerged states"
+                            );
+                            instance_for_stream
+                                .store
+                                .states
+                                .iter()
+                                .map(|e| apply_override(e.value().clone(), None))
+                                .collect()
+                        }
+                    };
                     let snap = serde_json::json!({
                         "type": "snapshot",
                         "entities": fresh,
