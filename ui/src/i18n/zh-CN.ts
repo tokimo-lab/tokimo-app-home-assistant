@@ -213,4 +213,22 @@ export const zhCN: Record<string, string> = {
   // Camera tile fullscreen overlay
   cameraCloseFullscreen: "退出全屏",
   cameraRefresh: "刷新",
+
+  // Tile context menu (right-click)
+  tileSizeHeading: "大小",
+  tileSizeSmall: "小",
+  tileSizeMedium: "中",
+  tileSizeLarge: "大",
+  hideEntity: "隐藏设备",
+
+  // Family sidebar tooltips
+  sidebarNewFamily: "新建家庭",
+  sidebarSettings: "家庭设置",
+  sidebarExpand: "展开侧边栏",
+  sidebarCollapse: "收起侧边栏",
+
+  // Rooms tab (settings)
+  roomsSyncDescription: "从 Home Assistant 同步区域为房间，并管理排序与图标",
+  roomsIconPlaceholder: "🏠 或 mdi:sofa",
+  roomsIconEditTitle: "点击编辑图标",
 };

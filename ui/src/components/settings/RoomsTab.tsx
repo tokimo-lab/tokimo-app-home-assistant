@@ -38,7 +38,6 @@ export function RoomsTab({
     setSyncing(true);
     try {
       const r = await onSyncAreas();
-      // TODO(R7-i18n): toast text
       toast.success(`${t("roomsSyncDone")} (+${r.created} / ~${r.updated})`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : String(e));
@@ -121,6 +120,7 @@ export function RoomsTab({
               <RoomIconEditor
                 room={room}
                 onChange={(icon) => onEditRoom(room.id, { icon })}
+                t={t}
               />
               <RoomNameEditor
                 room={room}
@@ -145,10 +145,7 @@ function SyncBar({
 }) {
   return (
     <div className="flex items-center justify-between">
-      {/* TODO(R7-i18n) */}
-      <p className="text-xs text-white/50">
-        从 Home Assistant 同步区域为房间，并管理排序与图标
-      </p>
+      <p className="text-xs text-white/50">{t("roomsSyncDescription")}</p>
       <button
         type="button"
         onClick={onSync}
@@ -165,9 +162,11 @@ function SyncBar({
 function RoomIconEditor({
   room,
   onChange,
+  t,
 }: {
   room: HaRoom;
   onChange: (icon: string) => Promise<unknown>;
+  t: (k: string) => string;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(room.icon ?? "");
@@ -205,8 +204,7 @@ function RoomIconEditor({
             setEditing(false);
           }
         }}
-        // TODO(R7-i18n) placeholder
-        placeholder="🏠 或 mdi:sofa"
+        placeholder={t("roomsIconPlaceholder")}
         className="w-24 shrink-0 rounded bg-white/[0.08] px-2 py-1 text-sm text-white outline-none ring-1 ring-blue-400/60"
       />
     );
@@ -216,8 +214,7 @@ function RoomIconEditor({
     <button
       type="button"
       onClick={() => setEditing(true)}
-      // TODO(R7-i18n) title
-      title="点击编辑图标"
+      title={t("roomsIconEditTitle")}
       className="flex h-7 w-9 shrink-0 cursor-pointer items-center justify-center rounded border border-white/[0.06] bg-white/[0.02] text-sm text-white/70 transition hover:border-white/20 hover:text-white"
     >
       {room.icon && room.icon.length > 0 ? (

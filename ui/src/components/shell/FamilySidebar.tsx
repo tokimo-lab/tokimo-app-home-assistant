@@ -75,6 +75,7 @@ interface FamilySidebarProps {
   onSettingsClick: () => void;
   onToggleCollapse: () => void;
   onContextMenuItem?: (id: string, e: React.MouseEvent) => void;
+  t: (k: string) => string;
 }
 
 export function FamilySidebar({
@@ -87,6 +88,7 @@ export function FamilySidebar({
   onSettingsClick,
   onToggleCollapse,
   onContextMenuItem,
+  t,
 }: FamilySidebarProps) {
   const sections = [
     {
@@ -121,7 +123,7 @@ export function FamilySidebar({
 
   const collapsedFooter = (
     <div className="flex flex-col items-center gap-1">
-      <Tooltip title="新建家庭" placement="right">
+      <Tooltip title={t("sidebarNewFamily")} placement="right">
         <button
           type="button"
           onClick={onCreateClick}
@@ -130,7 +132,7 @@ export function FamilySidebar({
           <Plus className="h-4 w-4" />
         </button>
       </Tooltip>
-      <Tooltip title="家庭设置" placement="right">
+      <Tooltip title={t("sidebarSettings")} placement="right">
         <button
           type="button"
           onClick={onSettingsClick}
@@ -143,7 +145,7 @@ export function FamilySidebar({
           <Settings className="h-4 w-4" />
         </button>
       </Tooltip>
-      <Tooltip title="展开侧边栏" placement="right">
+      <Tooltip title={t("sidebarExpand")} placement="right">
         <button
           type="button"
           onClick={onToggleCollapse}
@@ -157,7 +159,7 @@ export function FamilySidebar({
 
   const fullFooter = (
     <div className="flex items-center gap-1">
-      <Tooltip title="新建家庭">
+      <Tooltip title={t("sidebarNewFamily")}>
         <button
           type="button"
           onClick={onCreateClick}
@@ -166,7 +168,7 @@ export function FamilySidebar({
           <Plus className="h-4 w-4" />
         </button>
       </Tooltip>
-      <Tooltip title="家庭设置">
+      <Tooltip title={t("sidebarSettings")}>
         <button
           type="button"
           onClick={onSettingsClick}
@@ -179,7 +181,7 @@ export function FamilySidebar({
           <Settings className="h-4 w-4" />
         </button>
       </Tooltip>
-      <Tooltip title="收起侧边栏">
+      <Tooltip title={t("sidebarCollapse")}>
         <button
           type="button"
           onClick={onToggleCollapse}

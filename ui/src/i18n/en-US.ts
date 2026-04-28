@@ -214,4 +214,23 @@ export const enUS: Record<string, string> = {
   // Camera tile fullscreen overlay
   cameraCloseFullscreen: "Close fullscreen",
   cameraRefresh: "Refresh",
+
+  // Tile context menu (right-click)
+  tileSizeHeading: "Size",
+  tileSizeSmall: "Small",
+  tileSizeMedium: "Medium",
+  tileSizeLarge: "Large",
+  hideEntity: "Hide entity",
+
+  // Family sidebar tooltips
+  sidebarNewFamily: "New Family",
+  sidebarSettings: "Family Settings",
+  sidebarExpand: "Expand sidebar",
+  sidebarCollapse: "Collapse sidebar",
+
+  // Rooms tab (settings)
+  roomsSyncDescription:
+    "Sync areas from Home Assistant as rooms, and manage order and icons.",
+  roomsIconPlaceholder: "🏠 or mdi:sofa",
+  roomsIconEditTitle: "Click to edit icon",
 };

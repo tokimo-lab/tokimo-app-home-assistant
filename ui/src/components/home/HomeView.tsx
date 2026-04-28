@@ -257,8 +257,9 @@ function UnassignedSection({
         className="mb-3 flex w-full cursor-pointer items-center gap-2 text-left text-base font-semibold text-[var(--text-primary)] transition hover:text-[var(--accent,#6366f1)]"
       >
         {expanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
-        {/* TODO(R7-i18n): "其他" */}
-        <span>其他 ({entities.length})</span>
+        <span>
+          {t("domainOther")} ({entities.length})
+        </span>
       </button>
       {expanded && (
         <FlowGrid

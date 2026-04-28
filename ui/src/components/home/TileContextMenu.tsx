@@ -21,11 +21,10 @@ interface TileContextMenuProps {
 }
 
 const SIZES: EntitySize[] = ["small", "medium", "large"];
-// TODO(R7-i18n): extract these labels to en-US/zh-CN dictionaries
-const SIZE_LABEL: Record<EntitySize, string> = {
-  small: "小",
-  medium: "中",
-  large: "大",
+const SIZE_LABEL_KEY: Record<EntitySize, string> = {
+  small: "tileSizeSmall",
+  medium: "tileSizeMedium",
+  large: "tileSizeLarge",
 };
 
 /**
@@ -86,12 +85,14 @@ export function TileContextMenu({
         className="z-[9999] min-w-[180px] rounded-xl border border-white/[0.08] bg-[var(--surface-elevated,#1a1a1a)] py-1 text-[var(--text-primary)] shadow-2xl"
         {...getFloatingProps()}
       >
-        {/* TODO(R7-i18n): use t() */}
-        <div className="px-3 py-1 text-xs text-white/40">大小</div>
+        {/* Size selector */}
+        <div className="px-3 py-1 text-xs text-white/40">
+          {t("tileSizeHeading")}
+        </div>
         {SIZES.map((s) => (
           <MenuItem
             key={s}
-            label={SIZE_LABEL[s]}
+            label={t(SIZE_LABEL_KEY[s])}
             trailing={
               s === currentSize ? (
                 <Check size={14} className="text-[var(--accent,#6366f1)]" />
@@ -113,8 +114,7 @@ export function TileContextMenu({
 
         <MenuItem
           icon={<EyeOff size={16} />}
-          // TODO(R7-i18n): "隐藏设备"
-          label="隐藏设备"
+          label={t("hideEntity")}
           onClick={handle(onHide)}
         />
       </div>

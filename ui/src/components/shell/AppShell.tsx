@@ -13,6 +13,7 @@ interface AppShellProps {
   onOpenSettings: () => void;
   onCreateInstance: () => void;
   onContextMenuInstance: (id: string, e: React.MouseEvent) => void;
+  t: (k: string) => string;
 }
 
 export function AppShell({
@@ -24,6 +25,7 @@ export function AppShell({
   onOpenSettings,
   onCreateInstance,
   onContextMenuInstance,
+  t,
 }: AppShellProps) {
   const [containerRef, containerWidth] = useContainerWidth();
   const { collapsed, onToggleCollapse } = useSidebarCollapsed(
@@ -46,6 +48,7 @@ export function AppShell({
         onSettingsClick={onOpenSettings}
         onToggleCollapse={onToggleCollapse}
         onContextMenuItem={onContextMenuInstance}
+        t={t}
       />
       <main className="relative flex-1 overflow-auto">{children}</main>
     </div>
