@@ -144,6 +144,18 @@ pub async fn run_connection(instance: Arc<InstanceCtx>, pool: sqlx::PgPool) -> a
         .tx
         .send(EntityEvent::Status(Arc::new(ConnStatus::Connected)));
 
+    // Refresh device/entity registry caches in the background. Best-effort:
+    // failures are logged but do not abort the event loop. Done after we
+    // mark Connected so the SSE clients see status flip immediately.
+    {
+        let inst = Arc::clone(&instance);
+        tokio::spawn(async move {
+            if let Err(e) = refresh_registries(&inst).await {
+                warn!(instance_id = %inst.id, error = %e.message, "HA WS: registry refresh failed");
+            }
+        });
+    }
+
     // Update last_connected_at in DB (best-effort; do not abort supervisor on
     // failure — the live WS session is more important than the audit field).
     if let Err(e) = sqlx::query("UPDATE instances SET last_connected_at = NOW() WHERE id = $1")
@@ -393,6 +405,76 @@ pub async fn fetch_device_registry(
     verify_tls: bool,
 ) -> Result<serde_json::Value, AppError> {
     ws_command(base_url, access_token, verify_tls, "config/device_registry/list").await
+}
+
+/// Refresh the per-instance device & entity registry caches by issuing two
+/// one-shot WS commands against HA. Both maps are atomically swapped on
+/// success; on partial failure (one fetch errors) we keep the previous
+/// snapshot intact and log. Callers should treat this as best-effort.
+pub async fn refresh_registries(instance: &Arc<InstanceCtx>) -> Result<(), AppError> {
+    use std::collections::HashMap;
+
+    use crate::state::DeviceMeta;
+
+    let (base_url, access_token, verify_tls) = {
+        let cfg = instance.config.read().await;
+        (cfg.base_url.clone(), cfg.access_token.clone(), cfg.verify_tls)
+    };
+
+    let devices = fetch_device_registry(&base_url, &access_token, verify_tls).await?;
+    let entities = fetch_entity_registry(&base_url, &access_token, verify_tls).await?;
+
+    let empty = Vec::new();
+    let device_arr = devices.as_array().unwrap_or(&empty);
+    let mut device_map: HashMap<String, DeviceMeta> = HashMap::with_capacity(device_arr.len());
+    for d in device_arr {
+        let Some(device_id) = d.get("id").and_then(|v| v.as_str()) else {
+            continue;
+        };
+        let str_field = |k: &str| {
+            d.get(k)
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+                .filter(|s| !s.is_empty())
+        };
+        let name = str_field("name_by_user").or_else(|| str_field("name"));
+        device_map.insert(
+            device_id.to_string(),
+            DeviceMeta {
+                manufacturer: str_field("manufacturer"),
+                model: str_field("model"),
+                sw_version: str_field("sw_version"),
+                serial_number: str_field("serial_number"),
+                name,
+            },
+        );
+    }
+
+    let entity_arr = entities.as_array().unwrap_or(&empty);
+    let mut e2d_map: HashMap<String, String> = HashMap::with_capacity(entity_arr.len());
+    for e in entity_arr {
+        let Some(entity_id) = e.get("entity_id").and_then(|v| v.as_str()) else {
+            continue;
+        };
+        if let Some(device_id) = e.get("device_id").and_then(|v| v.as_str())
+            && !device_id.is_empty()
+        {
+            e2d_map.insert(entity_id.to_string(), device_id.to_string());
+        }
+    }
+
+    let device_count = device_map.len();
+    let entity_count = e2d_map.len();
+    *instance.device_registry.write().await = Arc::new(device_map);
+    *instance.entity_to_device.write().await = Arc::new(e2d_map);
+
+    debug!(
+        instance_id = %instance.id,
+        devices = device_count,
+        entities_with_device = entity_count,
+        "HA WS: registry caches refreshed"
+    );
+    Ok(())
 }
 
 /// Convert `http://host/...` → `ws://host/api/websocket` (strips any existing path).

@@ -8,6 +8,7 @@
 //! per instance. Supervisors are fully detached (errors are logged, never
 //! propagated) so one offline HA cannot block others.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::Duration;
@@ -79,6 +80,23 @@ pub struct EntityState {
     pub last_changed: String,
     pub last_updated: String,
     pub context: Option<serde_json::Value>,
+}
+
+/// Device metadata pulled from HA's `config/device_registry/list`.
+///
+/// HA's device registry is the authoritative source of `manufacturer` / `model` /
+/// `sw_version` / `serial_number` for each device. Entities are linked to a
+/// device via `entity_registry.device_id`; we cache both maps in `InstanceCtx`
+/// so per-entity lookups are O(1) without hitting HA each time.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub struct DeviceMeta {
+    pub manufacturer: Option<String>,
+    pub model: Option<String>,
+    pub sw_version: Option<String>,
+    pub serial_number: Option<String>,
+    /// Resolved display name: prefers `name_by_user`, falls back to `name`.
+    pub name: Option<String>,
 }
 
 /// Cached entity override snapshot (subset of entity_overrides row minus entity_id).
@@ -193,6 +211,14 @@ pub struct InstanceCtx {
     /// Cached entity overrides (entity_id → OverrideSnapshot) to eliminate
     /// per-event DB queries. Populated on boot and updated by writers.
     pub override_cache: DashMap<String, OverrideSnapshot>,
+    /// HA device registry cache (device_id → DeviceMeta). Populated on
+    /// supervisor startup via `config/device_registry/list`. Reads are cheap
+    /// `Arc::clone` of the inner map; writers swap the whole `Arc`.
+    pub device_registry: RwLock<Arc<HashMap<String, DeviceMeta>>>,
+    /// HA entity registry cache (entity_id → device_id). Same swap pattern as
+    /// `device_registry`. Many entities have no associated device — those
+    /// entity_ids are simply absent from this map.
+    pub entity_to_device: RwLock<Arc<HashMap<String, String>>>,
 }
 
 impl InstanceCtx {
@@ -207,7 +233,22 @@ impl InstanceCtx {
             store: EntityStore::new(),
             status: RwLock::new(Arc::new(ConnStatus::Connecting)),
             override_cache: DashMap::new(),
+            device_registry: RwLock::new(Arc::new(HashMap::new())),
+            entity_to_device: RwLock::new(Arc::new(HashMap::new())),
         })
+    }
+
+    /// Lookup device metadata for an entity, traversing the cached
+    /// entity_to_device → device_registry maps. Returns `None` when:
+    ///   - the entity is not in the registry yet (registry not fetched, or
+    ///     entity is not registered)
+    ///   - the entity has no associated device
+    ///   - the device is gone from the registry
+    pub async fn device_for_entity(&self, entity_id: &str) -> Option<DeviceMeta> {
+        let e2d = self.entity_to_device.read().await.clone();
+        let device_id = e2d.get(entity_id)?;
+        let dr = self.device_registry.read().await.clone();
+        dr.get(device_id).cloned()
     }
 }
 
