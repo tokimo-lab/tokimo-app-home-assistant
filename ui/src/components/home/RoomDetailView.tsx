@@ -1,7 +1,11 @@
+import type { AppRuntimeCtx } from "@tokimo/sdk";
 import { ChevronLeft } from "lucide-react";
+import { useState } from "react";
 import { getDomain } from "../../lib/domain";
+import { useDisplayPatch } from "../../state/useDisplayPatch";
 import type {
   CallParams,
+  EntitySize,
   EntityState,
   HaInstance,
   HaRoom,
@@ -9,11 +13,13 @@ import type {
 } from "../../types";
 import { FlowGrid } from "./FlowGrid";
 import { StatusBadgesRow } from "./StatusBadgesRow";
+import { TileContextMenu } from "./TileContextMenu";
 
 interface RoomDetailViewProps {
   instance: HaInstance;
   room: HaRoom;
   entities: ReadonlyMap<string, EntityState>;
+  ctx: AppRuntimeCtx;
   getPending: (entityId: string) => PendingOp | undefined;
   onCall: (params: CallParams) => void;
   onBack: () => void;
@@ -86,15 +92,29 @@ function domainBucket(domain: string): string {
   return DOMAIN_ORDER.includes(domain) ? domain : "other";
 }
 
+interface MenuState {
+  entity: EntityState;
+  x: number;
+  y: number;
+}
+
 export function RoomDetailView({
   instance,
   room,
   entities,
+  ctx,
   getPending,
   onCall,
   onBack,
   t,
 }: RoomDetailViewProps) {
+  const { patch, reorderRoomEntitiesOptimistic } = useDisplayPatch(
+    instance.id,
+    ctx,
+    t,
+  );
+  const [menu, setMenu] = useState<MenuState | null>(null);
+
   // Resolve entities for this room: prefer area_id; fall back to legacy room.entities list.
   const byId = new Set<string>();
   for (const e of entities.values()) {
@@ -123,6 +143,28 @@ export function RoomDetailView({
   }
 
   const orderedKeys = [...DOMAIN_ORDER, "other"].filter((k) => grouped.has(k));
+
+  const onContextMenu = (entity: EntityState, e: React.MouseEvent) => {
+    setMenu({ entity, x: e.clientX, y: e.clientY });
+  };
+  const closeMenu = () => setMenu(null);
+  const onSetSize = (size: EntitySize) => {
+    if (!menu) return;
+    void patch(menu.entity.entity_id, { size });
+  };
+  const onToggleFavorite = (next: boolean) => {
+    if (!menu) return;
+    void patch(menu.entity.entity_id, { is_favorite: next });
+  };
+  const onHide = () => {
+    if (!menu) return;
+    void patch(menu.entity.entity_id, { hidden: true });
+  };
+  const onReorder = (orderedIds: string[]) => {
+    void reorderRoomEntitiesOptimistic(
+      orderedIds.map((id, i) => ({ entity_id: id, sort_order: i })),
+    );
+  };
 
   return (
     <div className="flex h-full flex-col gap-6 overflow-auto px-6 py-6">
@@ -155,11 +197,26 @@ export function RoomDetailView({
               instanceId={instance.id}
               getPending={getPending}
               onCall={onCall}
+              onContextMenu={onContextMenu}
+              onReorder={onReorder}
               t={t}
             />
           </section>
         );
       })}
+
+      {menu && (
+        <TileContextMenu
+          entity={menu.entity}
+          x={menu.x}
+          y={menu.y}
+          onClose={closeMenu}
+          onSetSize={onSetSize}
+          onToggleFavorite={onToggleFavorite}
+          onHide={onHide}
+          t={t}
+        />
+      )}
     </div>
   );
 }
