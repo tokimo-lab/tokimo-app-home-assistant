@@ -27,6 +27,9 @@ interface HomeViewProps {
     entityId: string,
     dto: UpdateEntityDisplayDto,
   ) => void | Promise<void>;
+  onReorderFavorites?: (
+    items: import("../../types").FavoriteReorderItem[],
+  ) => void | Promise<void>;
   t: (k: string) => string;
 }
 
@@ -74,6 +77,7 @@ export function HomeView({
   onReorderRooms,
   editMode = false,
   onPatchDisplay,
+  onReorderFavorites,
   t,
 }: HomeViewProps) {
   const headerProps = {
@@ -158,6 +162,8 @@ export function HomeView({
             t={t}
             editMode={editMode}
             onPatchDisplay={onPatchDisplay}
+            enableFavoriteToggle
+            onReorder={onReorderFavorites}
           />
         </section>
       )}
@@ -184,6 +190,7 @@ export function HomeView({
               t={t}
               editMode={editMode}
               onPatchDisplay={onPatchDisplay}
+              enableFavoriteToggle
             />
           </section>
         );
@@ -202,6 +209,7 @@ export function HomeView({
             t={t}
             editMode={editMode}
             onPatchDisplay={onPatchDisplay}
+            enableFavoriteToggle
           />
         </section>
       )}

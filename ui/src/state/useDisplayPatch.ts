@@ -7,7 +7,7 @@ import type {
   FavoriteReorderItem,
   UpdateEntityDisplayDto,
 } from "../types";
-import { applyOptimistic, getEntity } from "./entityStore";
+import { applyOptimistic, getEntitiesSnapshot, getEntity } from "./entityStore";
 
 /**
  * Merge display fields from a patch into an entity, preserving everything
@@ -52,11 +52,23 @@ export function useDisplayPatch(
       const original = getEntity(entityId);
       if (!original) return;
 
-      const optimistic = mergeDisplay(original, dto);
+      // When adding to favorites without an explicit order, place at the end.
+      let effectiveDto = dto;
+      if (dto.is_favorite === true && dto.favorite_order === undefined) {
+        let maxOrder = -1;
+        for (const e of getEntitiesSnapshot().values()) {
+          if (e.is_favorite && (e.favorite_order ?? 0) > maxOrder) {
+            maxOrder = e.favorite_order ?? 0;
+          }
+        }
+        effectiveDto = { ...dto, favorite_order: maxOrder + 1 };
+      }
+
+      const optimistic = mergeDisplay(original, effectiveDto);
       applyOptimistic(optimistic);
 
       try {
-        await updateEntityDisplay(instanceId, entityId, dto);
+        await updateEntityDisplay(instanceId, entityId, effectiveDto);
       } catch (err) {
         applyOptimistic(original);
         const msg = err instanceof Error ? err.message : String(err);

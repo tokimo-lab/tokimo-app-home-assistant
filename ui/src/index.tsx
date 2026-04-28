@@ -86,7 +86,11 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
   const { call: onCall, getPending } = useCallService(instanceId, ctx);
 
   // ── Display mutations (size / favorite / reorder) ────────────────────────
-  const { patch: patchDisplay } = useDisplayPatch(instanceId, ctx, t);
+  const { patch: patchDisplay, reorderFavoritesOptimistic } = useDisplayPatch(
+    instanceId,
+    ctx,
+    t,
+  );
 
   // ── Edit mode (R6) ───────────────────────────────────────────────────────
   const [editMode, setEditMode] = useState(false);
@@ -285,6 +289,7 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
           }}
           editMode={editMode}
           onPatchDisplay={patchDisplay}
+          onReorderFavorites={reorderFavoritesOptimistic}
           t={t}
         />
       )}
