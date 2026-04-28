@@ -5,12 +5,20 @@ import { formatState, getFriendlyName } from "../../lib/format";
 import { useDetailOverlay } from "../../state/useDetailOverlay";
 import type { CallParams, EntityState, PendingOp } from "../../types";
 import type { DomainDetailProps } from "./_types";
+import { BinarySensorDetail } from "./BinarySensorDetail";
+import { CameraDetail } from "./CameraDetail";
 import { ClimateDetail } from "./ClimateDetail";
 import { CoverDetail } from "./CoverDetail";
+import { FanDetail } from "./FanDetail";
 import { LightDetail } from "./LightDetail";
 import { LockDetail } from "./LockDetail";
+import { MediaPlayerDetail } from "./MediaPlayerDetail";
+import { SceneDetail } from "./SceneDetail";
+import { ScriptDetail } from "./ScriptDetail";
+import { SensorDetail } from "./SensorDetail";
 import { SwitchDetail } from "./SwitchDetail";
 import { UnsupportedDetail } from "./UnsupportedDetail";
+import { VacuumDetail } from "./VacuumDetail";
 
 interface DetailOverlayProps {
   getEntity: (entityId: string) => EntityState | undefined;
@@ -33,6 +41,14 @@ const DOMAIN_DETAILS: Record<string, ComponentType<DomainDetailProps>> = {
   switch: SwitchDetail,
   input_boolean: SwitchDetail,
   lock: LockDetail,
+  media_player: MediaPlayerDetail,
+  scene: SceneDetail,
+  script: ScriptDetail,
+  fan: FanDetail,
+  sensor: SensorDetail,
+  binary_sensor: BinarySensorDetail,
+  vacuum: VacuumDetail,
+  camera: CameraDetail,
 };
 
 export function DetailOverlay({
