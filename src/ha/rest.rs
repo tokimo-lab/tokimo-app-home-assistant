@@ -118,35 +118,3 @@ pub async fn get_states(
 
     Ok(states)
 }
-
-/// Call `GET <base_url>/api/config/area_registry/list`.
-pub async fn get_area_registry(
-    http: &Client,
-    base_url: &str,
-    access_token: &str,
-) -> Result<serde_json::Value, AppError> {
-    let url = format!("{}/api/config/area_registry/list", base_url.trim_end_matches('/'));
-    debug!(%url, "HA area registry fetch");
-
-    let resp = http
-        .get(&url)
-        .bearer_auth(access_token)
-        .send()
-        .await
-        .map_err(|e| AppError::bad_gateway(format!("HA unreachable: {e}")))?;
-
-    if resp.status() == reqwest::StatusCode::UNAUTHORIZED {
-        return Err(AppError::unauthorized("HA rejected the access token"));
-    }
-    if !resp.status().is_success() {
-        let status = resp.status();
-        return Err(AppError::bad_gateway(format!("HA area registry HTTP {status}")));
-    }
-
-    let value: serde_json::Value = resp
-        .json()
-        .await
-        .map_err(|e| AppError::bad_gateway(format!("HA response parse: {e}")))?;
-
-    Ok(value)
-}

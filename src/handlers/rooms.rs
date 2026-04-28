@@ -277,8 +277,7 @@ pub async fn sync_areas(State(ctx): State<Arc<AppCtx>>, Path(id): Path<Uuid>) ->
     let access_token: String = r.get("access_token");
     let verify_tls: bool = r.get("verify_tls");
 
-    let http = super::instance_http_client(&ctx, id, verify_tls);
-    let areas = crate::ha::rest::get_area_registry(&http, &base_url, &access_token).await?;
+    let areas = crate::ha::ws::fetch_area_registry(&base_url, &access_token, verify_tls).await?;
 
     let arr = areas
         .as_array()
@@ -319,7 +318,6 @@ pub async fn areas(State(ctx): State<Arc<AppCtx>>, Path(id): Path<Uuid>) -> Resu
     let access_token: String = r.get("access_token");
     let verify_tls: bool = r.get("verify_tls");
 
-    let http = super::instance_http_client(&ctx, id, verify_tls);
-    let result = crate::ha::rest::get_area_registry(&http, &base_url, &access_token).await?;
+    let result = crate::ha::ws::fetch_area_registry(&base_url, &access_token, verify_tls).await?;
     Ok(Json(result))
 }

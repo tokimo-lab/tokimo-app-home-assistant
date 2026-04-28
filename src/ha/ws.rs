@@ -14,6 +14,7 @@ use tokio::time::timeout;
 use tokio_tungstenite::{connect_async_tls_with_config, tungstenite::Message};
 use tracing::{debug, info, warn};
 
+use crate::error::AppError;
 use crate::state::{ConnStatus, EntityEvent, EntityState, InstanceCtx};
 
 // ─── WS message shapes ───────────────────────────────────────────────────────
@@ -270,6 +271,99 @@ where
             Some(Ok(_)) => {} // skip binary / control frames
         }
     }
+}
+
+/// One-shot WebSocket fetch of HA's area registry.
+///
+/// HA only exposes `config/area_registry/list` over the WebSocket API — the
+/// equivalent REST path returns 404. This helper opens a short-lived WS
+/// connection, performs the standard auth handshake, issues a single command,
+/// and returns the `result` field as raw JSON.
+pub async fn fetch_area_registry(
+    base_url: &str,
+    access_token: &str,
+    verify_tls: bool,
+) -> Result<serde_json::Value, AppError> {
+    let ws_url = to_ws_url(base_url).map_err(|e| AppError::bad_gateway(format!("HA WS url: {e}")))?;
+    debug!(%ws_url, verify_tls, "HA WS one-shot: fetch_area_registry");
+
+    let connector = crate::tls::ws_connector(verify_tls);
+    let overall = Duration::from_secs(10);
+
+    let result = timeout(overall, async move {
+        let (mut stream, _) = connect_async_tls_with_config(&ws_url, None, false, connector)
+            .await
+            .map_err(|e| AppError::bad_gateway(format!("HA WS connect: {e}")))?;
+
+        // auth_required
+        let msg = read_msg(&mut stream)
+            .await
+            .map_err(|e| AppError::bad_gateway(format!("HA WS read auth_required: {e}")))?;
+        if msg.kind != "auth_required" {
+            return Err(AppError::bad_gateway(format!(
+                "HA WS expected auth_required, got {}",
+                msg.kind
+            )));
+        }
+
+        // auth
+        stream
+            .send(Message::Text(
+                json!({"type":"auth","access_token": access_token}).to_string(),
+            ))
+            .await
+            .map_err(|e| AppError::bad_gateway(format!("HA WS send auth: {e}")))?;
+
+        let msg = read_msg(&mut stream)
+            .await
+            .map_err(|e| AppError::bad_gateway(format!("HA WS read auth response: {e}")))?;
+        match msg.kind.as_str() {
+            "auth_ok" => {}
+            "auth_invalid" => return Err(AppError::unauthorized("HA rejected the access token")),
+            other => {
+                return Err(AppError::bad_gateway(format!(
+                    "HA WS unexpected message after auth: {other}"
+                )));
+            }
+        }
+
+        // command
+        let cmd_id: u64 = 1;
+        stream
+            .send(Message::Text(
+                json!({"id": cmd_id, "type": "config/area_registry/list"}).to_string(),
+            ))
+            .await
+            .map_err(|e| AppError::bad_gateway(format!("HA WS send command: {e}")))?;
+
+        let msg = read_msg(&mut stream)
+            .await
+            .map_err(|e| AppError::bad_gateway(format!("HA WS read result: {e}")))?;
+        if msg.id != Some(cmd_id) || msg.kind != "result" {
+            return Err(AppError::bad_gateway(format!(
+                "HA WS unexpected response (kind={}, id={:?})",
+                msg.kind, msg.id
+            )));
+        }
+        if msg.success != Some(true) {
+            return Err(AppError::bad_gateway(format!(
+                "HA WS area_registry/list failed: {:?}",
+                msg.error
+            )));
+        }
+        let result = msg
+            .result
+            .ok_or_else(|| AppError::bad_gateway("HA WS area_registry/list missing result"))?;
+
+        // Best-effort close.
+        let _ = stream.send(Message::Close(None)).await;
+
+        Ok::<serde_json::Value, AppError>(result)
+    })
+    .await
+    .map_err(|_| AppError::bad_gateway("HA WS area_registry/list timed out"))?;
+
+    result
 }
 
 /// Convert `http://host/...` → `ws://host/api/websocket` (strips any existing path).
