@@ -50,6 +50,17 @@ export function applyBatch(batch: EntityState[]) {
 
 /** Apply a single SSE "updated" event — fires both render and sseListeners. */
 export function applySSEUpdate(entity: EntityState, contextId?: string) {
+  const existing = entities.get(entity.entity_id);
+  if (
+    existing &&
+    existing.state === entity.state &&
+    existing.last_updated === entity.last_updated
+  ) {
+    // No real state change — skip Map clone and render notification.
+    // Still fire sseListeners so pending optimistic ops can be ack'd.
+    for (const cb of sseListeners) cb(entity.entity_id, entity, contextId);
+    return;
+  }
   entities = new Map(entities);
   entities.set(entity.entity_id, entity);
   notifyRender();
