@@ -9,7 +9,7 @@ use axum::{
 };
 use serde::Deserialize;
 use sqlx::Row;
-use tracing::info;
+use tracing::{info, warn};
 use url::{Host, Url};
 use uuid::Uuid;
 
@@ -141,6 +141,8 @@ pub async fn update(
     Path(id): Path<Uuid>,
     Json(req): Json<UpdateReq>,
 ) -> Result<Json<InstanceDto>, AppError> {
+    info!(instance_id = %id, "PATCH /instances/{id} called");
+
     if let Some(url) = &req.base_url {
         validate_base_url(url).await?;
     }
@@ -150,7 +152,10 @@ pub async fn update(
         .bind(id)
         .fetch_optional(&ctx.pool)
         .await?
-        .ok_or_else(|| AppError::not_found(format!("instance not found: {id}")))?;
+        .ok_or_else(|| {
+            warn!(instance_id = %id, "PATCH /instances/{id} returned 404: instance not found");
+            AppError::not_found(format!("instance not found: {id}"))
+        })?;
 
     let new_base_url = req.base_url.as_deref().unwrap_or(current.get("base_url"));
     let new_token = req.access_token.as_deref().unwrap_or(current.get("access_token"));
