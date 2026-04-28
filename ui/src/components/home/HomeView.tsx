@@ -1,4 +1,5 @@
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronRight } from "lucide-react";
+import { useState } from "react";
 import { getDomain } from "../../lib/domain";
 import type {
   CallParams,
@@ -6,7 +7,6 @@ import type {
   HaInstance,
   HaRoom,
   PendingOp,
-  UpdateEntityDisplayDto,
 } from "../../types";
 import { EmptyState } from "../EmptyState";
 import { FlowGrid } from "./FlowGrid";
@@ -21,23 +21,8 @@ interface HomeViewProps {
   onCall: (params: CallParams) => void;
   onOpenRoom: (roomId: string) => void;
   onOpenSettings: () => void;
-  onToggleEdit?: () => void;
-  onReorderRooms?: () => void;
-  editMode?: boolean;
-  onPatchDisplay?: (
-    entityId: string,
-    dto: UpdateEntityDisplayDto,
-  ) => void | Promise<void>;
-  onReorderFavorites?: (
-    items: import("../../types").FavoriteReorderItem[],
-  ) => void | Promise<void>;
-  reorderRoomsMode?: boolean;
-  onToggleReorderRoomsMode?: () => void;
-  onMoveRoom?: (roomId: string, direction: "up" | "down") => void;
   t: (k: string) => string;
 }
-
-const noop = () => {};
 
 const RENDERABLE_DOMAINS = new Set([
   "light",
@@ -77,29 +62,11 @@ export function HomeView({
   onCall,
   onOpenRoom,
   onOpenSettings,
-  onToggleEdit,
-  onReorderRooms,
-  editMode = false,
-  onPatchDisplay,
-  onReorderFavorites,
-  reorderRoomsMode = false,
-  onToggleReorderRoomsMode,
-  onMoveRoom,
   t,
 }: HomeViewProps) {
-  const headerProps = {
-    instance,
-    rooms,
-    t,
-    onOpenSettings,
-    onToggleEdit: onToggleEdit ?? noop,
-    onReorderRooms: onReorderRooms ?? noop,
-    onOpenRoom,
-    editMode,
-  };
+  const headerProps = { instance, rooms, t, onOpenSettings, onOpenRoom };
   const allEntities = Array.from(entities.values()).filter(isRenderable);
 
-  // Favorites
   const favorites = allEntities
     .filter((e) => e.is_favorite)
     .sort((a, b) => (a.favorite_order ?? 0) - (b.favorite_order ?? 0));
@@ -144,26 +111,6 @@ export function HomeView({
     <div className="relative flex h-full flex-col gap-6 overflow-auto px-6 py-6">
       <HomeHeader {...headerProps} />
 
-      {editMode && (
-        <button
-          type="button"
-          onClick={onToggleEdit ?? noop}
-          className="sticky top-0 z-30 ml-auto flex h-9 cursor-pointer items-center gap-2 self-end rounded-full bg-[var(--accent,#6366f1)] px-4 text-sm font-medium text-white shadow-lg transition hover:opacity-90"
-        >
-          {t("done")}
-        </button>
-      )}
-
-      {reorderRoomsMode && (
-        <button
-          type="button"
-          onClick={onToggleReorderRoomsMode ?? noop}
-          className="sticky top-0 z-30 ml-auto flex h-9 cursor-pointer items-center gap-2 self-end rounded-full bg-[var(--accent,#6366f1)] px-4 text-sm font-medium text-white shadow-lg transition hover:opacity-90"
-        >
-          {t("done")}
-        </button>
-      )}
-
       <StatusBadgesRow entities={allEntities} t={t} />
 
       {favorites.length > 0 && (
@@ -177,15 +124,11 @@ export function HomeView({
             getPending={getPending}
             onCall={onCall}
             t={t}
-            editMode={editMode}
-            onPatchDisplay={onPatchDisplay}
-            enableFavoriteToggle
-            onReorder={onReorderFavorites}
           />
         </section>
       )}
 
-      {rooms.map((room, idx) => {
+      {rooms.map((room) => {
         const list = (entitiesByRoom.get(room.id) ?? [])
           .slice()
           .sort(sortBySortOrder);
@@ -200,30 +143,6 @@ export function HomeView({
               >
                 {room.name}
               </button>
-              {reorderRoomsMode && onMoveRoom && (
-                <span className="ml-auto flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => onMoveRoom(room.id, "up")}
-                    disabled={idx === 0}
-                    title={t("reorderUp")}
-                    aria-label={t("reorderUp")}
-                    className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-black/5 text-[var(--text-primary)] transition hover:bg-black/10 disabled:cursor-not-allowed disabled:opacity-30 dark:bg-white/10 dark:hover:bg-white/20"
-                  >
-                    <ChevronUp size={16} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onMoveRoom(room.id, "down")}
-                    disabled={idx === rooms.length - 1}
-                    title={t("reorderDown")}
-                    aria-label={t("reorderDown")}
-                    className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-black/5 text-[var(--text-primary)] transition hover:bg-black/10 disabled:cursor-not-allowed disabled:opacity-30 dark:bg-white/10 dark:hover:bg-white/20"
-                  >
-                    <ChevronDown size={16} />
-                  </button>
-                </span>
-              )}
             </div>
             <FlowGrid
               entities={list}
@@ -231,32 +150,59 @@ export function HomeView({
               getPending={getPending}
               onCall={onCall}
               t={t}
-              editMode={editMode}
-              onPatchDisplay={onPatchDisplay}
-              enableFavoriteToggle
             />
           </section>
         );
       })}
 
       {unassigned.length > 0 && (
-        <section>
-          <h2 className="mb-3 text-base font-semibold text-[var(--text-primary)]">
-            {t("sectionUnassigned")}
-          </h2>
-          <FlowGrid
-            entities={unassigned.slice().sort(sortBySortOrder)}
-            instanceId={instance.id}
-            getPending={getPending}
-            onCall={onCall}
-            t={t}
-            editMode={editMode}
-            onPatchDisplay={onPatchDisplay}
-            enableFavoriteToggle
-          />
-        </section>
+        <UnassignedSection
+          entities={unassigned.slice().sort(sortBySortOrder)}
+          instanceId={instance.id}
+          getPending={getPending}
+          onCall={onCall}
+          t={t}
+        />
       )}
     </div>
+  );
+}
+
+function UnassignedSection({
+  entities,
+  instanceId,
+  getPending,
+  onCall,
+  t,
+}: {
+  entities: EntityState[];
+  instanceId: string;
+  getPending: (entityId: string) => PendingOp | undefined;
+  onCall: (params: CallParams) => void;
+  t: (k: string) => string;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <section>
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="mb-3 flex w-full cursor-pointer items-center gap-2 text-left text-base font-semibold text-[var(--text-primary)] transition hover:text-[var(--accent,#6366f1)]"
+      >
+        {expanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+        {/* TODO(R7): i18n */}
+        <span>其他 ({entities.length})</span>
+      </button>
+      {expanded && (
+        <FlowGrid
+          entities={entities}
+          instanceId={instanceId}
+          getPending={getPending}
+          onCall={onCall}
+          t={t}
+        />
+      )}
+    </section>
   );
 }
 
@@ -265,36 +211,23 @@ function HomeHeader({
   rooms,
   t,
   onOpenSettings,
-  onToggleEdit,
-  onReorderRooms,
   onOpenRoom,
-  editMode,
 }: {
   instance: HaInstance;
   rooms: HaRoom[];
   t: (k: string) => string;
   onOpenSettings: () => void;
-  onToggleEdit: () => void;
-  onReorderRooms: () => void;
   onOpenRoom: (roomId: string) => void;
-  editMode: boolean;
 }) {
   return (
     <div className="flex items-center justify-between">
       <h1 className="text-2xl font-semibold text-[var(--text-primary)]">
         {instance.name}
-        {editMode && (
-          <span className="ml-3 text-sm font-normal text-[var(--text-secondary)]">
-            · {t("editHomeView")}
-          </span>
-        )}
       </h1>
       <HomeMenu
         rooms={rooms}
         t={t}
         onOpenSettings={onOpenSettings}
-        onToggleEdit={onToggleEdit}
-        onReorderRooms={onReorderRooms}
         onOpenRoom={onOpenRoom}
       />
     </div>

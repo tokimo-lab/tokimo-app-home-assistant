@@ -9,7 +9,7 @@ import {
   useInteractions,
   useRole,
 } from "@floating-ui/react";
-import { ArrowUpDown, MoreHorizontal, Pencil, Settings } from "lucide-react";
+import { MoreHorizontal, Settings } from "lucide-react";
 import { useState } from "react";
 import type { HaRoom } from "../../types";
 
@@ -17,8 +17,6 @@ interface HomeMenuProps {
   rooms: HaRoom[];
   t: (k: string) => string;
   onOpenSettings: () => void;
-  onToggleEdit: () => void;
-  onReorderRooms: () => void;
   onOpenRoom: (roomId: string) => void;
 }
 
@@ -26,8 +24,6 @@ export function HomeMenu({
   rooms,
   t,
   onOpenSettings,
-  onToggleEdit,
-  onReorderRooms,
   onOpenRoom,
 }: HomeMenuProps) {
   const [open, setOpen] = useState(false);
@@ -79,16 +75,6 @@ export function HomeMenu({
               icon={<Settings size={16} />}
               label={t("menuHomeSettings")}
               onClick={handle(onOpenSettings)}
-            />
-            <MenuItem
-              icon={<Pencil size={16} />}
-              label={t("menuEditHomeView")}
-              onClick={handle(onToggleEdit)}
-            />
-            <MenuItem
-              icon={<ArrowUpDown size={16} />}
-              label={t("menuReorderSections")}
-              onClick={handle(onReorderRooms)}
             />
 
             {rooms.length > 0 && (

@@ -5,14 +5,14 @@ import {
   type MenuBarConfig,
   makeTranslator,
 } from "@tokimo/sdk";
-import { useShellMenuBar, useShellToast, useShellWindowNav } from "@tokimo/sdk/react";
+import { useShellMenuBar, useShellWindowNav } from "@tokimo/sdk/react";
 import {
   ConfigProvider,
   ToastProvider,
   enUS as uiEnUS,
   zhCN as uiZhCN,
 } from "@tokimo/ui";
-import { StrictMode, useCallback, useEffect, useMemo, useState } from "react";
+import { StrictMode, useEffect, useMemo, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { HomeView } from "./components/home/HomeView";
 import { RoomDetailView } from "./components/home/RoomDetailView";
@@ -31,7 +31,7 @@ import { useDisplayPatch } from "./state/useDisplayPatch";
 import { useEntities } from "./state/useEntities";
 import { useInstances } from "./state/useInstances";
 import { useRooms } from "./state/useRooms";
-import type { ParsedRoute, RoomReorderItem } from "./types";
+import type { ParsedRoute } from "./types";
 
 function parseRoute(route: string): ParsedRoute {
   if (route === "/setup") return { page: "setup" };
@@ -84,52 +84,12 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
   const { call: onCall, getPending } = useCallService(instanceId, ctx);
 
   // ── Display mutations (size / favorite / reorder) ────────────────────────
-  const toast = useShellToast(ctx);
-  const { patch: patchDisplay, reorderFavoritesOptimistic } = useDisplayPatch(
-    instanceId,
-    ctx,
-    t,
-  );
-
-  // ── Edit mode (R6) ───────────────────────────────────────────────────────
-  const [editMode, setEditMode] = useState(false);
-  const [reorderRoomsMode, setReorderRoomsMode] = useState(false);
-  // Reset modes whenever the active instance changes.
-  useEffect(() => {
-    setEditMode(false);
-    setReorderRoomsMode(false);
-  }, []);
+  // NOTE(R5): patchDisplay / reorderFavoritesOptimistic kept for the
+  // upcoming context-menu + drag flow; HomeView itself no longer consumes them.
+  useDisplayPatch(instanceId, ctx, t);
 
   // ── Rooms (for HomeView grouping + room detail navigation) ───────────────
-  const {
-    rooms,
-    editRoom,
-    reload: reloadRooms,
-    reorderRooms: reorderRoomsOptimistic,
-  } = useRooms(instanceId);
-
-  const handleMoveRoom = useCallback(
-    async (roomId: string, direction: "up" | "down") => {
-      const idx = rooms.findIndex((r) => r.id === roomId);
-      if (idx < 0) return;
-      const target = direction === "up" ? idx - 1 : idx + 1;
-      if (target < 0 || target >= rooms.length) return;
-      const next = rooms.slice();
-      [next[idx], next[target]] = [next[target], next[idx]];
-      const items: RoomReorderItem[] = next.map((r, i) => ({
-        room_id: r.id,
-        sort_order: i,
-      }));
-      try {
-        await reorderRoomsOptimistic(items);
-      } catch (err) {
-        toast.error(
-          err instanceof Error ? err.message : t("errorReorderFailed"),
-        );
-      }
-    },
-    [rooms, reorderRoomsOptimistic, toast, t],
-  );
+  const { rooms, editRoom, reload: reloadRooms } = useRooms(instanceId);
 
   // ── Settings pane ────────────────────────────────────────────────────────
   const [settingsTab, setSettingsTab] = useState<SettingsTab | null>(null);
@@ -294,14 +254,6 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
             navigateTo(`/instance/${activeInstance.id}/room/${rid}`)
           }
           onOpenSettings={() => openSettings({ tab: "family" })}
-          onToggleEdit={() => setEditMode((v) => !v)}
-          onReorderRooms={() => setReorderRoomsMode(true)}
-          editMode={editMode}
-          onPatchDisplay={patchDisplay}
-          onReorderFavorites={reorderFavoritesOptimistic}
-          reorderRoomsMode={reorderRoomsMode}
-          onToggleReorderRoomsMode={() => setReorderRoomsMode((v) => !v)}
-          onMoveRoom={handleMoveRoom}
           t={t}
         />
       )}
