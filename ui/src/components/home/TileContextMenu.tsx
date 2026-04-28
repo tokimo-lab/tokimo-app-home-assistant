@@ -6,6 +6,7 @@ import {
   useRole,
 } from "@floating-ui/react";
 import { Check, EyeOff, Star, StarOff } from "lucide-react";
+import { useLayoutEffect } from "react";
 import type { EntitySize, EntityState } from "../../types";
 
 interface TileContextMenuProps {
@@ -54,19 +55,23 @@ export function TileContextMenu({
   });
 
   // Anchor at the click coordinates via a virtual reference rect.
-  refs.setPositionReference({
-    getBoundingClientRect: () => ({
-      x,
-      y,
-      top: y,
-      left: x,
-      right: x,
-      bottom: y,
-      width: 0,
-      height: 0,
-      toJSON: () => ({}),
-    }),
-  });
+  // Must be in useLayoutEffect — refs.setPositionReference internally calls
+  // React setState and must not be called during render.
+  useLayoutEffect(() => {
+    refs.setPositionReference({
+      getBoundingClientRect: () => ({
+        x,
+        y,
+        top: y,
+        left: x,
+        right: x,
+        bottom: y,
+        width: 0,
+        height: 0,
+        toJSON: () => ({}),
+      }),
+    });
+  }, [x, y, refs.setPositionReference]);
 
   const dismiss = useDismiss(context);
   const role = useRole(context, { role: "menu" });
