@@ -19,6 +19,7 @@
 //!   POST   /instances/:id/rooms
 //!   POST   /instances/:id/rooms/sync_areas
 //!   GET    /instances/:id/capabilities
+//!   GET    /instances/:id/camera_proxy/:entity_id
 //!
 //! Room sub-resources (room_id is globally unique UUID):
 //!   PATCH  /rooms/:room_id
@@ -80,7 +81,7 @@ pub async fn spawn(service: &str, ctx: Arc<AppCtx>) -> anyhow::Result<DataPlaneS
 }
 
 fn build_router(ctx: Arc<AppCtx>) -> Router {
-    use handlers::{display, entities, instances, rooms, services, sse};
+    use handlers::{camera, display, entities, instances, rooms, services, sse};
 
     Router::new()
         // ── Instance CRUD ─────────────────────────────────────────────────
@@ -104,6 +105,11 @@ fn build_router(ctx: Arc<AppCtx>) -> Router {
             post(entities::upsert_override),
         )
         .route("/instances/{id}/capabilities", get(entities::capabilities))
+        // ── Camera proxy ─────────────────────────────────────────────────
+        .route(
+            "/instances/{instance_id}/camera_proxy/{entity_id}",
+            get(camera::camera_proxy),
+        )
         // ── Display / favorites / room order ─────────────────────────────
         .route(
             "/instances/{id}/entities/{entity_id}/display",
