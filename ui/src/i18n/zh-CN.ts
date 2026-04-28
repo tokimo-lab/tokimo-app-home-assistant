@@ -165,6 +165,7 @@ export const zhCN: Record<string, string> = {
   errorTest: "连接测试失败",
   errorCallService: "操作失败 — 已撤销",
   errorTimeout: "无响应 — 已撤销",
+  errorReorderFailed: "排序失败",
 
   // General
   loading: "加载中…",

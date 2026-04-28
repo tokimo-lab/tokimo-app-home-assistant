@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { ApiError } from "../api/client";
+import { reorderRooms as apiReorderRooms } from "../api/display";
 import {
   addEntityToRoom,
   createRoom as apiCreateRoom,
@@ -12,6 +13,7 @@ import {
 import type {
   CreateRoomDto,
   HaRoom,
+  RoomReorderItem,
   SyncAreasResult,
   UpdateRoomDto,
 } from "../types";
@@ -105,6 +107,29 @@ export function useRooms(instanceId: string | null) {
     [instanceId, load],
   );
 
+  const reorderRooms = useCallback(
+    async (items: RoomReorderItem[]): Promise<void> => {
+      if (!instanceId) throw new Error("No instance");
+      const orderById = new Map(items.map((i) => [i.room_id, i.sort_order]));
+      const previous = rooms;
+      // Optimistic: re-sort locally by the new sort_order.
+      setRooms((prev) =>
+        [...prev].sort(
+          (a, b) =>
+            (orderById.get(a.id) ?? Number.POSITIVE_INFINITY) -
+            (orderById.get(b.id) ?? Number.POSITIVE_INFINITY),
+        ),
+      );
+      try {
+        await apiReorderRooms(instanceId, items);
+      } catch (err) {
+        setRooms(previous);
+        throw err;
+      }
+    },
+    [instanceId, rooms],
+  );
+
   return {
     rooms,
     loading,
@@ -116,5 +141,6 @@ export function useRooms(instanceId: string | null) {
     syncAreas,
     addEntity,
     removeEntity,
+    reorderRooms,
   };
 }

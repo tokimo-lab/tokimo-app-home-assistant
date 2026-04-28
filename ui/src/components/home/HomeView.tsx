@@ -1,3 +1,4 @@
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { getDomain } from "../../lib/domain";
 import type {
   CallParams,
@@ -30,6 +31,9 @@ interface HomeViewProps {
   onReorderFavorites?: (
     items: import("../../types").FavoriteReorderItem[],
   ) => void | Promise<void>;
+  reorderRoomsMode?: boolean;
+  onToggleReorderRoomsMode?: () => void;
+  onMoveRoom?: (roomId: string, direction: "up" | "down") => void;
   t: (k: string) => string;
 }
 
@@ -78,6 +82,9 @@ export function HomeView({
   editMode = false,
   onPatchDisplay,
   onReorderFavorites,
+  reorderRoomsMode = false,
+  onToggleReorderRoomsMode,
+  onMoveRoom,
   t,
 }: HomeViewProps) {
   const headerProps = {
@@ -147,6 +154,16 @@ export function HomeView({
         </button>
       )}
 
+      {reorderRoomsMode && (
+        <button
+          type="button"
+          onClick={onToggleReorderRoomsMode ?? noop}
+          className="sticky top-0 z-30 ml-auto flex h-9 cursor-pointer items-center gap-2 self-end rounded-full bg-[var(--accent,#6366f1)] px-4 text-sm font-medium text-white shadow-lg transition hover:opacity-90"
+        >
+          {t("done")}
+        </button>
+      )}
+
       <StatusBadgesRow entities={allEntities} t={t} />
 
       {favorites.length > 0 && (
@@ -168,20 +185,46 @@ export function HomeView({
         </section>
       )}
 
-      {rooms.map((room) => {
+      {rooms.map((room, idx) => {
         const list = (entitiesByRoom.get(room.id) ?? [])
           .slice()
           .sort(sortBySortOrder);
         if (list.length === 0) return null;
         return (
           <section key={room.id}>
-            <button
-              type="button"
-              onClick={() => onOpenRoom(room.id)}
-              className="mb-3 cursor-pointer text-left text-base font-semibold text-[var(--text-primary)] transition hover:text-[var(--accent,#6366f1)]"
-            >
-              {room.name}
-            </button>
+            <div className="mb-3 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => onOpenRoom(room.id)}
+                className="cursor-pointer text-left text-base font-semibold text-[var(--text-primary)] transition hover:text-[var(--accent,#6366f1)]"
+              >
+                {room.name}
+              </button>
+              {reorderRoomsMode && onMoveRoom && (
+                <span className="ml-auto flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => onMoveRoom(room.id, "up")}
+                    disabled={idx === 0}
+                    title={t("reorderUp")}
+                    aria-label={t("reorderUp")}
+                    className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-black/5 text-[var(--text-primary)] transition hover:bg-black/10 disabled:cursor-not-allowed disabled:opacity-30 dark:bg-white/10 dark:hover:bg-white/20"
+                  >
+                    <ChevronUp size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onMoveRoom(room.id, "down")}
+                    disabled={idx === rooms.length - 1}
+                    title={t("reorderDown")}
+                    aria-label={t("reorderDown")}
+                    className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-black/5 text-[var(--text-primary)] transition hover:bg-black/10 disabled:cursor-not-allowed disabled:opacity-30 dark:bg-white/10 dark:hover:bg-white/20"
+                  >
+                    <ChevronDown size={16} />
+                  </button>
+                </span>
+              )}
+            </div>
             <FlowGrid
               entities={list}
               instanceId={instance.id}

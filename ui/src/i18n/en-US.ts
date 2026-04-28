@@ -165,6 +165,7 @@ export const enUS: Record<string, string> = {
   errorTest: "Connection test failed",
   errorCallService: "Action failed — reverted",
   errorTimeout: "No response — reverted",
+  errorReorderFailed: "Reorder failed",
 
   // General
   loading: "Loading…",
