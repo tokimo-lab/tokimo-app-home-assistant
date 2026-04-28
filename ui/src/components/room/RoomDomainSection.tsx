@@ -1,5 +1,5 @@
 import type { CallParams, EntityState, PendingOp } from "../../types";
-import { FlowGrid } from "../home/FlowGrid";
+import { TileGrid } from "../home/TileGrid";
 
 interface RoomDomainSectionProps {
   /** i18n key resolved by parent (e.g. "domainClimate"). */
@@ -12,8 +12,8 @@ interface RoomDomainSectionProps {
 }
 
 /**
- * One domain group inside a RoomPage. Renders a section heading + flow
- * grid of tiles via the central `resolveTile` dispatch in `FlowGrid`.
+ * One domain group inside a RoomPage. Renders a section heading + grid
+ * of tiles via the central `resolveTile` dispatch in `TileGrid`.
  *
  * Reordering is intentionally disabled here: the room view is read-only
  * for layout. Per-domain reorder lives elsewhere (edit-home-view mode).
@@ -32,7 +32,7 @@ export function RoomDomainSection({
       <h2 className="mb-3 text-base font-semibold text-zinc-900 dark:text-zinc-100">
         {t(titleKey)}
       </h2>
-      <FlowGrid
+      <TileGrid
         entities={entities}
         instanceId={instanceId}
         getPending={getPending}

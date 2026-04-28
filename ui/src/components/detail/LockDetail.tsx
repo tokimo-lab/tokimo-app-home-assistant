@@ -21,9 +21,7 @@ export function LockDetail({ entity, onCall, t }: DomainDetailProps) {
         type="button"
         onClick={toggle}
         aria-pressed={isLocked}
-        aria-label={
-          isLocked ? t("detailLockUnlock") : t("detailLockLock")
-        }
+        aria-label={isLocked ? t("detailLockUnlock") : t("detailLockLock")}
         className={`flex h-40 w-40 cursor-pointer items-center justify-center rounded-full shadow-lg transition active:scale-95 ${
           isLocked
             ? "bg-emerald-500 text-white hover:bg-emerald-600"

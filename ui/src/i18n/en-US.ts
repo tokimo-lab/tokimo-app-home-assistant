@@ -181,7 +181,8 @@ export const enUS: Record<string, string> = {
   detailEntityMissing: "Entity is no longer available",
   detailOpenSettings: "Open settings",
   detailUnsupportedTitle: "No detail view",
-  detailUnsupportedSubtitle: "This entity type does not have an interactive detail card yet.",
+  detailUnsupportedSubtitle:
+    "This entity type does not have an interactive detail card yet.",
   detailLightBrightness: "Brightness",
   detailLightColor: "Color",
   detailLightColorTemp: "Color Temperature",
@@ -264,8 +265,10 @@ export const enUS: Record<string, string> = {
   accessoryRoomNone: "Unassigned",
   accessoryAddToHomeView: "Show in Home View",
   accessoryIncludeInFavorites: "Include in Favorites",
-  accessoryHint: "Long-press a tile to open this card. Settings here only affect the Tokimo dashboard layout — they do not modify the underlying Home Assistant entity.",
-  accessoryNotCertified: "This accessory is not HomeKit-certified — only Tokimo display settings apply.",
+  accessoryHint:
+    "Long-press a tile to open this card. Settings here only affect the Tokimo dashboard layout — they do not modify the underlying Home Assistant entity.",
+  accessoryNotCertified:
+    "This accessory is not HomeKit-certified — only Tokimo display settings apply.",
   accessoryHomekitCertified: "HomeKit certified",
   accessoryEditIcon: "Edit icon",
   accessoryIconPlaceholder: "🏠 or mdi:lightbulb",
@@ -295,7 +298,8 @@ export const enUS: Record<string, string> = {
   homeSettingsNamePlaceholder: "My Home",
   homeSettingsSectionRooms: "Rooms",
   homeSettingsSectionMembers: "Members",
-  homeSettingsMembersComingSoon: "Inviting people is coming in a future update.",
+  homeSettingsMembersComingSoon:
+    "Inviting people is coming in a future update.",
   homeSettingsSectionAbout: "About",
   homeSettingsAboutUrl: "Server URL",
   homeSettingsAboutStatus: "Status",

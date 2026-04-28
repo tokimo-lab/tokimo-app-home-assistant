@@ -80,9 +80,7 @@ export function FanDetail({ entity, onCall, t }: DomainDetailProps) {
         type="button"
         onClick={togglePower}
         aria-pressed={isOn}
-        aria-label={
-          isOn ? t("detailFanTurnOff") : t("detailFanTurnOn")
-        }
+        aria-label={isOn ? t("detailFanTurnOff") : t("detailFanTurnOn")}
         className={`flex h-12 w-12 cursor-pointer items-center justify-center rounded-full shadow transition active:scale-95 ${
           isOn
             ? "bg-sky-500 text-white hover:bg-sky-600"

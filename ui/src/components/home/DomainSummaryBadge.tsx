@@ -176,9 +176,7 @@ function switchesBadges(
     if ((d === "switch" || d === "input_boolean") && e.state === "on") on += 1;
   }
   if (on === 0) return [];
-  return [
-    { key: "on", icon: Lock, label: `${on} ${t("summarySwitchesOn")}` },
-  ];
+  return [{ key: "on", icon: Lock, label: `${on} ${t("summarySwitchesOn")}` }];
 }
 
 function fansBadges(
@@ -190,9 +188,7 @@ function fansBadges(
     if (getDomain(e.entity_id) === "fan" && e.state === "on") on += 1;
   }
   if (on === 0) return [];
-  return [
-    { key: "fans", icon: Wind, label: `${on} ${t("summaryFansOn")}` },
-  ];
+  return [{ key: "fans", icon: Wind, label: `${on} ${t("summaryFansOn")}` }];
 }
 
 function computeBadges(

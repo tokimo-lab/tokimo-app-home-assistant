@@ -70,16 +70,12 @@ function chipSummary(
 
   if (chip === "lights") {
     const on = list.filter((e) => e.state === "on").length;
-    return on > 0
-      ? `${on} ${t("chipSummaryOn")}`
-      : t("chipSummaryAllOff");
+    return on > 0 ? `${on} ${t("chipSummaryOn")}` : t("chipSummaryAllOff");
   }
 
   if (chip === "switches" || chip === "fans") {
     const on = list.filter((e) => e.state === "on").length;
-    return on > 0
-      ? `${on} ${t("chipSummaryOn")}`
-      : t("chipSummaryAllOff");
+    return on > 0 ? `${on} ${t("chipSummaryOn")}` : t("chipSummaryAllOff");
   }
 
   if (chip === "climate") {

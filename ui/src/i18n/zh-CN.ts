@@ -264,7 +264,8 @@ export const zhCN: Record<string, string> = {
   accessoryRoomNone: "未分组",
   accessoryAddToHomeView: "在主页中显示",
   accessoryIncludeInFavorites: "加入收藏",
-  accessoryHint: "长按磁贴打开此卡片。这里的设置仅影响 Tokimo 仪表板布局，不会修改 Home Assistant 上的实体。",
+  accessoryHint:
+    "长按磁贴打开此卡片。这里的设置仅影响 Tokimo 仪表板布局，不会修改 Home Assistant 上的实体。",
   accessoryNotCertified: "此配件未通过 HomeKit 认证 — 仅 Tokimo 显示设置生效。",
   accessoryHomekitCertified: "已通过 HomeKit 认证",
   accessoryEditIcon: "编辑图标",

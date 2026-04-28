@@ -22,9 +22,7 @@ export function SwitchDetail({ entity, onCall, t }: DomainDetailProps) {
         type="button"
         onClick={toggle}
         aria-pressed={isOn}
-        aria-label={
-          isOn ? t("detailSwitchTurnOff") : t("detailSwitchTurnOn")
-        }
+        aria-label={isOn ? t("detailSwitchTurnOff") : t("detailSwitchTurnOn")}
         className={`flex h-40 w-40 cursor-pointer items-center justify-center rounded-full shadow-lg transition active:scale-95 ${
           isOn
             ? "bg-amber-400 text-white hover:bg-amber-500"

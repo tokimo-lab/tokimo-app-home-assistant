@@ -14,8 +14,10 @@ import {
 } from "@tokimo/ui";
 import { StrictMode, useEffect, useMemo, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { HomeView } from "./components/home/HomeView";
-import { RoomDetailView } from "./components/home/RoomDetailView";
+import { DetailOverlay } from "./components/detail/DetailOverlay";
+import { HomePage } from "./components/home/HomePage";
+import { RoomPageHost } from "./components/room/RoomPageHost";
+import { AccessorySettingsPage } from "./components/settings/AccessorySettingsPage";
 import {
   SettingsPane,
   type SettingsTab,
@@ -28,8 +30,13 @@ import "./index.css";
 import { SetupPage } from "./pages/SetupPage";
 import { setActiveInstance } from "./state/activeInstanceStore";
 import { useCallService } from "./state/useCallService";
+import {
+  registerOpenInNewWindow,
+  useDetailOverlay,
+} from "./state/useDetailOverlay";
 import { useEntities } from "./state/useEntities";
 import { useInstances } from "./state/useInstances";
+import { clearRoomStack } from "./state/useRoomNav";
 import { useRooms } from "./state/useRooms";
 import type { ParsedRoute } from "./types";
 
@@ -37,10 +44,9 @@ function parseRoute(route: string): ParsedRoute {
   if (route === "/setup") return { page: "setup" };
   const home = route.match(/^\/instance\/([^/]+)\/home$/);
   if (home) return { page: "home", instanceId: home[1] };
-  const room = route.match(/^\/instance\/([^/]+)\/room\/([^/]+)$/);
-  if (room) return { page: "room", instanceId: room[1], roomId: room[2] };
-  // Backward-compat: redirect old /rooms and /devices routes to /home.
-  const legacy = route.match(/^\/instance\/([^/]+)\/(rooms|devices)$/);
+  // Backward-compat: redirect old /rooms, /devices, and /room/:id routes to /home.
+  // Rooms are now an in-memory push-stack via useRoomNav, not URL-driven.
+  const legacy = route.match(/^\/instance\/([^/]+)\/(rooms|devices|room)/);
   if (legacy) return { page: "home", instanceId: legacy[1] };
   return { page: "root" };
 }
@@ -64,9 +70,7 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
   const parsed = useMemo(() => parseRoute(route), [route]);
 
   const instanceId =
-    parsed.page === "home" || parsed.page === "room"
-      ? (parsed.instanceId ?? null)
-      : null;
+    parsed.page === "home" ? (parsed.instanceId ?? null) : null;
 
   // ── Instances ────────────────────────────────────────────────────────────
   const {
@@ -83,24 +87,19 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
   // ── Service calls (optimistic-UI) ────────────────────────────────────────
   const { call: onCall, getPending } = useCallService(instanceId, ctx);
 
-  // ── Display mutations are consumed inside HomeView/RoomDetailView,
-  //    which call useDisplayPatch(instance.id, ctx, t) themselves.
-
-  // ── Rooms (for HomeView grouping + room detail navigation) ───────────────
+  // ── Rooms (for HomePage grouping + room stack navigation) ────────────────
   const { rooms } = useRooms(instanceId);
 
-  // ── Settings pane ────────────────────────────────────────────────────────
+  // ── Detail overlay state (for accessory-settings escape hatch) ───────────
+  const { closeDetail } = useDetailOverlay();
+  const [accessorySettingsEntityId, setAccessorySettingsEntityId] = useState<
+    string | null
+  >(null);
+
+  // ── Settings pane (Family settings) ──────────────────────────────────────
   const [settingsTab, setSettingsTab] = useState<SettingsTab | null>(null);
   const [settingsTargetId, setSettingsTargetId] = useState<string | null>(null);
-  // ── New-family editor ────────────────────────────────────────────────────
   const [creatingFamily, setCreatingFamily] = useState(false);
-  // Close the pane whenever the active instance changes (URL or list reconcile),
-  // unless we're explicitly reopening it (e.g. avatar right-click which sets
-  // both in the same React event).
-  useEffect(() => {
-    setSettingsTab(null);
-    setSettingsTargetId(null);
-  }, []);
   const openSettings = (opts: { tab: SettingsTab; instanceId?: string }) => {
     const targetId = opts.instanceId ?? effectiveInstanceId;
     setCreatingFamily(false);
@@ -118,11 +117,52 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
   };
   const closeCreateFamily = () => setCreatingFamily(false);
 
-  // ── Sync activeInstanceStore ─────────────────────────────────────────────
+  // ── Sync activeInstanceStore + reset transient stacks on instance change ─
   useEffect(() => {
     const inst = instances.find((i) => i.id === instanceId);
     setActiveInstance(instanceId, inst?.name ?? null);
-  }, [instanceId, instances]);
+    // Switching home/family invalidates any pushed rooms or open detail card.
+    clearRoomStack();
+    closeDetail();
+    setAccessorySettingsEntityId(null);
+  }, [instanceId, instances, closeDetail]);
+
+  // ── Register `openInNewWindow` injection for DetailOverlay ───────────────
+  // The desktop shell may eventually expose `openModalWindow` on AppRuntimeCtx;
+  // until then we feature-detect and degrade gracefully.
+  useEffect(() => {
+    type MaybeOpenModalCtx = AppRuntimeCtx & {
+      openModalWindow?: (opts: {
+        component: () => Promise<unknown>;
+        title?: string;
+        metadata?: Record<string, unknown>;
+      }) => void;
+    };
+    const maybe = ctx as MaybeOpenModalCtx;
+    registerOpenInNewWindow(({ entityId, instanceId: iid }) => {
+      if (typeof maybe.openModalWindow === "function") {
+        maybe.openModalWindow({
+          component: () =>
+            import("./components/settings/AccessorySettingsPage"),
+          title: t("accessoryClose"),
+          metadata: { instanceId: iid, entityId },
+        });
+      } else {
+        // TODO(H10/desktop): wire a real Tokimo modal once the SDK exposes
+        // `openModalWindow`. For now we simply log so click-to-pop-out is a
+        // no-op rather than a hard error.
+        console.warn(
+          "[home-assistant] openModalWindow not available in AppRuntimeCtx; " +
+            "ignoring openInNewWindow for",
+          iid,
+          entityId,
+        );
+      }
+    });
+    return () => {
+      registerOpenInNewWindow(null);
+    };
+  }, [ctx, t]);
 
   // ── MenuBar ──────────────────────────────────────────────────────────────
   const menuBarConfig = useMemo<MenuBarConfig>(
@@ -163,7 +203,7 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
 
   // ── Reconcile stale instanceId in URL ────────────────────────────────────
   useEffect(() => {
-    if (parsed.page !== "home" && parsed.page !== "room") return;
+    if (parsed.page !== "home") return;
     if (instancesLoading) return;
     if (!instanceId) return;
     if (instances.some((i) => i.id === instanceId)) return;
@@ -178,32 +218,18 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
     }
   }, [parsed.page, instanceId, instances, instancesLoading, nav, t]);
 
-  // ── Reconcile stale roomId in URL (room no longer exists → /home) ────────
-  useEffect(() => {
-    if (parsed.page !== "room") return;
-    if (!instanceId || !parsed.roomId) return;
-    if (rooms.length === 0) return;
-    if (rooms.some((r) => r.id === parsed.roomId)) return;
-    const inst = instances.find((i) => i.id === instanceId);
-    nav.replace(
-      `/instance/${instanceId}/home`,
-      inst ? `${inst.name} · ${t("navHome")}` : "Home Assistant",
-    );
-  }, [parsed.page, parsed.roomId, instanceId, rooms, instances, nav, t]);
-
   // ── Navigate helpers ─────────────────────────────────────────────────────
   function navigateTo(path: string) {
     const r = parseRoute(path);
     let title = "Home Assistant";
     if (r.page === "setup") title = t("setupTitle");
-    else if (r.page === "home" || r.page === "room") {
+    else if (r.page === "home") {
       const inst = instances.find((i) => i.id === r.instanceId);
       title = inst ? `${inst.name} · ${t("navHome")}` : "Home Assistant";
     }
     nav.navigate(path, title);
   }
 
-  // ── Handle a successful family creation ─────────────────────────────────
   function handleFamilyCreated(created: import("./types").HaInstance) {
     setCreatingFamily(false);
     void reloadInstances();
@@ -222,14 +248,17 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
     return <SetupPage t={t} onCreated={handleFamilyCreated} />;
   }
 
-  // Instance page (home | room)
   const activeInstance = instances.find((i) => i.id === instanceId) ?? null;
 
   return (
     <AppShell
       instances={instances}
       activeInstanceId={effectiveInstanceId}
-      settingsActive={settingsTab !== null || creatingFamily}
+      settingsActive={
+        settingsTab !== null ||
+        creatingFamily ||
+        accessorySettingsEntityId !== null
+      }
       onNavigate={navigateTo}
       onCreateInstance={openCreateFamily}
       onOpenSettings={() => openSettings({ tab: "family" })}
@@ -243,32 +272,40 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
       t={t}
     >
       {parsed.page === "home" && activeInstance && (
-        <HomeView
-          instance={activeInstance}
-          entities={entities}
-          rooms={rooms}
-          ctx={ctx}
-          getPending={getPending}
-          onCall={onCall}
-          onOpenRoom={(rid) =>
-            navigateTo(`/instance/${activeInstance.id}/room/${rid}`)
-          }
-          onOpenSettings={() => openSettings({ tab: "family" })}
-          t={t}
-        />
-      )}
-      {parsed.page === "room" && activeInstance && parsed.roomId && (
-        <RoomDetailViewWrapper
-          instance={activeInstance}
-          roomId={parsed.roomId}
-          rooms={rooms}
-          entities={entities}
-          ctx={ctx}
-          getPending={getPending}
-          onCall={onCall}
-          onBack={() => navigateTo(`/instance/${activeInstance.id}/home`)}
-          t={t}
-        />
+        <>
+          <HomePage
+            instance={activeInstance}
+            entities={entities}
+            rooms={rooms}
+            ctx={ctx}
+            getPending={getPending}
+            onCall={onCall}
+            onOpenRoom={() => {
+              /* HomePage uses pushRoom() internally via useRoomNav */
+            }}
+            onOpenSettings={() => openSettings({ tab: "family" })}
+            t={t}
+          />
+          <RoomPageHost
+            instance={activeInstance}
+            entities={entities}
+            rooms={rooms}
+            ctx={ctx}
+            getPending={getPending}
+            onCall={onCall}
+            t={t}
+          />
+          <DetailOverlay
+            getEntity={(id) => entities.get(id)}
+            onCall={onCall}
+            getPending={getPending}
+            onOpenSettings={(eid) => {
+              setAccessorySettingsEntityId(eid);
+              closeDetail();
+            }}
+            t={t}
+          />
+        </>
       )}
 
       <AnimatedSettingsPane open={settingsTab !== null}>
@@ -306,47 +343,18 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
           />
         )}
       </AnimatedSettingsPane>
-    </AppShell>
-  );
-}
 
-function RoomDetailViewWrapper({
-  instance,
-  roomId,
-  rooms,
-  entities,
-  ctx,
-  getPending,
-  onCall,
-  onBack,
-  t,
-}: {
-  instance: import("./types").HaInstance;
-  roomId: string;
-  rooms: import("./types").HaRoom[];
-  entities: ReadonlyMap<string, import("./types").EntityState>;
-  ctx: AppRuntimeCtx;
-  getPending: (entityId: string) => import("./types").PendingOp | undefined;
-  onCall: (params: import("./types").CallParams) => void;
-  onBack: () => void;
-  t: (k: string) => string;
-}) {
-  const room = rooms.find((r) => r.id === roomId);
-  if (!room) {
-    // Rooms may still be loading — show spinner; the URL reconciler will redirect if it truly is gone.
-    return <Spinner />;
-  }
-  return (
-    <RoomDetailView
-      instance={instance}
-      room={room}
-      entities={entities}
-      ctx={ctx}
-      getPending={getPending}
-      onCall={onCall}
-      onBack={onBack}
-      t={t}
-    />
+      <AnimatedSettingsPane open={accessorySettingsEntityId !== null}>
+        {accessorySettingsEntityId !== null && activeInstance && (
+          <AccessorySettingsPage
+            instanceId={activeInstance.id}
+            entityId={accessorySettingsEntityId}
+            onClose={() => setAccessorySettingsEntityId(null)}
+            t={t}
+          />
+        )}
+      </AnimatedSettingsPane>
+    </AppShell>
   );
 }
 

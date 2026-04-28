@@ -117,9 +117,7 @@ export function MediaPlayerDetail({ entity, onCall, t }: DomainDetailProps) {
           disabled={isOff}
           aria-pressed={isPlaying}
           aria-label={
-            isPlaying
-              ? t("detailMediaPlayerPause")
-              : t("detailMediaPlayerPlay")
+            isPlaying ? t("detailMediaPlayerPause") : t("detailMediaPlayerPlay")
           }
           className="flex h-16 w-16 cursor-pointer items-center justify-center rounded-full bg-amber-400 text-white shadow-lg transition hover:bg-amber-500 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
         >
@@ -148,9 +146,7 @@ export function MediaPlayerDetail({ entity, onCall, t }: DomainDetailProps) {
           disabled={isOff}
           aria-pressed={muted}
           aria-label={
-            muted
-              ? t("detailMediaPlayerUnmute")
-              : t("detailMediaPlayerMute")
+            muted ? t("detailMediaPlayerUnmute") : t("detailMediaPlayerMute")
           }
           className="flex h-9 w-9 flex-shrink-0 cursor-pointer items-center justify-center rounded-full text-zinc-600 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-40 dark:text-zinc-300 dark:hover:bg-zinc-800"
         >
