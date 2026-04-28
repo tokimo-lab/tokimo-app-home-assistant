@@ -261,13 +261,14 @@ impl ConnectionPool {
     /// Insert a new instance and start its supervisor.
     pub fn add_instance(&self, ctx: Arc<InstanceCtx>) {
         let pool = self.pool.clone();
+        let pool_for_cache = self.pool.clone();
         let ctx_clone = Arc::clone(&ctx);
         let ctx_for_cache = Arc::clone(&ctx);
         let id = ctx.id;
         
         // Populate override cache (errors logged, don't fail add).
         tokio::spawn(async move {
-            if let Err(e) = crate::handlers::entities::populate_override_cache(&pool, &ctx_for_cache, id).await {
+            if let Err(e) = crate::handlers::entities::populate_override_cache(&pool_for_cache, &ctx_for_cache, id).await {
                 warn!(instance_id = %id, error = %e.message, "failed to populate override cache on add_instance");
             }
         });
