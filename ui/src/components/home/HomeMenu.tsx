@@ -68,7 +68,7 @@ export function HomeMenu({
           <div
             ref={refs.setFloating}
             style={floatingStyles}
-            className="z-50 min-w-[220px] rounded-xl border border-white/[0.08] bg-[var(--surface-elevated,#1a1a1a)] py-1 text-[var(--text-primary)] shadow-2xl"
+            className="z-[9999] min-w-[220px] rounded-xl border border-white/[0.08] bg-[var(--surface-elevated,#1a1a1a)] py-1 text-[var(--text-primary)] shadow-2xl"
             {...getFloatingProps()}
           >
             <MenuItem
