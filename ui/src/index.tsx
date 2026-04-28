@@ -87,12 +87,7 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
   //    which call useDisplayPatch(instance.id, ctx, t) themselves.
 
   // ── Rooms (for HomeView grouping + room detail navigation) ───────────────
-  const {
-    rooms,
-    editRoom,
-    reload: reloadRooms,
-    syncAreas,
-  } = useRooms(instanceId);
+  const { rooms } = useRooms(instanceId);
 
   // ── Settings pane ────────────────────────────────────────────────────────
   const [settingsTab, setSettingsTab] = useState<SettingsTab | null>(null);
@@ -284,8 +279,6 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
                 ? (instances.find((i) => i.id === settingsTargetId) ?? null)
                 : null
             }
-            tab={settingsTab}
-            onTabChange={(tab) => setSettingsTab(tab)}
             onClose={closeSettings}
             onInstanceUpdated={() => void reloadInstances()}
             onInstanceDeleted={() => {
@@ -299,11 +292,6 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
                 nav.replace("/setup", "Home Assistant");
               }
             }}
-            rooms={rooms}
-            ctx={ctx}
-            onEditRoom={editRoom}
-            onReloadRooms={reloadRooms}
-            onSyncAreas={syncAreas}
             t={t}
           />
         )}
