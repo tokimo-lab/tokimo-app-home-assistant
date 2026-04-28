@@ -46,3 +46,14 @@
     transform: rotate(0.6deg);
   }
 }
+
+.ha-tile-jiggle {
+  animation: ha-wiggle 0.4s ease-in-out infinite;
+  transform-origin: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ha-tile-jiggle {
+    animation: none;
+  }
+}
