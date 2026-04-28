@@ -1,4 +1,5 @@
 //! axum HTTP server on a Unix Domain Socket.
+#![cfg(unix)]
 //!
 //! Routes (proxied under `/api/apps/home-assistant/<rest>` by the central server):
 //!
