@@ -1,6 +1,6 @@
 import type { AppRuntimeCtx } from "@tokimo/sdk";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { getDomain } from "../../lib/domain";
 import { useDisplayPatch } from "../../state/useDisplayPatch";
 import type {
@@ -81,36 +81,52 @@ export function HomeView({
   const [menu, setMenu] = useState<MenuState | null>(null);
 
   const headerProps = { instance, rooms, t, onOpenSettings, onOpenRoom };
-  const allEntities = Array.from(entities.values()).filter(isRenderable);
+  const allEntities = useMemo(
+    () => Array.from(entities.values()).filter(isRenderable),
+    [entities],
+  );
 
-  const favorites = allEntities
-    .filter((e) => e.is_favorite)
-    .sort((a, b) => (a.favorite_order ?? 0) - (b.favorite_order ?? 0));
+  const favorites = useMemo(
+    () =>
+      allEntities
+        .filter((e) => e.is_favorite)
+        .sort((a, b) => (a.favorite_order ?? 0) - (b.favorite_order ?? 0)),
+    [allEntities],
+  );
 
   // Build entity → room mapping. Prefer entity.area_id, fall back to room.entities legacy list.
-  const entityRoomId = new Map<string, string>();
-  for (const e of allEntities) {
-    if (e.area_id) entityRoomId.set(e.entity_id, e.area_id);
-  }
-  for (const room of rooms) {
-    for (const re of room.entities) {
-      if (!entityRoomId.has(re.entity_id)) {
-        entityRoomId.set(re.entity_id, room.id);
+  const entityRoomId = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const e of allEntities) {
+      if (e.area_id) map.set(e.entity_id, e.area_id);
+    }
+    for (const room of rooms) {
+      for (const re of room.entities) {
+        if (!map.has(re.entity_id)) {
+          map.set(re.entity_id, room.id);
+        }
       }
     }
-  }
+    return map;
+  }, [allEntities, rooms]);
 
-  const entitiesByRoom = new Map<string, EntityState[]>();
-  for (const e of allEntities) {
-    const rid = entityRoomId.get(e.entity_id);
-    if (rid) {
-      const arr = entitiesByRoom.get(rid) ?? [];
-      arr.push(e);
-      entitiesByRoom.set(rid, arr);
+  const entitiesByRoom = useMemo(() => {
+    const map = new Map<string, EntityState[]>();
+    for (const e of allEntities) {
+      const rid = entityRoomId.get(e.entity_id);
+      if (rid) {
+        const arr = map.get(rid) ?? [];
+        arr.push(e);
+        map.set(rid, arr);
+      }
     }
-  }
+    return map;
+  }, [allEntities, entityRoomId]);
 
-  const unassigned = allEntities.filter((e) => !entityRoomId.has(e.entity_id));
+  const unassigned = useMemo(
+    () => allEntities.filter((e) => !entityRoomId.has(e.entity_id)),
+    [allEntities, entityRoomId],
+  );
 
   const onContextMenu = (entity: EntityState, e: React.MouseEvent) => {
     setMenu({ entity, x: e.clientX, y: e.clientY });
