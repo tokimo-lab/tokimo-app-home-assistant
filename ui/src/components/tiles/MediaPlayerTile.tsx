@@ -2,7 +2,7 @@ import { Pause, Play, SkipForward, Volume2, VolumeX } from "lucide-react";
 import { memo } from "react";
 import { getTileGradient } from "../../lib/colors";
 import { getFriendlyName } from "../../lib/format";
-import { tilePropsEqual, type TileProps } from "./_types";
+import { type TileProps, tilePropsEqual } from "./_types";
 import { TileBase } from "./TileBase";
 
 function MediaPlayerTileImpl({ entity, t, onCall }: TileProps) {

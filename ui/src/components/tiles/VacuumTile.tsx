@@ -2,7 +2,7 @@ import { Battery, Wind } from "lucide-react";
 import { memo } from "react";
 import { getTileGradient } from "../../lib/colors";
 import { getFriendlyName } from "../../lib/format";
-import { tilePropsEqual, type TileProps } from "./_types";
+import { type TileProps, tilePropsEqual } from "./_types";
 import { TileBase } from "./TileBase";
 
 function VacuumTileImpl({ entity, t, onCall }: TileProps) {

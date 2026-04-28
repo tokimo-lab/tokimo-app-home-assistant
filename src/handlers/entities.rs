@@ -55,6 +55,43 @@ pub(crate) fn apply_override(state: EntityState, ov: Option<&OverrideRow>) -> En
     }
 }
 
+/// Apply overrides from cached snapshot (avoids per-event DB query).
+pub(crate) fn apply_override_snapshot(
+    state: EntityState,
+    ov: Option<&crate::state::OverrideSnapshot>,
+) -> EntityDto {
+    EntityDto {
+        entity_id: state.entity_id,
+        state: state.state,
+        attributes: state.attributes,
+        last_changed: state.last_changed,
+        last_updated: state.last_updated,
+        context: state.context,
+        display_name: ov.and_then(|o| o.display_name.clone()),
+        custom_icon: ov.and_then(|o| o.custom_icon.clone()),
+        area_id: ov.and_then(|o| o.area_id),
+        hidden: ov.map(|o| o.hidden).unwrap_or(false),
+        is_favorite: ov.map(|o| o.is_favorite).unwrap_or(false),
+        favorite_order: ov.map(|o| o.favorite_order).unwrap_or(0),
+        size: ov.map(|o| o.size.clone()).unwrap_or_else(|| "small".to_string()),
+        sort_order: ov.map(|o| o.sort_order).unwrap_or(0),
+    }
+}
+
+/// Convert OverrideRow to OverrideSnapshot (helper for cache population).
+pub(crate) fn override_row_to_snapshot(o: &OverrideRow) -> crate::state::OverrideSnapshot {
+    crate::state::OverrideSnapshot {
+        display_name: o.display_name.clone(),
+        custom_icon: o.custom_icon.clone(),
+        area_id: o.area_id,
+        hidden: o.hidden,
+        is_favorite: o.is_favorite,
+        favorite_order: o.favorite_order,
+        size: o.size.clone(),
+        sort_order: o.sort_order,
+    }
+}
+
 pub(crate) struct OverrideRow {
     pub entity_id: String,
     pub display_name: Option<String>,
@@ -94,6 +131,22 @@ pub(crate) async fn load_overrides(pool: &sqlx::PgPool, instance_id: Uuid) -> Re
     Ok(rows.iter().map(row_to_override).collect())
 }
 
+/// Populate the override cache for an instance from the DB.
+/// Clears the cache first, then loads all overrides.
+pub(crate) async fn populate_override_cache(
+    pool: &sqlx::PgPool,
+    instance: &Arc<crate::state::InstanceCtx>,
+    instance_id: Uuid,
+) -> Result<(), AppError> {
+    let overrides = load_overrides(pool, instance_id).await?;
+    instance.override_cache.clear();
+    for o in overrides {
+        let snapshot = override_row_to_snapshot(&o);
+        instance.override_cache.insert(o.entity_id.clone(), snapshot);
+    }
+    Ok(())
+}
+
 // ─── List entities ────────────────────────────────────────────────────────────
 
 /// Build a fresh snapshot of all entities for an instance with overrides
@@ -114,6 +167,21 @@ pub(crate) async fn snapshot_entities(
         .iter()
         .map(|e| apply_override(e.value().clone(), ov_map.get(e.key())))
         .collect())
+}
+
+/// Build a snapshot using the cached overrides (SSE hot path optimization).
+pub(crate) fn snapshot_entities_cached(
+    instance: &Arc<crate::state::InstanceCtx>,
+) -> Vec<EntityDto> {
+    instance
+        .store
+        .states
+        .iter()
+        .map(|e| {
+            let ov = instance.override_cache.get(e.key()).map(|r| r.clone());
+            apply_override_snapshot(e.value().clone(), ov.as_ref())
+        })
+        .collect()
 }
 
 /// Fetch a single override row by entity_id (used by SSE per-entity updates).
@@ -206,7 +274,8 @@ pub async fn upsert_override(
                hidden       = COALESCE($5, entity_overrides.hidden),
                is_favorite  = COALESCE($6, entity_overrides.is_favorite),
                updated_at   = NOW()
-           RETURNING entity_id, display_name, custom_icon, hidden, is_favorite, updated_at"#,
+           RETURNING entity_id, display_name, custom_icon, hidden, is_favorite, updated_at,
+                     area_id, favorite_order, size, sort_order"#,
     )
     .bind(instance_id)
     .bind(&entity_id)
@@ -216,6 +285,21 @@ pub async fn upsert_override(
     .bind(req.is_favorite)
     .fetch_one(&ctx.pool)
     .await?;
+
+    // Update cache after successful DB write.
+    if let Some(instance) = ctx.conn_pool.instances.get(&instance_id) {
+        let snapshot = crate::state::OverrideSnapshot {
+            display_name: r.get("display_name"),
+            custom_icon: r.get("custom_icon"),
+            area_id: r.get("area_id"),
+            hidden: r.get("hidden"),
+            is_favorite: r.get("is_favorite"),
+            favorite_order: r.get("favorite_order"),
+            size: r.get("size"),
+            sort_order: r.get("sort_order"),
+        };
+        instance.override_cache.insert(entity_id.clone(), snapshot);
+    }
 
     Ok(Json(OverrideResp {
         entity_id: r.get("entity_id"),

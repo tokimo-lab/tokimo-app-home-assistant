@@ -372,6 +372,11 @@ pub async fn sync_areas(State(ctx): State<Arc<AppCtx>>, Path(id): Path<Uuid>) ->
         upserted_entities += 1;
     }
 
+    // Refresh cache after bulk area updates.
+    if let Some(instance) = ctx.conn_pool.instances.get(&id) {
+        let _ = crate::handlers::entities::populate_override_cache(&ctx.pool, &instance, id).await;
+    }
+
     Ok(Json(SyncAreasResp {
         upserted,
         upserted_entities,

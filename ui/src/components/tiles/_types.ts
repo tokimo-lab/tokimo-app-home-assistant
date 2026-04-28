@@ -7,3 +7,13 @@ export interface TileProps {
   onCall: (params: CallParams) => void;
   t: (k: string) => string;
 }
+
+export function tilePropsEqual(prev: TileProps, next: TileProps): boolean {
+  return (
+    prev.entity === next.entity &&
+    prev.pending === next.pending &&
+    prev.instanceId === next.instanceId &&
+    prev.onCall === next.onCall &&
+    prev.t === next.t
+  );
+}

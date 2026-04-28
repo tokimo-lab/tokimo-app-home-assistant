@@ -13,7 +13,7 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { memo, type CSSProperties, type ReactNode } from "react";
+import { type CSSProperties, memo, type ReactNode } from "react";
 import type {
   CallParams,
   EntitySize,
@@ -185,5 +185,6 @@ const SortableCell = memo(
       </div>
     );
   },
-  (prev, next) => prev.entity === next.entity && prev.onContextMenu === next.onContextMenu,
+  (prev, next) =>
+    prev.entity === next.entity && prev.onContextMenu === next.onContextMenu,
 );

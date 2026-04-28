@@ -81,6 +81,19 @@ pub struct EntityState {
     pub context: Option<serde_json::Value>,
 }
 
+/// Cached entity override snapshot (subset of entity_overrides row minus entity_id).
+#[derive(Debug, Clone)]
+pub struct OverrideSnapshot {
+    pub display_name: Option<String>,
+    pub custom_icon: Option<String>,
+    pub area_id: Option<Uuid>,
+    pub hidden: bool,
+    pub is_favorite: bool,
+    pub favorite_order: i32,
+    pub size: String,
+    pub sort_order: i32,
+}
+
 /// Events broadcast to SSE subscribers.
 #[derive(Debug, Clone)]
 pub enum EntityEvent {
@@ -177,6 +190,9 @@ pub struct InstanceCtx {
     pub store: EntityStore,
     /// Last-known connection status.
     pub status: RwLock<Arc<ConnStatus>>,
+    /// Cached entity overrides (entity_id → OverrideSnapshot) to eliminate
+    /// per-event DB queries. Populated on boot and updated by writers.
+    pub override_cache: DashMap<String, OverrideSnapshot>,
 }
 
 impl InstanceCtx {
@@ -190,6 +206,7 @@ impl InstanceCtx {
             cancel: CancelToken::new(),
             store: EntityStore::new(),
             status: RwLock::new(Arc::new(ConnStatus::Connecting)),
+            override_cache: DashMap::new(),
         })
     }
 }
@@ -224,6 +241,12 @@ impl ConnectionPool {
                 verify_tls,
             };
             let ctx = InstanceCtx::new(id, config);
+            
+            // Populate override cache before inserting (errors logged, don't fail boot).
+            if let Err(e) = crate::handlers::entities::populate_override_cache(&pool, &ctx, id).await {
+                warn!(instance_id = %id, error = %e.message, "failed to populate override cache on boot");
+            }
+            
             cp.instances.insert(id, Arc::clone(&ctx));
             spawn_supervisor(Arc::clone(&ctx), pool.clone());
         }
@@ -239,6 +262,16 @@ impl ConnectionPool {
     pub fn add_instance(&self, ctx: Arc<InstanceCtx>) {
         let pool = self.pool.clone();
         let ctx_clone = Arc::clone(&ctx);
+        let ctx_for_cache = Arc::clone(&ctx);
+        let id = ctx.id;
+        
+        // Populate override cache (errors logged, don't fail add).
+        tokio::spawn(async move {
+            if let Err(e) = crate::handlers::entities::populate_override_cache(&pool, &ctx_for_cache, id).await {
+                warn!(instance_id = %id, error = %e.message, "failed to populate override cache on add_instance");
+            }
+        });
+        
         self.instances.insert(ctx.id, ctx);
         spawn_supervisor(ctx_clone, pool);
     }
@@ -259,6 +292,12 @@ impl ConnectionPool {
 
         // Create fresh InstanceCtx (new CancelToken + empty store).
         let new_ctx = InstanceCtx::new(id, new_config);
+        
+        // Populate override cache (errors logged, don't fail restart).
+        if let Err(e) = crate::handlers::entities::populate_override_cache(&self.pool, &new_ctx, id).await {
+            warn!(instance_id = %id, error = %e.message, "failed to populate override cache on restart_instance");
+        }
+        
         self.instances.insert(id, Arc::clone(&new_ctx));
         spawn_supervisor(new_ctx, self.pool.clone());
     }

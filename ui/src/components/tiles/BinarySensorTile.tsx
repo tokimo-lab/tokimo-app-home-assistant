@@ -1,7 +1,7 @@
 import { Zap } from "lucide-react";
 import { memo } from "react";
 import { formatState, getFriendlyName } from "../../lib/format";
-import { tilePropsEqual, type TileProps } from "./_types";
+import { type TileProps, tilePropsEqual } from "./_types";
 import { TileBase } from "./TileBase";
 
 // Binary sensor active = motion/door/window open → orange

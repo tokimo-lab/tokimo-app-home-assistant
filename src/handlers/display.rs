@@ -195,6 +195,21 @@ pub async fn update_display(
 
     let size_db: String = r.get("size");
 
+    // Update cache after successful DB write.
+    if let Some(instance) = ctx.conn_pool.instances.get(&instance_id) {
+        let snapshot = crate::state::OverrideSnapshot {
+            display_name: r.get("display_name"),
+            custom_icon: r.get("custom_icon"),
+            area_id: r.get("area_id"),
+            hidden: r.get("hidden"),
+            is_favorite: r.get("is_favorite"),
+            favorite_order: r.get("favorite_order"),
+            size: size_db.clone(),
+            sort_order: r.get("sort_order"),
+        };
+        instance.override_cache.insert(entity_id.clone(), snapshot);
+    }
+
     // Broadcast EntityEvent::Updated so SSE clients see size/is_favorite/
     // hidden/area_id override changes immediately, instead of waiting for
     // the next upstream HA state_changed. The SSE handler itself re-fetches
@@ -304,6 +319,11 @@ pub async fn reorder_favorites(
     .execute(&mut *tx)
     .await?;
     tx.commit().await?;
+
+    // Refresh cache after bulk update (easier than partial updates).
+    if let Some(instance) = ctx.conn_pool.instances.get(&instance_id) {
+        let _ = crate::handlers::entities::populate_override_cache(&ctx.pool, &instance, instance_id).await;
+    }
 
     Ok(Json(ReorderResp {
         updated: res.rows_affected() as usize,
