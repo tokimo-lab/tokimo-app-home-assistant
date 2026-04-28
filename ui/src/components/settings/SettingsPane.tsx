@@ -1,6 +1,6 @@
 import { X } from "lucide-react";
 import type { ReactNode } from "react";
-import type { HaRoom, UpdateRoomDto } from "../../types";
+import type { HaInstance, HaRoom, UpdateRoomDto } from "../../types";
 import { FamilyTab } from "./FamilyTab";
 import { FavoritesTab } from "./FavoritesTab";
 import { RoomsTab } from "./RoomsTab";
@@ -8,10 +8,11 @@ import { RoomsTab } from "./RoomsTab";
 export type SettingsTab = "family" | "rooms" | "favorites";
 
 interface SettingsPaneProps {
-  instanceId: string;
+  instance: HaInstance | null;
   tab: SettingsTab;
   onTabChange: (tab: SettingsTab) => void;
   onClose: () => void;
+  onInstanceUpdated?: () => void;
   onInstanceDeleted: () => void;
   rooms: HaRoom[];
   onEditRoom: (roomId: string, dto: UpdateRoomDto) => Promise<unknown>;
@@ -20,10 +21,11 @@ interface SettingsPaneProps {
 }
 
 export function SettingsPane({
-  instanceId,
+  instance,
   tab,
   onTabChange,
   onClose,
+  onInstanceUpdated,
   onInstanceDeleted,
   rooms,
   onEditRoom,
@@ -71,23 +73,41 @@ export function SettingsPane({
       </nav>
 
       <div className="flex-1 overflow-y-auto p-4">
-        {tab === "family" && (
-          <FamilyTab
-            instanceId={instanceId}
-            onInstanceDeleted={onInstanceDeleted}
-            t={t}
-          />
+        {instance === null ? (
+          <div className="flex flex-col items-start gap-3">
+            <p className="text-sm text-white/60">{t("noInstances")}</p>
+            <button
+              type="button"
+              onClick={onClose}
+              className="cursor-pointer rounded-lg border border-white/10 px-3 py-1.5 text-sm text-white/80 transition hover:bg-white/[0.08] hover:text-white"
+            >
+              {t("settingsClose")}
+            </button>
+          </div>
+        ) : (
+          <>
+            {tab === "family" && (
+              <FamilyTab
+                instance={instance}
+                onUpdated={onInstanceUpdated}
+                onDeleted={onInstanceDeleted}
+                t={t}
+              />
+            )}
+            {tab === "rooms" && (
+              <RoomsTab
+                instanceId={instance.id}
+                rooms={rooms}
+                onEditRoom={onEditRoom}
+                onReloadRooms={onReloadRooms}
+                t={t}
+              />
+            )}
+            {tab === "favorites" && (
+              <FavoritesTab instanceId={instance.id} t={t} />
+            )}
+          </>
         )}
-        {tab === "rooms" && (
-          <RoomsTab
-            instanceId={instanceId}
-            rooms={rooms}
-            onEditRoom={onEditRoom}
-            onReloadRooms={onReloadRooms}
-            t={t}
-          />
-        )}
-        {tab === "favorites" && <FavoritesTab instanceId={instanceId} t={t} />}
       </div>
     </div>
   );

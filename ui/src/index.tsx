@@ -133,6 +133,7 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
 
   // ── Settings pane ────────────────────────────────────────────────────────
   const [settingsTab, setSettingsTab] = useState<SettingsTab | null>(null);
+  const [settingsTargetId, setSettingsTargetId] = useState<string | null>(null);
   // ── New-family editor ────────────────────────────────────────────────────
   const [creatingFamily, setCreatingFamily] = useState(false);
   // Close the pane whenever the active instance changes (URL or list reconcile),
@@ -140,14 +141,21 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
   // both in the same React event).
   useEffect(() => {
     setSettingsTab(null);
+    setSettingsTargetId(null);
   }, []);
-  const openSettings = (tab: SettingsTab) => {
+  const openSettings = (opts: { tab: SettingsTab; instanceId?: string }) => {
+    const targetId = opts.instanceId ?? effectiveInstanceId;
     setCreatingFamily(false);
-    setSettingsTab(tab);
+    setSettingsTargetId(targetId);
+    setSettingsTab(opts.tab);
   };
-  const closeSettings = () => setSettingsTab(null);
+  const closeSettings = () => {
+    setSettingsTab(null);
+    setSettingsTargetId(null);
+  };
   const openCreateFamily = () => {
     setSettingsTab(null);
+    setSettingsTargetId(null);
     setCreatingFamily(true);
   };
   const closeCreateFamily = () => setCreatingFamily(false);
@@ -266,13 +274,13 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
       settingsActive={settingsTab !== null || creatingFamily}
       onNavigate={navigateTo}
       onCreateInstance={openCreateFamily}
-      onOpenSettings={() => openSettings("family")}
+      onOpenSettings={() => openSettings({ tab: "family" })}
       onContextMenuInstance={(id, e) => {
         e.preventDefault();
         if (id !== instanceId) {
           navigateTo(`/instance/${id}/home`);
         }
-        openSettings("family");
+        openSettings({ tab: "family", instanceId: id });
       }}
     >
       {parsed.page === "home" && activeInstance && (
@@ -285,7 +293,7 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
           onOpenRoom={(rid) =>
             navigateTo(`/instance/${activeInstance.id}/room/${rid}`)
           }
-          onOpenSettings={() => openSettings("family")}
+          onOpenSettings={() => openSettings({ tab: "family" })}
           onToggleEdit={() => setEditMode((v) => !v)}
           onReorderRooms={() => setReorderRoomsMode(true)}
           editMode={editMode}
@@ -311,17 +319,22 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
       )}
 
       <AnimatedSettingsPane open={settingsTab !== null}>
-        {settingsTab !== null && effectiveInstanceId && (
+        {settingsTab !== null && (
           <SettingsPane
-            instanceId={effectiveInstanceId}
+            instance={
+              settingsTargetId
+                ? (instances.find((i) => i.id === settingsTargetId) ?? null)
+                : null
+            }
             tab={settingsTab}
             onTabChange={(tab) => setSettingsTab(tab)}
             onClose={closeSettings}
+            onInstanceUpdated={() => void reloadInstances()}
             onInstanceDeleted={() => {
+              const deletedId = settingsTargetId;
               closeSettings();
-              const remaining = instances.filter(
-                (i) => i.id !== effectiveInstanceId,
-              );
+              void reloadInstances();
+              const remaining = instances.filter((i) => i.id !== deletedId);
               if (remaining.length > 0) {
                 navigateTo(`/instance/${remaining[0].id}/home`);
               } else {

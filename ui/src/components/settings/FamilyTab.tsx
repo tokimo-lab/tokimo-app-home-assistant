@@ -6,45 +6,38 @@ import {
   testInstance,
   updateInstance,
 } from "../../api/instances";
-import { useInstances } from "../../state/useInstances";
-import type { UpdateInstanceDto } from "../../types";
+import type { HaInstance, UpdateInstanceDto } from "../../types";
 
 interface FamilyTabProps {
-  instanceId: string;
-  onInstanceDeleted: () => void;
+  instance: HaInstance;
+  onUpdated?: () => void;
+  onDeleted: () => void;
   t: (k: string) => string;
 }
 
 type TestState = "idle" | "testing" | "ok" | "fail";
 
 export function FamilyTab({
-  instanceId,
-  onInstanceDeleted,
+  instance,
+  onUpdated,
+  onDeleted,
   t,
 }: FamilyTabProps) {
-  const { instances, reload } = useInstances();
-  const inst = instances.find((i) => i.id === instanceId) ?? null;
-
-  const [name, setName] = useState("");
-  const [url, setUrl] = useState("");
+  const [name, setName] = useState(instance.name);
+  const [url, setUrl] = useState(instance.base_url);
   const [token, setToken] = useState("");
-  const [verifyTls, setVerifyTls] = useState(true);
+  const [verifyTls, setVerifyTls] = useState(instance.verify_tls);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [testState, setTestState] = useState<TestState>("idle");
 
   useEffect(() => {
-    if (!inst) return;
-    setName(inst.name);
-    setUrl(inst.base_url);
+    setName(instance.name);
+    setUrl(instance.base_url);
     setToken("");
-    setVerifyTls(inst.verify_tls);
+    setVerifyTls(instance.verify_tls);
     setTestState("idle");
-  }, [inst]);
-
-  if (!inst) {
-    return <p className="text-sm text-white/60">{t("noInstances")}</p>;
-  }
+  }, [instance]);
 
   async function save() {
     setSaving(true);
@@ -57,9 +50,9 @@ export function FamilyTab({
       };
       const trimmed = token.trim();
       if (trimmed !== "") dto.access_token = trimmed;
-      await updateInstance(instanceId, dto);
+      await updateInstance(instance.id, dto);
       setToken("");
-      await reload();
+      onUpdated?.();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -70,7 +63,7 @@ export function FamilyTab({
   async function test() {
     setTestState("testing");
     try {
-      const r = await testInstance(instanceId);
+      const r = await testInstance(instance.id);
       setTestState(r.ok ? "ok" : "fail");
     } catch {
       setTestState("fail");
@@ -80,9 +73,8 @@ export function FamilyTab({
   async function remove() {
     if (!confirm(t("settingsDeleteConfirm"))) return;
     try {
-      await deleteInstance(instanceId);
-      await reload();
-      onInstanceDeleted();
+      await deleteInstance(instance.id);
+      onDeleted();
     } catch (e) {
       alert(e instanceof Error ? e.message : String(e));
     }
@@ -114,7 +106,7 @@ export function FamilyTab({
           value={token}
           onChange={(e) => setToken(e.target.value)}
           placeholder={
-            inst.access_token
+            instance.access_token
               ? `${t("settingsFamilyTokenSet")} — ${t("settingsFamilyTokenPlaceholder")}`
               : t("settingsFamilyTokenPlaceholder")
           }
