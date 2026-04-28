@@ -27,7 +27,6 @@ import "./index.css";
 import { SetupPage } from "./pages/SetupPage";
 import { setActiveInstance } from "./state/activeInstanceStore";
 import { useCallService } from "./state/useCallService";
-import { useDisplayPatch } from "./state/useDisplayPatch";
 import { useEntities } from "./state/useEntities";
 import { useInstances } from "./state/useInstances";
 import { useRooms } from "./state/useRooms";
@@ -83,10 +82,8 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
   // ── Service calls (optimistic-UI) ────────────────────────────────────────
   const { call: onCall, getPending } = useCallService(instanceId, ctx);
 
-  // ── Display mutations (size / favorite / reorder) ────────────────────────
-  // NOTE(R5): patchDisplay / reorderFavoritesOptimistic kept for the
-  // upcoming context-menu + drag flow; HomeView itself no longer consumes them.
-  useDisplayPatch(instanceId, ctx, t);
+  // ── Display mutations are consumed inside HomeView/RoomDetailView,
+  //    which call useDisplayPatch(instance.id, ctx, t) themselves.
 
   // ── Rooms (for HomeView grouping + room detail navigation) ───────────────
   const { rooms, editRoom, reload: reloadRooms } = useRooms(instanceId);
@@ -248,6 +245,7 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
           instance={activeInstance}
           entities={entities}
           rooms={rooms}
+          ctx={ctx}
           getPending={getPending}
           onCall={onCall}
           onOpenRoom={(rid) =>
@@ -263,6 +261,7 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
           roomId={parsed.roomId}
           rooms={rooms}
           entities={entities}
+          ctx={ctx}
           getPending={getPending}
           onCall={onCall}
           onBack={() => navigateTo(`/instance/${activeInstance.id}/home`)}
@@ -319,6 +318,7 @@ function RoomDetailViewWrapper({
   roomId,
   rooms,
   entities,
+  ctx,
   getPending,
   onCall,
   onBack,
@@ -328,6 +328,7 @@ function RoomDetailViewWrapper({
   roomId: string;
   rooms: import("./types").HaRoom[];
   entities: ReadonlyMap<string, import("./types").EntityState>;
+  ctx: AppRuntimeCtx;
   getPending: (entityId: string) => import("./types").PendingOp | undefined;
   onCall: (params: import("./types").CallParams) => void;
   onBack: () => void;
@@ -343,6 +344,7 @@ function RoomDetailViewWrapper({
       instance={instance}
       room={room}
       entities={entities}
+      ctx={ctx}
       getPending={getPending}
       onCall={onCall}
       onBack={onBack}
