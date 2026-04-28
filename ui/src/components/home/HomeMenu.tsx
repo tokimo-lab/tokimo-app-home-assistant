@@ -9,21 +9,38 @@ import {
   useInteractions,
   useRole,
 } from "@floating-ui/react";
-import { MoreHorizontal, Settings } from "lucide-react";
+import { cn } from "@tokimo/ui";
+import {
+  LayoutGrid,
+  MoreHorizontal,
+  Pencil,
+  Rows,
+  Settings,
+} from "lucide-react";
+import type { ReactNode } from "react";
 import { useState } from "react";
 import type { HaRoom } from "../../types";
+import { HomeSummary } from "./HomeSummary";
 
 interface HomeMenuProps {
+  /** Required for HomeSummary banner. Optional for legacy callers (H10 will
+   *  remove the legacy HomeView entirely). */
+  instanceId?: string;
   rooms: HaRoom[];
   t: (k: string) => string;
   onOpenSettings: () => void;
+  onEditHomeView?: () => void;
+  onReorderSections?: () => void;
   onOpenRoom: (roomId: string) => void;
 }
 
 export function HomeMenu({
+  instanceId,
   rooms,
   t,
   onOpenSettings,
+  onEditHomeView,
+  onReorderSections,
   onOpenRoom,
 }: HomeMenuProps) {
   const [open, setOpen] = useState(false);
@@ -32,7 +49,7 @@ export function HomeMenu({
     open,
     onOpenChange: setOpen,
     placement: "bottom-end",
-    middleware: [offset(4), shift({ padding: 8 })],
+    middleware: [offset(6), shift({ padding: 8 })],
     whileElementsMounted: autoUpdate,
   });
 
@@ -56,7 +73,7 @@ export function HomeMenu({
       <button
         ref={refs.setReference}
         type="button"
-        aria-label={t("menuOpen")}
+        aria-label={t("ha.menu.open")}
         className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-[var(--text-secondary)] transition hover:bg-white/[0.06]"
         {...getReferenceProps()}
       >
@@ -68,24 +85,51 @@ export function HomeMenu({
           <div
             ref={refs.setFloating}
             style={floatingStyles}
-            className="z-[9999] min-w-[220px] rounded-xl border border-white/[0.08] bg-[var(--surface-elevated,#1a1a1a)] py-1 text-[var(--text-primary)] shadow-2xl"
+            className={cn(
+              "z-[9999] min-w-[260px] overflow-hidden rounded-xl",
+              "border border-white/[0.08] bg-[var(--surface-elevated,#1a1a1a)]",
+              "py-1 text-[var(--text-primary)] shadow-2xl",
+            )}
             {...getFloatingProps()}
           >
+            <div className="px-1 py-1">
+              {instanceId && (
+                <HomeSummary instanceId={instanceId} variant="menu" t={t} />
+              )}
+            </div>
+
+            <div className="my-1 h-px bg-white/[0.08]" />
+
             <MenuItem
               icon={<Settings size={16} />}
-              label={t("menuHomeSettings")}
+              label={t("ha.menu.homeSettings")}
               onClick={handle(onOpenSettings)}
             />
+            {onEditHomeView && (
+              <MenuItem
+                icon={<LayoutGrid size={16} />}
+                label={t("ha.menu.editHomeView")}
+                onClick={handle(onEditHomeView)}
+              />
+            )}
+            {onReorderSections && (
+              <MenuItem
+                icon={<Rows size={16} />}
+                label={t("ha.menu.reorderSections")}
+                onClick={handle(onReorderSections)}
+              />
+            )}
 
             {rooms.length > 0 && (
               <>
                 <div className="my-1 h-px bg-white/[0.08]" />
                 <div className="px-3 py-1 text-xs text-white/40">
-                  {t("menuRoomsHeading")}
+                  {t("ha.menu.roomsHeading")}
                 </div>
                 {rooms.map((room) => (
                   <MenuItem
                     key={room.id}
+                    icon={<Pencil size={16} className="opacity-0" />}
                     label={room.name}
                     onClick={handle(() => onOpenRoom(room.id))}
                   />
@@ -104,7 +148,7 @@ function MenuItem({
   label,
   onClick,
 }: {
-  icon?: React.ReactNode;
+  icon?: ReactNode;
   label: string;
   onClick: () => void;
 }) {
