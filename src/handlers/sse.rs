@@ -33,6 +33,38 @@ pub async fn events(
     // Subscribe before snapshotting to avoid a race.
     let mut rx = instance.store.tx.subscribe();
 
+    // If the WS supervisor hasn't yet bootstrapped (still connecting, or in
+    // backoff), the store is empty and the client would render an empty
+    // dashboard until HA pushes the next state_changed event. Seed once via
+    // HA REST so the first snapshot is usable. Failures are logged and
+    // ignored — the SSE stream still works, and the WS supervisor will fill
+    // the store as soon as it connects.
+    if instance.store.states.is_empty() {
+        let (base_url, access_token) = {
+            let cfg = instance.config.read().await;
+            (cfg.base_url.clone(), cfg.access_token.clone())
+        };
+        match crate::ha::rest::get_states(&instance.http, &base_url, &access_token).await {
+            Ok(states) => {
+                for s in states {
+                    instance.store.states.insert(s.entity_id.clone(), s);
+                }
+                tracing::debug!(
+                    instance_id = %id,
+                    count = instance.store.states.len(),
+                    "SSE: seeded entity store from HA REST"
+                );
+            }
+            Err(e) => {
+                tracing::warn!(
+                    instance_id = %id,
+                    error = %e.message,
+                    "SSE: failed to seed entity store from HA REST; continuing with empty snapshot"
+                );
+            }
+        }
+    }
+
     // Build initial snapshot.
     let snapshot: Vec<crate::state::EntityState> = instance.store.states.iter().map(|e| e.value().clone()).collect();
 

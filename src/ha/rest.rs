@@ -82,6 +82,43 @@ pub async fn call_service(
     Ok(value)
 }
 
+/// Call `GET <base_url>/api/states` and return the parsed entity state list.
+///
+/// Used to seed `instance.store.states` on first SSE subscribe when the WS
+/// supervisor hasn't yet bootstrapped (or is still reconnecting). Without this
+/// seed the frontend's HomeView shows an empty state until HA pushes the next
+/// `state_changed` event.
+pub async fn get_states(
+    http: &Client,
+    base_url: &str,
+    access_token: &str,
+) -> Result<Vec<crate::state::EntityState>, AppError> {
+    let url = format!("{}/api/states", base_url.trim_end_matches('/'));
+    debug!(%url, "HA get_states fetch");
+
+    let resp = http
+        .get(&url)
+        .bearer_auth(access_token)
+        .send()
+        .await
+        .map_err(|e| AppError::bad_gateway(format!("HA unreachable: {e}")))?;
+
+    if resp.status() == reqwest::StatusCode::UNAUTHORIZED {
+        return Err(AppError::unauthorized("HA rejected the access token"));
+    }
+    if !resp.status().is_success() {
+        let status = resp.status();
+        return Err(AppError::bad_gateway(format!("HA get_states HTTP {status}")));
+    }
+
+    let states: Vec<crate::state::EntityState> = resp
+        .json()
+        .await
+        .map_err(|e| AppError::bad_gateway(format!("HA states parse: {e}")))?;
+
+    Ok(states)
+}
+
 /// Call `GET <base_url>/api/config/area_registry/list`.
 pub async fn get_area_registry(
     http: &Client,
