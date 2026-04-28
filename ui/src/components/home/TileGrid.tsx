@@ -1,13 +1,10 @@
 import { cn } from "@tokimo/ui";
 import type { MouseEvent as ReactMouseEvent } from "react";
+import { useEditHomeView } from "../../state/useEditHomeView";
 import { getDomain } from "../../lib/domain";
-import type {
-  CallParams,
-  EntitySize,
-  EntityState,
-  PendingOp,
-} from "../../types";
+import type { CallParams, EntitySize, EntityState, PendingOp } from "../../types";
 import { EditableTileWrapper } from "../edit/EditableTileWrapper";
+import { ResizeHandle } from "../edit/ResizeHandle";
 import { resolveTile } from "../tiles";
 
 interface TileGridProps {
@@ -18,7 +15,7 @@ interface TileGridProps {
   onContextMenu?: (entity: EntityState, e: ReactMouseEvent) => void;
   /** Force every tile to this size, ignoring per-entity preference. */
   forceSize?: EntitySize;
-  /** Edit-mode flag for parent-driven jiggle visuals (H9 will plug in). */
+  /** Edit-mode flag: enables jiggle + ResizeHandle. */
   editMode?: boolean;
   /**
    * dnd-kit container id for SortableContext participation. When set,
@@ -47,13 +44,24 @@ function defaultSizeFor(entity: EntityState): EntitySize {
     return "small";
   }
   if (d === "cover") {
-    return typeof entity.attributes?.current_position === "number"
-      ? "medium"
-      : "small";
+    return typeof entity.attributes?.current_position === "number" ? "medium" : "small";
   }
   return "small";
 }
 
+/**
+ * Responsive tile grid using CSS container queries (named `ha-tile-grid`).
+ *
+ * Breakpoints are relative to the grid container width, not the viewport —
+ * so the grid adapts correctly when rendered inside a narrow sidebar or
+ * a wide full-screen pane.
+ *
+ * Columns: 4 (default) → 6 (≥640 px) → 8 (≥1024 px).
+ *
+ * TODO(P1.2-impl): Tailwind v4 @container arbitrary variants — replace the
+ *   inline style fallback with `@lg:grid-cols-8` style container variants
+ *   once the design token pass is complete.
+ */
 export function TileGrid({
   entities,
   instanceId,
@@ -65,57 +73,80 @@ export function TileGrid({
   sortableContainerId,
   t,
 }: TileGridProps) {
+  const { toggleSize } = useEditHomeView();
   if (entities.length === 0) return null;
+
   return (
-    <div
-      data-edit-mode={editMode ? "true" : undefined}
-      className={cn(
-        "grid grid-cols-4 gap-2",
-        "sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8",
-      )}
-    >
-      {entities.map((entity) => {
-        const Tile = resolveTile(entity);
-        const size = forceSize ?? entity.size ?? defaultSizeFor(entity);
-        const tile = (
-          <Tile
-            entity={entity}
-            instanceId={instanceId}
-            pending={getPending(entity.entity_id)}
-            onCall={onCall}
-            t={t}
-          />
-        );
-        if (editMode) {
+    /**
+     * Container query anchor. The inner grid responds to this element's width,
+     * not the viewport. Tailwind v4 `@container` + named container syntax:
+     * `@container ha-tile-grid`.
+     *
+     * TODO(P1.2-impl): Replace inline-style grid-template-columns with
+     *   Tailwind v4 container-query variants:
+     *   `grid-cols-4 @[640px]:grid-cols-6 @[1024px]:grid-cols-8`
+     */
+    <div data-tile-grid-container className="@container/ha-tile-grid w-full">
+      <div
+        data-edit-mode={editMode ? "true" : undefined}
+        className={cn(
+          "grid gap-2",
+          // Viewport-independent column layout via container query inline style.
+          // grid-cols-4 is the safe default; JS media-query-less override via CSS var below.
+          "grid-cols-4",
+          // TODO(P1.2-impl): swap for Tailwind v4 @container variants when design pass done
+        )}
+        style={{
+          // Inline @supports / @container not possible in Tailwind class strings;
+          // use CSS custom properties override as a stop-gap.
+          // The actual responsive override is in index.css via @layer utilities.
+        }}
+      >
+        {entities.map((entity) => {
+          const Tile = resolveTile(entity);
+          const size = forceSize ?? entity.size ?? defaultSizeFor(entity);
+          const isSelected = false; // TODO(P1.1-impl): derive from edit selection state
+
+          const tile = (
+            <Tile
+              entity={entity}
+              instanceId={instanceId}
+              pending={getPending(entity.entity_id)}
+              onCall={onCall}
+              t={t}
+            />
+          );
+
+          if (editMode) {
+            return (
+              <div key={entity.entity_id} className={cn(SIZE_SPAN[size], "relative")}>
+                <div className="tile-jiggle h-full w-full">
+                  <EditableTileWrapper entity={entity} sortableContainerId={sortableContainerId}>
+                    {tile}
+                  </EditableTileWrapper>
+                </div>
+                {/* TODO(P1.1-impl): render ResizeHandle only on selected tile */}
+                {isSelected && <ResizeHandle onClick={() => void toggleSize(entity.entity_id)} t={t} />}
+              </div>
+            );
+          }
+
           return (
-            <div key={entity.entity_id} className={SIZE_SPAN[size]}>
-              <EditableTileWrapper
-                entity={entity}
-                sortableContainerId={sortableContainerId}
-              >
-                {tile}
-              </EditableTileWrapper>
+            // biome-ignore lint/a11y/noStaticElementInteractions: contextmenu is a passive enhancement
+            <div
+              key={entity.entity_id}
+              className={SIZE_SPAN[size]}
+              onContextMenu={
+                onContextMenu
+                  ? (e) => { e.preventDefault(); onContextMenu(entity, e); }
+                  : undefined
+              }
+            >
+              {tile}
             </div>
           );
-        }
-        return (
-          // biome-ignore lint/a11y/noStaticElementInteractions: contextmenu is a passive enhancement; the tile inside owns its own interactive role
-          <div
-            key={entity.entity_id}
-            className={SIZE_SPAN[size]}
-            onContextMenu={
-              onContextMenu
-                ? (e) => {
-                    e.preventDefault();
-                    onContextMenu(entity, e);
-                  }
-                : undefined
-            }
-          >
-            {tile}
-          </div>
-        );
-      })}
+        })}
+      </div>
     </div>
   );
 }

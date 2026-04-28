@@ -468,6 +468,21 @@ pub async fn refresh_registries(instance: &Arc<InstanceCtx>) -> Result<(), AppEr
     *instance.device_registry.write().await = Arc::new(device_map);
     *instance.entity_to_device.write().await = Arc::new(e2d_map);
 
+    // TODO(P1.0-impl): Wire mark_default_hidden_for_diagnostic_entities here.
+    //   Once `InstanceCtx` exposes the PgPool (or we thread it through), call:
+    //
+    //   let registry_entries: Vec<HaEntityRegistryEntry> = entity_arr
+    //       .iter()
+    //       .filter_map(HaEntityRegistryEntry::from_json)
+    //       .collect();
+    //   if let Err(e) = sync_visibility::mark_default_hidden_for_diagnostic_entities(
+    //       &pool, instance.id, &registry_entries,
+    //   ).await {
+    //       warn!(err = %e, "failed to mark diagnostic entities as hidden");
+    //   }
+    //
+    // Requires: `use crate::ha::sync_visibility::{self, HaEntityRegistryEntry};`
+
     debug!(
         instance_id = %instance.id,
         devices = device_count,

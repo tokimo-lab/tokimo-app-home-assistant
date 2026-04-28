@@ -57,3 +57,5 @@
     animation: none;
   }
 }
+
+@import "./components/edit/jiggle.css";

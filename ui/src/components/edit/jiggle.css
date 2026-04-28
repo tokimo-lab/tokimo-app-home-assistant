@@ -1,0 +1,29 @@
+/**
+ * Apple Home–style jiggle animation for edit mode tiles.
+ *
+ * Usage: add `tile-jiggle` class to the tile wrapper div.
+ *
+ * Note: `ha-tile-jiggle` in index.css is the legacy class; new components
+ * should use `tile-jiggle` from this file. Both coexist during migration.
+ */
+
+@keyframes jiggle {
+  0%,
+  100% {
+    transform: rotate(-0.5deg);
+  }
+  50% {
+    transform: rotate(0.5deg);
+  }
+}
+
+.tile-jiggle {
+  animation: jiggle 0.4s infinite alternate;
+  transform-origin: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tile-jiggle {
+    animation: none;
+  }
+}
