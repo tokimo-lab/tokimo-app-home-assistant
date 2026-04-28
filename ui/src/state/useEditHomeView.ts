@@ -3,11 +3,19 @@ import { useCallback, useSyncExternalStore } from "react";
 interface EditHomeViewState {
   editMode: boolean;
   selectedTileId: string | null;
+  /**
+   * When true, the home view is in the "Reorder Sections" sub-mode of
+   * edit mode (drag whole rooms vertically). Mutually exclusive with
+   * normal tile editing in the UI, but lives behind the same `editMode`
+   * gate so `Done` exits both at once.
+   */
+  reorderSections: boolean;
 }
 
 let state: EditHomeViewState = {
   editMode: false,
   selectedTileId: null,
+  reorderSections: false,
 };
 
 const listeners = new Set<() => void>();
@@ -20,7 +28,8 @@ function setState(patch: Partial<EditHomeViewState>) {
   const next = { ...state, ...patch };
   if (
     next.editMode === state.editMode &&
-    next.selectedTileId === state.selectedTileId
+    next.selectedTileId === state.selectedTileId &&
+    next.reorderSections === state.reorderSections
   ) {
     return;
   }
@@ -57,7 +66,9 @@ export function registerToggleSize(fn: ToggleSizeFn | null): void {
 
 export interface UseEditHomeViewResult {
   editMode: boolean;
+  reorderSections: boolean;
   enterEditMode: () => void;
+  enterReorderSections: () => void;
   exitEditMode: () => void;
   selectedTileId: string | null;
   selectTile: (id: string | null) => void;
@@ -78,11 +89,19 @@ export function useEditHomeView(): UseEditHomeViewResult {
   const snap = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 
   const enterEditMode = useCallback(() => {
-    setState({ editMode: true });
+    setState({ editMode: true, reorderSections: false });
+  }, []);
+
+  const enterReorderSections = useCallback(() => {
+    setState({ editMode: true, reorderSections: true, selectedTileId: null });
   }, []);
 
   const exitEditMode = useCallback(() => {
-    setState({ editMode: false, selectedTileId: null });
+    setState({
+      editMode: false,
+      reorderSections: false,
+      selectedTileId: null,
+    });
   }, []);
 
   const selectTile = useCallback((id: string | null) => {
@@ -101,7 +120,9 @@ export function useEditHomeView(): UseEditHomeViewResult {
 
   return {
     editMode: snap.editMode,
+    reorderSections: snap.reorderSections,
     enterEditMode,
+    enterReorderSections,
     exitEditMode,
     selectedTileId: snap.selectedTileId,
     selectTile,
@@ -111,7 +132,7 @@ export function useEditHomeView(): UseEditHomeViewResult {
 
 // Test-only reset hook (also useful when the active HA instance changes).
 export function __resetEditHomeViewForTests(): void {
-  state = { editMode: false, selectedTileId: null };
+  state = { editMode: false, selectedTileId: null, reorderSections: false };
   toggleSizeImpl = null;
   emit();
 }

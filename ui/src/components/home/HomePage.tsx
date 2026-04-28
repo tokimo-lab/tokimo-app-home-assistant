@@ -6,6 +6,10 @@ import {
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
 import type { AppRuntimeCtx } from "@tokimo/sdk";
 import { Plus } from "lucide-react";
 import {
@@ -15,6 +19,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { reorderRooms } from "../../api/display";
 import { getDomain } from "../../lib/domain";
 import { useDisplayPatch } from "../../state/useDisplayPatch";
 import {
@@ -37,6 +42,7 @@ import type {
 import { EmptyState } from "../EmptyState";
 import { cycleSizeFor } from "../edit/EditableTileWrapper";
 import { EditModeToolbar } from "../edit/EditModeToolbar";
+import { SectionDragRow } from "../edit/SectionDragHandle";
 import { CamerasSection } from "./CamerasSection";
 import { DomainSummaryBadge } from "./DomainSummaryBadge";
 import { FAVORITES_CONTAINER_ID, FavoritesSection } from "./FavoritesSection";
@@ -147,7 +153,13 @@ export function HomePage({
   const { selectedChip, selectChip, availableChips } = useFilterChip();
   const { patch, reorderFavoritesOptimistic, reorderRoomEntitiesOptimistic } =
     useDisplayPatch(instance.id, ctx, t);
-  const { editMode, exitEditMode, enterEditMode } = useEditHomeView();
+  const {
+    editMode,
+    reorderSections,
+    exitEditMode,
+    enterEditMode,
+    enterReorderSections,
+  } = useEditHomeView();
   const [menu, setMenu] = useState<MenuState | null>(null);
 
   const allEntities = useMemo(
@@ -351,6 +363,34 @@ export function HomePage({
     ],
   );
 
+  // ── Reorder Sections drag handler ─────────────────────────────────────
+  // Whole rooms are dragged vertically; on drop, fire-and-forget the
+  // batch reorder endpoint. The local `rooms` array is upstream-owned
+  // (props), so order will refresh through React Query / WS once the
+  // server confirms.
+  const handleSectionDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event;
+      if (!over) return;
+      const activeId = String(active.id);
+      const overId = String(over.id);
+      if (activeId === overId) return;
+
+      const ordered = rooms.map((r) => r.id);
+      const fromIdx = ordered.indexOf(activeId);
+      const toIdx = ordered.indexOf(overId);
+      if (fromIdx < 0 || toIdx < 0) return;
+      const [moved] = ordered.splice(fromIdx, 1);
+      if (moved !== undefined) ordered.splice(toIdx, 0, moved);
+
+      void reorderRooms(
+        instance.id,
+        ordered.map((roomId, i) => ({ room_id: roomId, sort_order: i })),
+      );
+    },
+    [rooms, instance.id],
+  );
+
   if (allEntities.length === 0) {
     return (
       <div className="flex h-full flex-col px-6 py-6">
@@ -364,6 +404,7 @@ export function HomePage({
             t={t}
             onOpenSettings={onOpenSettings}
             onEnterEditMode={enterEditMode}
+            onEnterReorderSections={enterReorderSections}
             onOpenRoom={onOpenRoom}
           />
         )}
@@ -377,7 +418,13 @@ export function HomePage({
   return (
     <div className="relative flex h-full flex-col gap-5 overflow-auto px-6 py-6">
       {editMode ? (
-        <EditModeToolbar title={instance.name} onDone={exitEditMode} t={t} />
+        <EditModeToolbar
+          title={instance.name}
+          onDone={exitEditMode}
+          subtitle={reorderSections ? t("reorderSections") : undefined}
+          muted={reorderSections}
+          t={t}
+        />
       ) : (
         <Header
           title={headerTitle}
@@ -386,19 +433,45 @@ export function HomePage({
           t={t}
           onOpenSettings={onOpenSettings}
           onEnterEditMode={enterEditMode}
+          onEnterReorderSections={enterReorderSections}
           onOpenRoom={onOpenRoom}
         />
       )}
 
-      <FilterChipBar
-        availableChips={availableChips}
-        selectedChip={selectedChip}
-        onSelectChip={selectChip}
-        entities={entities}
-        t={t}
-      />
+      {!reorderSections && (
+        <FilterChipBar
+          availableChips={availableChips}
+          selectedChip={selectedChip}
+          onSelectChip={selectChip}
+          entities={entities}
+          t={t}
+        />
+      )}
 
-      {selectedChip ? (
+      {reorderSections ? (
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleSectionDragEnd}
+        >
+          <SortableContext
+            id="sections"
+            items={rooms.map((r) => r.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            <div className="flex flex-col gap-2">
+              {rooms.map((room) => (
+                <SectionDragRow
+                  key={room.id}
+                  room={room}
+                  count={(entitiesByRoom.get(room.id) ?? []).length}
+                  t={t}
+                />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
+      ) : selectedChip ? (
         <DomainSummaryBadge chipId={selectedChip} entities={entities} t={t} />
       ) : editMode ? (
         <DndContext
@@ -510,6 +583,7 @@ function Header({
   t,
   onOpenSettings,
   onEnterEditMode,
+  onEnterReorderSections,
   onOpenRoom,
 }: {
   title: string;
@@ -518,6 +592,7 @@ function Header({
   t: (k: string) => string;
   onOpenSettings: () => void;
   onEnterEditMode: () => void;
+  onEnterReorderSections: () => void;
   onOpenRoom: (roomId: string) => void;
 }) {
   return (
@@ -543,7 +618,7 @@ function Header({
           t={t}
           onOpenSettings={onOpenSettings}
           onEditHomeView={onEnterEditMode}
-          onReorderSections={onEnterEditMode}
+          onReorderSections={onEnterReorderSections}
           onOpenRoom={onOpenRoom}
         />
       </div>
