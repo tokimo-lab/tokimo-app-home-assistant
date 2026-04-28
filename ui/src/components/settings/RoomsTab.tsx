@@ -81,6 +81,7 @@ export function RoomsTab({
             isLast={idx === orderedRooms.length - 1}
             onMoveUp={() => move(idx, -1)}
             onMoveDown={() => move(idx, 1)}
+            t={t}
           >
             <RoomNameEditor
               room={room}

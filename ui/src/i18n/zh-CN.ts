@@ -202,4 +202,7 @@ export const zhCN: Record<string, string> = {
   settingsFavoritesEmpty: "还没有收藏的实体。",
   settingsRemoveFavorite: "取消收藏",
   settingsClose: "关闭",
+
+  // Sortable row controls (settings tabs)
+  dragHandle: "拖动排序",
 };

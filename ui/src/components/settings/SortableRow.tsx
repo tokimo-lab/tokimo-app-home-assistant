@@ -76,6 +76,7 @@ interface SortableRowProps {
   onMoveUp: () => void;
   onMoveDown: () => void;
   children: ReactNode;
+  t: (k: string) => string;
 }
 
 export function SortableRow({
@@ -85,6 +86,7 @@ export function SortableRow({
   onMoveUp,
   onMoveDown,
   children,
+  t,
 }: SortableRowProps) {
   const {
     attributes,
@@ -109,7 +111,7 @@ export function SortableRow({
     >
       <button
         type="button"
-        aria-label="drag handle"
+        aria-label={t("dragHandle")}
         className="flex h-8 w-6 cursor-grab items-center justify-center text-white/40 hover:text-white/70 active:cursor-grabbing"
         {...attributes}
         {...listeners}
@@ -121,7 +123,7 @@ export function SortableRow({
 
       <button
         type="button"
-        aria-label="move up"
+        aria-label={t("reorderUp")}
         disabled={isFirst}
         onClick={onMoveUp}
         className="flex h-7 w-7 cursor-pointer items-center justify-center rounded text-white/60 transition hover:bg-white/[0.08] hover:text-white disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
@@ -130,7 +132,7 @@ export function SortableRow({
       </button>
       <button
         type="button"
-        aria-label="move down"
+        aria-label={t("reorderDown")}
         disabled={isLast}
         onClick={onMoveDown}
         className="flex h-7 w-7 cursor-pointer items-center justify-center rounded text-white/60 transition hover:bg-white/[0.08] hover:text-white disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"

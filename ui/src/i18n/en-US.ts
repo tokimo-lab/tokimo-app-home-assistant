@@ -203,4 +203,7 @@ export const enUS: Record<string, string> = {
   settingsFavoritesEmpty: "No favorite entities yet.",
   settingsRemoveFavorite: "Remove from favorites",
   settingsClose: "Close",
+
+  // Sortable row controls (settings tabs)
+  dragHandle: "Drag to reorder",
 };

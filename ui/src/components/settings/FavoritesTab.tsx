@@ -102,6 +102,7 @@ export function FavoritesTab({ instanceId, t }: FavoritesTabProps) {
             isLast={idx === orderedFavorites.length - 1}
             onMoveUp={() => move(idx, -1)}
             onMoveDown={() => move(idx, 1)}
+            t={t}
           >
             <EntityIcon
               domain={getDomain(e.entity_id)}
