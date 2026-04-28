@@ -38,8 +38,8 @@ export function createInstanceEventStream(
   ] as const) {
     es.addEventListener(evtType, (e: MessageEvent<string>) => {
       try {
-        const data = JSON.parse(e.data) as SseEvent;
-        onEvent({ type: evtType, ...data } as SseEvent);
+        const data = JSON.parse(e.data) as Omit<SseEvent, "type">;
+        onEvent({ ...data, type: evtType } as SseEvent);
       } catch {
         // ignore
       }

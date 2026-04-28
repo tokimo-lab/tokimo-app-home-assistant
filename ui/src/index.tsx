@@ -23,6 +23,7 @@ import {
 import { AnimatedSettingsPane } from "./components/shell/AnimatedSettingsPane";
 import { AppShell } from "./components/shell/AppShell";
 import { enUS, zhCN } from "./i18n";
+// @ts-expect-error -- side-effect css import
 import "./index.css";
 import { SetupPage } from "./pages/SetupPage";
 import { setActiveInstance } from "./state/activeInstanceStore";
@@ -244,6 +245,7 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
         }
         openSettings({ tab: "family", instanceId: id });
       }}
+      t={t}
     >
       {parsed.page === "home" && activeInstance && (
         <HomeView
