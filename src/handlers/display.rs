@@ -194,6 +194,23 @@ pub async fn update_display(
     .await?;
 
     let size_db: String = r.get("size");
+
+    // Broadcast EntityEvent::Updated so SSE clients see size/is_favorite/
+    // hidden/area_id override changes immediately, instead of waiting for
+    // the next upstream HA state_changed. The SSE handler itself re-fetches
+    // the override row and merges it into an EntityDto, so we only need to
+    // ship the current raw EntityState here. If HA hasn't pushed this entity
+    // yet (no state in the store), skip the broadcast — there's nothing to
+    // merge against, and the next HA push will pick up the override anyway.
+    if let Some(instance) = ctx.conn_pool.instances.get(&instance_id)
+        && let Some(state) = instance.store.states.get(&entity_id)
+    {
+        let _ = instance.store.tx.send(crate::state::EntityEvent::Updated {
+            entity: Box::new(state.clone()),
+            context_id: None,
+        });
+    }
+
     Ok(Json(EntityDisplayDto {
         instance_id,
         entity_id: r.get("entity_id"),
