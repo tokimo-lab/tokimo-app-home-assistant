@@ -23,12 +23,13 @@
 //!   * Persisting the decision means user can override any one cell by
 //!     hand and the override sticks across reconnects / refreshes.
 //!
-//! The default rules ported from the previous frontend logic
-//! (`ui/src/components/home/_helpers.ts`):
+//! The default rules:
 //!   * `hidden` — `entity_category` ∈ {`diagnostic`, `config`}.
-//!   * `collapsed` — Tier-3 demotion: noise-keyword switch / binary_sensor,
-//!     or any non-Tier-1/2/binary_sensor domain. Plus per-(area_id, domain)
-//!     K-cap so a room with > K entities of one domain shows K + reveal.
+//!   * `collapsed` — pure domain-table lookup. Actuator-like domains
+//!     (`light`, `switch`, `climate`, …) default visible; read-only and
+//!     trigger-style domains (`sensor`, `binary_sensor`, `automation`,
+//!     `script`, `scene`, …) default collapsed. Plus a per-entity
+//!     name-keyword demotion for noise switches.
 //!   * `group_id` — `device::{device_id}::{domain}` when device_id is known,
 //!     else `name::{normalized_name}::{domain}`, else `None` (singleton).
 //!   * `group_primary` — within a group, the entity with the most features
@@ -56,57 +57,46 @@ const HIDDEN_BY_DEFAULT_CATEGORIES: &[&str] = &["diagnostic", "config"];
 /// History:
 ///   v1 — initial seal (hidden / collapsed-by-tier / group_id / group_primary).
 ///   v2 — added per-(area_id, domain) K-cap pass.
-const CURRENT_SEAL_VERSION: i32 = 2;
+///   v3 — dropped K-cap; collapsed seeded from explicit domain table only.
+const CURRENT_SEAL_VERSION: i32 = 3;
 
-/// Per-domain cap on how many entities stay visible (collapsed=false) within
-/// a single (area_id, domain) bucket. Excess entries get demoted to
-/// `collapsed=true` so the UI's "Show N more" reveal handles the long tail.
-/// Rooms with very few devices are unaffected (the cap only trims overflow).
-fn cap_for_domain(domain: &str) -> usize {
-    match domain {
-        // Tier-1 actuators: a room with > 4 lights or switches still shows
-        // 4 + reveal. 4 fits one row of toggle tiles on a typical layout.
-        "light"
-        | "switch"
-        | "input_boolean"
-        | "fan"
-        | "cover"
-        | "lock"
-        | "media_player"
-        | "climate"
-        | "vacuum"
-        | "water_heater"
-        | "humidifier"
-        | "alarm_control_panel" => 4,
-        // Trigger-style: scenes / scripts / automations.
-        "scene" | "script" | "automation" => 4,
-        // Read-only sensors: long tails are common (per-device temperature,
-        // humidity, illuminance, signal_strength, …) — cap tighter.
-        "sensor" | "binary_sensor" => 2,
-        // Unknown domain — match Tier-1 cap.
-        _ => 4,
-    }
-}
-
-/// Domains whose primary purpose is direct user actuation. Visible by
-/// default. Mirrors `TIER1_DOMAINS` in the frontend.
-const TIER1_DOMAINS: &[&str] = &[
+/// Domains that default to `collapsed = false` (visible inline on home).
+/// Direct user-actuation surfaces — the home page exists primarily to
+/// present these. `switch` is still subject to noise-keyword demotion in
+/// `default_collapsed` for configuration-style switches.
+const VISIBLE_DOMAINS: &[&str] = &[
     "light",
     "switch",
-    "input_boolean",
     "climate",
-    "cover",
-    "fan",
     "lock",
+    "cover",
     "media_player",
+    "fan",
     "vacuum",
-    "water_heater",
     "humidifier",
+    "water_heater",
+    "siren",
+    "valve",
+    "input_boolean",
     "alarm_control_panel",
 ];
 
-/// Trigger-style domains: scenes / scripts / automations. Visible by default.
-const TIER2_DOMAINS: &[&str] = &["scene", "script", "automation"];
+/// Domains that default to `collapsed = true` (folded under "Show more").
+/// Read-only telemetry, environment summaries, and trigger-style entries
+/// that flood the page with low-information tiles. The user can still pin
+/// individual entities by toggling collapsed off via the settings UI.
+const COLLAPSED_DOMAINS: &[&str] = &[
+    "sensor",
+    "binary_sensor",
+    "weather",
+    "sun",
+    "device_tracker",
+    "update",
+    "automation",
+    "script",
+    "scene",
+    "button",
+];
 
 /// Friendly-name keyword heuristics for switch demotion. Substring,
 /// case-insensitive on the resolved friendly_name. Source: frontend
@@ -184,8 +174,11 @@ const SWITCH_NOISE_KEYWORDS: &[&str] = &[
     "静音",
 ];
 
-/// Friendly-name keyword heuristics for binary_sensor demotion. Source:
-/// frontend `BINARY_SENSOR_NOISE_KEYWORDS` list.
+/// Friendly-name keyword heuristics for binary_sensor demotion. Currently
+/// unused — `binary_sensor` is unconditionally collapsed via the domain
+/// table — kept for the day we resurrect a "promote noisy-name binary
+/// sensors out of the collapsed bucket" pass without re-deriving the list.
+#[allow(dead_code)]
 const BINARY_SENSOR_NOISE_KEYWORDS: &[&str] = &[
     "滤网",
     "滤芯",
@@ -269,37 +262,31 @@ impl HaEntityRegistryEntry {
             .is_some_and(|c| HIDDEN_BY_DEFAULT_CATEGORIES.contains(&c))
     }
 
-    /// Tier-3 demotion. Mirrors the frontend `domainTier(...) == 3` path.
+    /// Pure domain-table lookup with one per-entity exception:
+    /// configuration-style switches (matched by friendly-name keyword)
+    /// fold even though `switch` is in `VISIBLE_DOMAINS`.
     fn default_collapsed(&self) -> bool {
         let domain = self.domain.as_str();
-        let name_lower = self
-            .friendly_name
-            .as_deref()
-            .map(|s| s.to_lowercase())
-            .unwrap_or_else(|| self.entity_id.to_lowercase());
 
-        if TIER1_DOMAINS.contains(&domain) {
-            // Tier-1 normally stays uncollapsed. switch is demoted to
-            // collapsed when its name matches the noise keyword list
-            // (configuration-style switches that pollute the home page).
-            if domain == "switch" && SWITCH_NOISE_KEYWORDS.iter().any(|k| name_lower.contains(k)) {
-                return true;
+        if VISIBLE_DOMAINS.contains(&domain) {
+            if domain == "switch" {
+                let name_lower = self
+                    .friendly_name
+                    .as_deref()
+                    .map(|s| s.to_lowercase())
+                    .unwrap_or_else(|| self.entity_id.to_lowercase());
+                if SWITCH_NOISE_KEYWORDS.iter().any(|k| name_lower.contains(k)) {
+                    return true;
+                }
             }
             return false;
         }
-        if TIER2_DOMAINS.contains(&domain) {
-            return false;
+        if COLLAPSED_DOMAINS.contains(&domain) {
+            return true;
         }
-        if domain == "binary_sensor" {
-            // Noise binary sensors (filter / fault / alarm…) collapse;
-            // everything else stays expanded. Critical-class promotion
-            // doesn't matter for the collapsed flag — a normal binary
-            // sensor is already Tier-2-equivalent for visibility.
-            return BINARY_SENSOR_NOISE_KEYWORDS.iter().any(|k| name_lower.contains(k));
-        }
-        // Anything else (sensor without env class, button, update,
-        // weather, …) is Tier 3 → collapsed.
-        true
+        // Unknown domains stay visible by default — better to show an
+        // unrecognised tile than to hide it under "Show more".
+        false
     }
 
     /// Compute the group identifier used to dedupe duplicate entities that
@@ -345,7 +332,7 @@ pub struct SyncStats {
     pub skipped_existing: usize,
 }
 
-/// Pure in-memory passes (1, 2, 2.5) that turn `entries` into per-entity
+/// Pure in-memory passes (1, 2) that turn `entries` into per-entity
 /// `Decision`s. Extracted from `sync_default_visibility_and_grouping` so
 /// the heuristic can be unit-tested without spinning up Postgres.
 fn compute_decisions(entries: &[HaEntityRegistryEntry]) -> Vec<Decision> {
@@ -375,37 +362,6 @@ fn compute_decisions(entries: &[HaEntityRegistryEntry]) -> Vec<Decision> {
         // First entry in ranked = primary; rest = demoted.
         for &idx in ranked.iter().skip(1) {
             decisions[idx].group_primary = false;
-        }
-    }
-
-    // Pass 2.5: per-(area_id, domain) K-cap. Among entities that survived
-    // tier-3 demotion AND group-primary demotion (i.e. would currently be
-    // surfaced on the home page for that room), keep only `cap_for_domain`
-    // and demote the overflow to `collapsed=true`. Without this cap a user
-    // with 30 lights in one room would see all 30 tiles inline; with it
-    // they see 4 + a "Show 26 more" reveal. None of this hides entities —
-    // it just controls the default fold state.
-    let mut buckets: HashMap<(Option<String>, String), Vec<usize>> = HashMap::new();
-    for (idx, e) in entries.iter().enumerate() {
-        let d = &decisions[idx];
-        if d.hidden || d.collapsed || !d.group_primary {
-            continue;
-        }
-        buckets
-            .entry((e.area_id.clone(), e.domain.clone()))
-            .or_default()
-            .push(idx);
-    }
-    for ((_area, domain), mut idxs) in buckets {
-        let cap = cap_for_domain(&domain);
-        if idxs.len() <= cap {
-            continue;
-        }
-        // Stable sort by primary_sort_key so the same K entities consistently
-        // win across re-syncs (otherwise a re-seal could shuffle the visible set).
-        idxs.sort_by(|&a, &b| entries[a].primary_sort_key().cmp(&entries[b].primary_sort_key()));
-        for &idx in idxs.iter().skip(cap) {
-            decisions[idx].collapsed = true;
         }
     }
 
@@ -503,13 +459,36 @@ mod tests {
     }
 
     #[test]
-    fn collapsed_demotes_tier3_domains() {
-        // sensor without env class → Tier 3 → collapsed
+    fn collapsed_follows_domain_table() {
+        // Read-only telemetry → collapsed.
         assert!(entry("sensor.foo").default_collapsed());
-        // light → Tier 1 → not collapsed
+        assert!(entry("binary_sensor.door").default_collapsed());
+        assert!(entry("weather.home").default_collapsed());
+        assert!(entry("sun.sun").default_collapsed());
+        assert!(entry("device_tracker.phone").default_collapsed());
+        assert!(entry("update.firmware").default_collapsed());
+        assert!(entry("button.reboot").default_collapsed());
+        // Trigger-style → collapsed.
+        assert!(entry("automation.morning").default_collapsed());
+        assert!(entry("script.bedtime").default_collapsed());
+        assert!(entry("scene.movie").default_collapsed());
+        // Actuators → visible.
         assert!(!entry("light.bedroom").default_collapsed());
-        // scene → Tier 2 → not collapsed
-        assert!(!entry("scene.movie").default_collapsed());
+        assert!(!entry("switch.fan").default_collapsed());
+        assert!(!entry("climate.ac").default_collapsed());
+        assert!(!entry("lock.front").default_collapsed());
+        assert!(!entry("cover.garage").default_collapsed());
+        assert!(!entry("media_player.tv").default_collapsed());
+        assert!(!entry("fan.living").default_collapsed());
+        assert!(!entry("vacuum.robot").default_collapsed());
+        assert!(!entry("humidifier.bedroom").default_collapsed());
+        assert!(!entry("water_heater.tank").default_collapsed());
+        assert!(!entry("siren.alarm").default_collapsed());
+        assert!(!entry("valve.water").default_collapsed());
+        assert!(!entry("input_boolean.guest").default_collapsed());
+        assert!(!entry("alarm_control_panel.house").default_collapsed());
+        // Unknown domain → visible (don't fold what we don't recognise).
+        assert!(!entry("group.living_room").default_collapsed());
     }
 
     #[test]
@@ -594,88 +573,19 @@ mod tests {
     }
 
     #[test]
-    fn cap_for_domain_values() {
-        assert_eq!(cap_for_domain("light"), 4);
-        assert_eq!(cap_for_domain("switch"), 4);
-        assert_eq!(cap_for_domain("scene"), 4);
-        assert_eq!(cap_for_domain("sensor"), 2);
-        assert_eq!(cap_for_domain("binary_sensor"), 2);
-        assert_eq!(cap_for_domain("nonexistent"), 4);
-    }
-
-    #[test]
-    fn collapsed_caps_per_domain_per_room() {
-        // 6 lights in the same room: 4 should stay visible, 2 collapse.
-        let mut entries: Vec<HaEntityRegistryEntry> = (0..6)
+    fn compute_decisions_does_not_apply_per_room_cap() {
+        // 30 lights in one room must all stay visible — domain table is
+        // the only collapsed gate, no overflow demotion.
+        let entries: Vec<HaEntityRegistryEntry> = (0..30)
             .map(|i| {
                 let mut e = entry(&format!("light.l{i}"));
                 e.area_id = Some("kitchen".into());
-                // Distinct primary_sort_key so cap chooses deterministically.
-                e.supported_features = Some((6 - i as i64) * 7); // more bits → wins
                 e.friendly_name = Some(format!("Light {i}"));
                 e
             })
             .collect();
-        // Add 2 lights in a *different* room — should NOT count toward kitchen cap.
-        for i in 0..2 {
-            let mut e = entry(&format!("light.bed{i}"));
-            e.area_id = Some("bedroom".into());
-            e.friendly_name = Some(format!("Bed {i}"));
-            entries.push(e);
-        }
-
         let decisions = compute_decisions(&entries);
-
-        let kitchen_visible = decisions
-            .iter()
-            .zip(entries.iter())
-            .filter(|(d, e)| !d.collapsed && e.area_id.as_deref() == Some("kitchen"))
-            .count();
-        let bedroom_visible = decisions
-            .iter()
-            .zip(entries.iter())
-            .filter(|(d, e)| !d.collapsed && e.area_id.as_deref() == Some("bedroom"))
-            .count();
-
-        assert_eq!(kitchen_visible, 4, "kitchen should cap at K=4");
-        assert_eq!(bedroom_visible, 2, "bedroom under cap stays uncollapsed");
-    }
-
-    #[test]
-    fn collapsed_cap_is_per_domain_not_room_total() {
-        // 4 lights + 4 switches in the same room: both stay fully visible
-        // because the cap is per-(area, domain).
-        let mut entries: Vec<HaEntityRegistryEntry> = Vec::new();
-        for i in 0..4 {
-            let mut e = entry(&format!("light.l{i}"));
-            e.area_id = Some("kitchen".into());
-            e.friendly_name = Some(format!("Light {i}"));
-            entries.push(e);
-        }
-        for i in 0..4 {
-            let mut e = entry(&format!("switch.s{i}"));
-            e.area_id = Some("kitchen".into());
-            e.friendly_name = Some(format!("Switch {i}"));
-            entries.push(e);
-        }
-
-        let decisions = compute_decisions(&entries);
-        let visible = decisions.iter().filter(|d| !d.collapsed).count();
-        assert_eq!(visible, 8, "8 visible total — cap is per-domain");
-    }
-
-    #[test]
-    fn collapsed_cap_skips_already_demoted() {
-        // 5 sensors (Tier-3 → already collapsed) in one room.
-        // Cap should not "credit" them as visible; they stay collapsed.
-        let entries: Vec<HaEntityRegistryEntry> = (0..5)
-            .map(|i| {
-                let mut e = entry(&format!("sensor.s{i}"));
-                e.area_id = Some("kitchen".into());
-                e
-            })
-            .collect();
-        let decisions = compute_decisions(&entries);
-        assert!(decisions.iter().all(|d| d.collapsed));
+        let visible = decisions.iter().filter(|d| !d.collapsed && d.group_primary).count();
+        assert_eq!(visible, 30, "all 30 lights stay visible without K-cap");
     }
 }
