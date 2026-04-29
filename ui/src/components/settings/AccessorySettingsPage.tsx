@@ -17,6 +17,7 @@ import type {
   UpdateEntityDisplayDto,
 } from "../../types";
 import { effectiveSizeForEntity } from "../home/_helpers";
+import { MembersSection } from "./MembersSection";
 
 /**
  * Dev-only flag to surface the "not certified" banner from AppleHome IMG_2664.
@@ -152,7 +153,14 @@ export function AccessorySettingsPage({
           <p className="text-sm text-red-400">{loadState.message}</p>
         )}
         {loadState.status === "ready" && (
-          <Body entity={loadState.entity} rooms={rooms} onPatch={patch} t={t} />
+          <Body
+            entity={loadState.entity}
+            rooms={rooms}
+            instanceId={instanceId}
+            onPatch={patch}
+            onRefresh={refresh}
+            t={t}
+          />
         )}
       </div>
     </div>
@@ -201,12 +209,16 @@ function Header({
 function Body({
   entity,
   rooms,
+  instanceId,
   onPatch,
+  onRefresh,
   t,
 }: {
   entity: EntityState;
   rooms: HaRoom[];
+  instanceId: string;
   onPatch: (dto: UpdateEntityDisplayDto) => Promise<void>;
+  onRefresh: () => Promise<void>;
   t: (k: string) => string;
 }) {
   const showCertWarning = isCertWarningEnabled();
@@ -334,6 +346,13 @@ function Body({
           </SettingRow>
         )}
       </Section>
+
+      <MembersSection
+        entity={entity}
+        instanceId={instanceId}
+        t={t}
+        onRefresh={onRefresh}
+      />
     </div>
   );
 }
