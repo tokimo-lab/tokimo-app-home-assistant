@@ -12,7 +12,7 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@floating-ui/react": "^0.27.19",
-    "@tokimo/sdk": "github:tokimo-lab/tokimo-package-sdk#2632b1b675b012735d54f85fee00b71b7f27e0c4",
+    "@tokimo/sdk": "github:tokimo-lab/tokimo-package-sdk#280a474613ae7bf4f746dfb8cee94e27cc91b636",
     "@tokimo/ui": "github:tokimo-lab/tokimo-ui#67925b8147d21f7d5ac3db50a3601400b144b89d",
     "lucide-react": "^1.11.0",
     "react": "^19.2.5",

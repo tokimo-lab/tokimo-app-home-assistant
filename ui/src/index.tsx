@@ -16,7 +16,6 @@ import { createRoot, type Root } from "react-dom/client";
 import { DetailOverlay } from "./components/detail/DetailOverlay";
 import { HomePage } from "./components/home/HomePage";
 import { RoomPageHost } from "./components/room/RoomPageHost";
-import { AccessorySettingsPage } from "./components/settings/AccessorySettingsPage";
 import {
   SettingsPane,
   type SettingsTab,
@@ -90,11 +89,8 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
   // ── Rooms (for HomePage grouping + room stack navigation) ────────────────
   const { rooms } = useRooms(instanceId);
 
-  // ── Detail overlay state (for accessory-settings escape hatch) ───────────
-  const { closeDetail } = useDetailOverlay();
-  const [accessorySettingsEntityId, setAccessorySettingsEntityId] = useState<
-    string | null
-  >(null);
+  // ── Detail overlay state ─────────────────────────────────────────────────
+  const { closeDetail, openInNewWindow } = useDetailOverlay();
 
   // ── Settings pane (Family settings) ──────────────────────────────────────
   const [settingsTab, setSettingsTab] = useState<SettingsTab | null>(null);
@@ -124,40 +120,21 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
     // Switching home/family invalidates any pushed rooms or open detail card.
     clearRoomStack();
     closeDetail();
-    setAccessorySettingsEntityId(null);
   }, [instanceId, instances, closeDetail]);
 
-  // ── Register `openInNewWindow` injection for DetailOverlay ───────────────
-  // The desktop shell may eventually expose `openModalWindow` on AppRuntimeCtx;
-  // until then we feature-detect and degrade gracefully.
+  // ── Wire DetailOverlay's "open in new window" to ShellApi.openModalWindow ─
+  // The desktop shell's openModalWindow is now a typed first-class API on
+  // `ctx.shell`; wire DetailOverlay's escape-hatch directly to it. The host
+  // owns title rendering, close logic, and parent-window lookup.
   useEffect(() => {
-    type MaybeOpenModalCtx = AppRuntimeCtx & {
-      openModalWindow?: (opts: {
-        component: () => Promise<unknown>;
-        title?: string;
-        metadata?: Record<string, unknown>;
-      }) => void;
-    };
-    const maybe = ctx as MaybeOpenModalCtx;
     registerOpenInNewWindow(({ entityId, instanceId: iid }) => {
-      if (typeof maybe.openModalWindow === "function") {
-        maybe.openModalWindow({
-          component: () =>
-            import("./components/settings/AccessorySettingsPage"),
-          title: t("accessoryClose"),
-          metadata: { instanceId: iid, entityId },
-        });
-      } else {
-        // TODO(H10/desktop): wire a real Tokimo modal once the SDK exposes
-        // `openModalWindow`. For now we simply log so click-to-pop-out is a
-        // no-op rather than a hard error.
-        console.warn(
-          "[home-assistant] openModalWindow not available in AppRuntimeCtx; " +
-            "ignoring openInNewWindow for",
-          iid,
-          entityId,
-        );
-      }
+      ctx.shell.openModalWindow({
+        component: () => import("./components/settings/AccessorySettingsPage"),
+        title: t("detailOpenSettings"),
+        width: 500,
+        height: 600,
+        metadata: { instanceId: iid, entityId, locale: ctx.locale },
+      });
     });
     return () => {
       registerOpenInNewWindow(null);
@@ -241,11 +218,7 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
       <AppShell
         instances={instances}
         activeInstanceId={effectiveInstanceId}
-        settingsActive={
-          settingsTab !== null ||
-          creatingFamily ||
-          accessorySettingsEntityId !== null
-        }
+        settingsActive={settingsTab !== null || creatingFamily}
         onNavigate={navigateTo}
         onCreateInstance={openCreateFamily}
         onOpenSettings={() => openSettings({ tab: "family" })}
@@ -287,7 +260,8 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
               onCall={onCall}
               getPending={getPending}
               onOpenSettings={(eid) => {
-                setAccessorySettingsEntityId(eid);
+                if (!activeInstance) return;
+                openInNewWindow(eid, activeInstance.id);
                 closeDetail();
               }}
               t={t}
@@ -327,17 +301,6 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
               t={t}
               onCreated={handleFamilyCreated}
               onCancel={closeCreateFamily}
-            />
-          )}
-        </AnimatedSettingsPane>
-
-        <AnimatedSettingsPane open={accessorySettingsEntityId !== null}>
-          {accessorySettingsEntityId !== null && activeInstance && (
-            <AccessorySettingsPage
-              instanceId={activeInstance.id}
-              entityId={accessorySettingsEntityId}
-              onClose={() => setAccessorySettingsEntityId(null)}
-              t={t}
             />
           )}
         </AnimatedSettingsPane>

@@ -1,9 +1,11 @@
+import { makeTranslator, type ShellWindowHandle } from "@tokimo/sdk";
 import { cn, Select, Switch } from "@tokimo/ui";
 import { AlertTriangle, Pencil, X } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { updateEntityDisplay } from "../../api/display";
 import { getEntity } from "../../api/entities";
 import { listRooms } from "../../api/rooms";
+import { enUS, zhCN } from "../../i18n";
 import type {
   EntitySize,
   EntityState,
@@ -23,6 +25,47 @@ function isCertWarningEnabled(): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * Modal-window entry: receives `ShellWindowHandle` from the host. Reads
+ * `instanceId` / `entityId` / `locale` from `win.metadata`, builds its own
+ * translator, and uses `win.close()` to dismiss the modal.
+ *
+ * This is the default export so the host can
+ * `lazy(() => import("…/AccessorySettingsPage"))` it directly.
+ */
+export default function AccessorySettingsModal({
+  win,
+}: {
+  win: ShellWindowHandle;
+}) {
+  const meta = win.metadata as {
+    instanceId?: string;
+    entityId?: string;
+    locale?: string;
+  };
+  const locale = meta.locale ?? "en-US";
+  const t = useMemo(
+    () => makeTranslator({ "zh-CN": zhCN, "en-US": enUS }, locale),
+    [locale],
+  );
+
+  if (!meta.instanceId || !meta.entityId) {
+    return (
+      <div className="flex h-full items-center justify-center bg-[var(--surface-base,#0b0f17)] px-4 text-sm text-red-300">
+        Missing instanceId/entityId in modal metadata.
+      </div>
+    );
+  }
+  return (
+    <AccessorySettingsPage
+      instanceId={meta.instanceId}
+      entityId={meta.entityId}
+      onClose={() => win.close()}
+      t={t}
+    />
+  );
 }
 
 interface AccessorySettingsPageProps {
