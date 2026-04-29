@@ -2,11 +2,9 @@ import { useMemo } from "react";
 import {
   bySortOrder,
   CHIP_LABEL_KEY,
-  dedupByDevice,
-  defaultHomeOrder,
+  isHomeVisible,
   isRenderable,
   passesChip,
-  passesDefaultHome,
 } from "../components/home/_helpers";
 import { getDomain } from "../lib/domain";
 import type { EntityState, HaInstance, HaRoom } from "../types";
@@ -65,17 +63,13 @@ export function useHomePageData({
   );
 
   const visibleEntities = useMemo(() => {
-    let list: EntityState[];
     if (selectedChip && chipDomains) {
-      list = allEntities.filter((e) => passesChip(e, selectedChip, chipDomains));
-    } else if (showAll) {
-      list = allEntities;
-    } else {
-      list = allEntities.filter((e) => passesDefaultHome(e, false));
+      return allEntities.filter((e) =>
+        passesChip(e, selectedChip, chipDomains),
+      );
     }
-    // Collapse same-physical-device duplicates after the tier/chip filter
-    // but before any per-room slicing or capping. See dedupByDevice docs.
-    return dedupByDevice(list);
+    if (showAll) return allEntities;
+    return allEntities.filter(isHomeVisible);
   }, [allEntities, selectedChip, chipDomains, showAll]);
 
   const entityRoomId = useMemo(() => {
@@ -100,12 +94,11 @@ export function useHomePageData({
       arr.push(e);
       map.set(rid, arr);
     }
-    // Apply the right comparator inside each bucket. Chip view keeps the
-    // user-curated sort_order; default home uses domain-priority order.
-    const cmp = selectedChip ? bySortOrder : defaultHomeOrder;
-    for (const arr of map.values()) arr.sort(cmp);
+    // Backend curates sort_order via entity_overrides; render order is the
+    // same for chip and default views — purely user-curated.
+    for (const arr of map.values()) arr.sort(bySortOrder);
     return map;
-  }, [visibleEntities, entityRoomId, selectedChip]);
+  }, [visibleEntities, entityRoomId]);
 
   const cameras = useMemo(
     () =>

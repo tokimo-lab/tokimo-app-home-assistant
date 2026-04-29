@@ -179,9 +179,7 @@ export interface EntityState {
    * any time; demoted siblings still appear in the snapshot but a
    * card-list view should usually render only the primary. */
   group_primary?: boolean;
-  /** Forward-compat: device grouping id from HA's entity_registry. May be
-   * undefined on list endpoints; when present, dedupByDevice uses it as
-   * the authoritative device identifier. */
+  /** Forward-compat: device grouping id from HA's entity_registry. */
   device_id?: string | null;
   /** Only populated by GET /entities/:eid single-fetch path. */
   device?: DeviceMeta;
