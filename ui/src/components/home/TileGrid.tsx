@@ -133,7 +133,7 @@ export function TileGrid({
             return (
               <motion.div
                 key={entity.entity_id}
-                layout
+                layout="position"
                 layoutId={entity.entity_id}
                 transition={LAYOUT_SPRING}
                 data-size={size}
@@ -158,7 +158,7 @@ export function TileGrid({
             // biome-ignore lint/a11y/noStaticElementInteractions: contextmenu is a passive enhancement
             <motion.div
               key={entity.entity_id}
-              layout
+              layout="position"
               layoutId={entity.entity_id}
               transition={LAYOUT_SPRING}
               data-size={size}
