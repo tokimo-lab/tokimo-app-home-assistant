@@ -432,6 +432,7 @@ export const zhCN: Record<string, string> = {
   cameraRefresh: "刷新",
 
   // Tile context menu (right-click)
+  showControls: "显示控件",
   tileSizeHeading: "大小",
   tileSizeSmall: "小",
   tileSizeMedium: "中",

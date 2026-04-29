@@ -436,6 +436,7 @@ export const enUS: Record<string, string> = {
   cameraRefresh: "Refresh",
 
   // Tile context menu (right-click)
+  showControls: "Show Controls",
   tileSizeHeading: "Size",
   tileSizeSmall: "Small",
   tileSizeMedium: "Medium",

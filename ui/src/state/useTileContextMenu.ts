@@ -15,6 +15,7 @@ export interface UseTileContextMenuResult {
   menu: TileContextMenuState | null;
   openMenu: (entity: EntityState, e: ReactMouseEvent) => void;
   closeMenu: () => void;
+  onShowControls: () => void;
   onSetSize: (size: EntitySize) => void;
   onToggleFavorite: (next: boolean) => void;
   onHide: () => void;
@@ -22,11 +23,14 @@ export interface UseTileContextMenuResult {
 
 /**
  * Owns tile context-menu state and the patch-callback wiring. HomePage
- * supplies the patch fn (from useDisplayPatch); this hook keeps the
- * boilerplate (open coords, close, three handlers) out of the layout layer.
+ * supplies the patch fn (from useDisplayPatch) and the openDetail fn
+ * (from useDetailOverlay); this hook keeps the boilerplate (open coords,
+ * close, four handlers) out of the layout layer.
  */
 export function useTileContextMenu(
   patch: (entityId: string, dto: UpdateEntityDisplayDto) => Promise<unknown>,
+  openDetail: (entityId: string, instanceId: string) => void,
+  instanceId: string,
 ): UseTileContextMenuResult {
   const [menu, setMenu] = useState<TileContextMenuState | null>(null);
 
@@ -35,6 +39,10 @@ export function useTileContextMenu(
   }, []);
 
   const closeMenu = useCallback(() => setMenu(null), []);
+
+  const onShowControls = useCallback(() => {
+    if (menu) openDetail(menu.entity.entity_id, instanceId);
+  }, [menu, openDetail, instanceId]);
 
   const onSetSize = useCallback(
     (size: EntitySize) => {
@@ -54,5 +62,13 @@ export function useTileContextMenu(
     if (menu) void patch(menu.entity.entity_id, { hidden: true });
   }, [menu, patch]);
 
-  return { menu, openMenu, closeMenu, onSetSize, onToggleFavorite, onHide };
+  return {
+    menu,
+    openMenu,
+    closeMenu,
+    onShowControls,
+    onSetSize,
+    onToggleFavorite,
+    onHide,
+  };
 }

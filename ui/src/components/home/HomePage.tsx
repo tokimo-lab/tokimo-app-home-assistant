@@ -2,6 +2,7 @@ import type { AppRuntimeCtx } from "@tokimo/sdk";
 import { useState } from "react";
 import { rescanInstance } from "../../api/client";
 import { clearEntities } from "../../state/entityStore";
+import { useDetailOverlay } from "../../state/useDetailOverlay";
 import { useDisplayPatch } from "../../state/useDisplayPatch";
 import { useDragHandlers } from "../../state/useDragHandlers";
 import { useEditHomeView } from "../../state/useEditHomeView";
@@ -76,8 +77,16 @@ export function HomePage({
       t,
     });
 
-  const { menu, openMenu, closeMenu, onSetSize, onToggleFavorite, onHide } =
-    useTileContextMenu(patch);
+  const { openDetail } = useDetailOverlay();
+  const {
+    menu,
+    openMenu,
+    closeMenu,
+    onShowControls,
+    onSetSize,
+    onToggleFavorite,
+    onHide,
+  } = useTileContextMenu(patch, openDetail, instance.id);
 
   useToggleSizeRegistry(entities, patch);
 
@@ -195,6 +204,7 @@ export function HomePage({
             x={menu.x}
             y={menu.y}
             onClose={closeMenu}
+            onShowControls={onShowControls}
             onSetSize={onSetSize}
             onToggleFavorite={onToggleFavorite}
             onHide={onHide}

@@ -5,7 +5,7 @@ import {
   useInteractions,
   useRole,
 } from "@floating-ui/react";
-import { Check, EyeOff, Star, StarOff } from "lucide-react";
+import { Check, EyeOff, Sliders, Star, StarOff } from "lucide-react";
 import { useLayoutEffect } from "react";
 import type { EntitySize, EntityState } from "../../types";
 
@@ -15,6 +15,7 @@ interface TileContextMenuProps {
   x: number;
   y: number;
   onClose: () => void;
+  onShowControls: () => void;
   onSetSize: (size: EntitySize) => void;
   onToggleFavorite: (next: boolean) => void;
   onHide: () => void;
@@ -37,6 +38,7 @@ export function TileContextMenu({
   x,
   y,
   onClose,
+  onShowControls,
   onSetSize,
   onToggleFavorite,
   onHide,
@@ -90,6 +92,15 @@ export function TileContextMenu({
         className="z-[9999] min-w-[180px] rounded-xl border border-white/[0.08] bg-[var(--surface-elevated,#1a1a1a)] py-1 text-[var(--text-primary)] shadow-2xl"
         {...getFloatingProps()}
       >
+        {/* Show Controls — primary action, mirrors Apple Home */}
+        <MenuItem
+          icon={<Sliders size={16} />}
+          label={t("showControls")}
+          onClick={handle(onShowControls)}
+        />
+
+        <div className="my-1 h-px bg-white/[0.08]" />
+
         {/* Size selector */}
         <div className="px-3 py-1 text-xs text-white/40">
           {t("tileSizeHeading")}
