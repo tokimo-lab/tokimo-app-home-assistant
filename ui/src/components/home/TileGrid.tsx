@@ -57,17 +57,18 @@ function defaultSizeFor(entity: EntityState): EntitySize {
 }
 
 /**
- * Responsive tile grid using CSS container queries (named `ha-tile-grid`).
+ * Responsive tile grid using Tailwind v4 CSS container queries
+ * (named container `tiles`).
  *
  * Breakpoints are relative to the grid container width, not the viewport —
  * so the grid adapts correctly when rendered inside a narrow sidebar or
  * a wide full-screen pane.
  *
- * Columns: 4 (default) → 6 (≥640 px) → 8 (≥1024 px).
- *
- * TODO(P1.2-impl): Tailwind v4 @container arbitrary variants — replace the
- *   inline style fallback with `@lg:grid-cols-8` style container variants
- *   once the design token pass is complete.
+ * Column strategy:
+ *   <  640 px → 4 cols
+ *   ≥  640 px → 6 cols
+ *   ≥ 1024 px → 8 cols
+ *   ≥ 1440 px → 10 cols (ultra-wide)
  */
 export function TileGrid({
   entities,
@@ -84,12 +85,15 @@ export function TileGrid({
   if (entities.length === 0) return null;
 
   return (
-    <div data-tile-grid-container className="@container w-full">
+    <div data-tile-grid-container className="@container/tiles w-full">
       <div
         data-edit-mode={editMode ? "true" : undefined}
         className={cn(
           "grid gap-2",
-          "grid-cols-4 @[640px]:grid-cols-6 @[1024px]:grid-cols-8",
+          "grid-cols-4",
+          "@[640px]/tiles:grid-cols-6",
+          "@[1024px]/tiles:grid-cols-8",
+          "@[1440px]/tiles:grid-cols-10",
         )}
       >
         {entities.map((entity) => {
