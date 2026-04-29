@@ -91,6 +91,9 @@ export interface EntityDisplay {
   favorite_order: number;
   size: EntitySize;
   sort_order: number;
+  collapsed: boolean;
+  group_id: string | null;
+  group_primary: boolean;
   updated_at?: string;
 }
 
@@ -103,6 +106,14 @@ export interface UpdateEntityDisplayDto {
   favorite_order?: number;
   size?: EntitySize;
   sort_order?: number;
+  collapsed?: boolean;
+  /**
+   * Only `true` is accepted by the backend — setting `false` directly
+   * returns 400. Elect a new primary by PATCHing another entity in the
+   * same group with `group_primary: true` (the backend demotes the
+   * previous primary in the same transaction).
+   */
+  group_primary?: true;
 }
 
 export interface RoomReorderItem {
@@ -154,6 +165,20 @@ export interface EntityState {
   favorite_order?: number;
   sort_order?: number;
   size?: EntitySize | null;
+  /** Tier-3 demotion / dedup-by-device collapse flag. Set by the backend
+   * sync_visibility默认固化 logic on first import; users can toggle via
+   * `PATCH /entities/:eid/display`. Collapsed entities still render but
+   * sit under a "show all" reveal. */
+  collapsed?: boolean;
+  /** Stable group key (`device::{device_id}::{domain}` or
+   * `name::{normalized_name}::{domain}`) shared by entities the backend
+   * considers the same physical thing. `null` for singletons. */
+  group_id?: string | null;
+  /** Whether this entity is the elected representative of its group.
+   * Within a `group_id` exactly one entity has `group_primary=true` at
+   * any time; demoted siblings still appear in the snapshot but a
+   * card-list view should usually render only the primary. */
+  group_primary?: boolean;
   /** Forward-compat: device grouping id from HA's entity_registry. May be
    * undefined on list endpoints; when present, dedupByDevice uses it as
    * the authoritative device identifier. */
