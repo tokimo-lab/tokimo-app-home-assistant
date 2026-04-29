@@ -146,7 +146,7 @@ export function TileContextMenu({
             <div className="my-1 h-px bg-white/[0.08]" />
             <MenuItem
               icon={<LayoutGrid size={16} />}
-              label={t("similarAccessories")}
+              label={t("tileContextMenuManageAccessory")}
               onClick={handle(onShowSimilar)}
             />
           </>

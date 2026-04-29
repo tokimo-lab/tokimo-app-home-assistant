@@ -16,19 +16,19 @@ import { createRoot, type Root } from "react-dom/client";
 import { DetailOverlay } from "./components/detail/DetailOverlay";
 import { HomePage } from "./components/home/HomePage";
 import { RoomPageHost } from "./components/room/RoomPageHost";
+import { HomeSettingsPage } from "./components/settings/HomeSettingsPage";
 import {
   SettingsPane,
   type SettingsTab,
 } from "./components/settings/SettingsPane";
-import { HomeSettingsPage } from "./components/settings/HomeSettingsPage";
 import { AnimatedSettingsPane } from "./components/shell/AnimatedSettingsPane";
 import { HomeAssistantMenuBar } from "./components/shell/HomeAssistantMenuBar";
 import { enUS, zhCN } from "./i18n";
 // @ts-expect-error -- side-effect css import
 import "./index.css";
+import { EntityManagementHost } from "./pages/EntityManagementHost";
 import { SetupPage } from "./pages/SetupPage";
 import { WelcomePage } from "./pages/WelcomePage";
-import { EntityManagementHost } from "./pages/EntityManagementHost";
 import { setActiveInstance } from "./state/activeInstanceStore";
 import { useCallService } from "./state/useCallService";
 import {

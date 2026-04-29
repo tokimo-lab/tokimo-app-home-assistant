@@ -1,7 +1,7 @@
 import type { AppRuntimeCtx } from "@tokimo/sdk";
 import { useShellToast } from "@tokimo/sdk/react";
 import { Switch } from "@tokimo/ui";
-import { ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { ChevronLeft, Search, Star } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { updateEntityDisplay } from "../api/display";
 import { listEntities } from "../api/entities";
@@ -106,6 +106,34 @@ function entityName(e: EntityState): string {
     e.attributes.friendly_name ??
     e.entity_id
   ).toString();
+}
+
+/**
+ * Format group_id for display in Accessory column.
+ * device::xxx → "Device · xxx后6位"
+ * via::root::area → "Via · root后6位"
+ * name::hash → "Name · hash前6位"
+ * null → "—"
+ */
+function formatAccessory(groupId: string | null | undefined): string | null {
+  if (!groupId) return null;
+  const parts = groupId.split("::");
+  if (parts.length < 2) return groupId;
+
+  const [type, ...rest] = parts;
+  const id = rest[0];
+  const suffix = id.length > 6 ? id.slice(-6) : id;
+
+  switch (type) {
+    case "device":
+      return `Device · ${suffix}`;
+    case "via":
+      return `Via · ${suffix}`;
+    case "name":
+      return `Name · ${suffix}`;
+    default:
+      return groupId;
+  }
 }
 
 function matchesSearch(e: EntityState, q: string): boolean {
@@ -217,25 +245,6 @@ export function EntityManagementPage({
     [entities, instance.id, setBusyFor, toast, t],
   );
 
-  const openSimilar = useCallback(
-    (entity: EntityState) => {
-      if (!entity.group_id) return;
-      ctx.shell.openModalWindow({
-        component: () => import("../components/home/SimilarEntitiesModal"),
-        title: t("similarAccessories"),
-        width: 480,
-        height: 560,
-        metadata: {
-          instanceId: instance.id,
-          groupId: entity.group_id,
-          currentEntityId: entity.entity_id,
-          locale: ctx.locale,
-        },
-      });
-    },
-    [ctx, instance.id, t],
-  );
-
   const openEntitySettings = useCallback(
     (entity: EntityState) => {
       ctx.shell.openModalWindow({
@@ -327,7 +336,6 @@ export function EntityManagementPage({
                     onToggleCollapsed={(next) =>
                       void patchField(e.entity_id, "collapsed", next)
                     }
-                    onOpenSimilar={() => openSimilar(e)}
                     onOpenSettings={() => openEntitySettings(e)}
                     t={t}
                   />
@@ -347,7 +355,6 @@ interface EntityRowProps {
   siblingCount: number;
   onToggleHidden: (next: boolean) => void;
   onToggleCollapsed: (next: boolean) => void;
-  onOpenSimilar: () => void;
   onOpenSettings: () => void;
   t: (k: string) => string;
 }
@@ -358,7 +365,6 @@ function EntityRow({
   siblingCount,
   onToggleHidden,
   onToggleCollapsed,
-  onOpenSimilar,
   onOpenSettings,
   t,
 }: EntityRowProps) {
@@ -368,6 +374,8 @@ function EntityRow({
   const isCollapsed = entity.collapsed === true;
   const inGroup = !!entity.group_id && siblingCount >= 2;
   const isNonPrimary = inGroup && entity.group_primary !== true;
+  const isPrimary = entity.group_primary === true;
+  const accessory = formatAccessory(entity.group_id);
 
   return (
     <li className="flex items-center gap-3 rounded-xl bg-black/[0.02] px-3 py-2.5 hover:bg-black/[0.04] dark:bg-white/[0.03] dark:hover:bg-white/[0.05]">
@@ -394,6 +402,16 @@ function EntityRow({
           <span className="truncate text-xs text-zinc-500 dark:text-zinc-400">
             {entity.entity_id}
           </span>
+          {accessory && (
+            <span className="flex items-center gap-1.5 text-[11px] text-zinc-500 dark:text-zinc-400">
+              <span className="shrink-0 rounded bg-zinc-100 px-1.5 py-0.5 font-medium dark:bg-zinc-800">
+                {accessory}
+              </span>
+              {isPrimary && (
+                <Star size={12} className="shrink-0 text-amber-500" />
+              )}
+            </span>
+          )}
         </span>
       </button>
 
@@ -418,21 +436,6 @@ function EntityRow({
             onChange={onToggleCollapsed}
           />
         </ToggleCell>
-        {inGroup && (
-          <button
-            type="button"
-            onClick={onOpenSimilar}
-            className="flex cursor-pointer items-center gap-1 rounded-full border border-black/[0.06] bg-black/[0.03] px-2.5 py-1 text-xs text-zinc-700 transition hover:bg-black/[0.06] dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-zinc-200 dark:hover:bg-white/[0.08]"
-          >
-            <span>
-              {t("entityMgmtGroupSiblings").replace(
-                "{n}",
-                String(siblingCount),
-              )}
-            </span>
-            <ChevronRight size={14} />
-          </button>
-        )}
       </div>
     </li>
   );

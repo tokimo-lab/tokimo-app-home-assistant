@@ -242,6 +242,8 @@ export const zhCN: Record<string, string> = {
   detailCameraPreview: "摄像头预览",
   detailCameraUnavailable: "摄像头不可用",
   detailCameraSnapshotNote: "快照 — 每隔几秒刷新",
+  detailSubFunctions: "子功能",
+  detailSubFunctionRun: "执行",
 
   // Binary sensor states
   stateMotionDetected: "检测到移动",
@@ -446,6 +448,7 @@ export const zhCN: Record<string, string> = {
   tileSizeMedium: "中",
   tileSizeLarge: "大",
   hideEntity: "隐藏设备",
+  tileContextMenuManageAccessory: "管理配件成员",
 
   // Similar accessories modal
   similarAccessories: "相似配件",
@@ -461,6 +464,8 @@ export const zhCN: Record<string, string> = {
   entityMgmtCollapsed: "折叠",
   entityMgmtGroupSiblings: "分组：{n}",
   entityMgmtNotPrimary: "非主项",
+  entityMgmtColumnAccessory: "配件",
+  entityMgmtFilterByAccessory: "按配件分组",
 
   // Family sidebar tooltips (removed — sidebar deleted)
 

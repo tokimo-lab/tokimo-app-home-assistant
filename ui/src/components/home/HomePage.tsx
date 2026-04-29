@@ -119,15 +119,15 @@ export function HomePage({
   const onShowSimilar = useCallback(() => {
     if (!menu?.entity.group_id) return;
     ctx.shell.openModalWindow({
-      component: () => import("./SimilarEntitiesModal"),
-      title: t("similarAccessories"),
-      width: 480,
-      height: 560,
+      component: () => import("../settings/AccessorySettingsPage"),
+      title: t("detailOpenSettings"),
+      width: 500,
+      height: 600,
       metadata: {
         instanceId: instance.id,
-        groupId: menu.entity.group_id,
-        currentEntityId: menu.entity.entity_id,
+        entityId: menu.entity.entity_id,
         locale: ctx.locale,
+        initialTab: "members",
       },
     });
   }, [ctx, instance.id, menu, t]);

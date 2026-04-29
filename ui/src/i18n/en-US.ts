@@ -243,6 +243,8 @@ export const enUS: Record<string, string> = {
   detailCameraPreview: "Camera preview",
   detailCameraUnavailable: "Camera unavailable",
   detailCameraSnapshotNote: "Snapshot — refreshed every few seconds",
+  detailSubFunctions: "Sub-functions",
+  detailSubFunctionRun: "Run",
 
   // Binary sensor states (device-class specific)
   stateMotionDetected: "Motion detected",
@@ -450,6 +452,7 @@ export const enUS: Record<string, string> = {
   tileSizeMedium: "Medium",
   tileSizeLarge: "Large",
   hideEntity: "Hide entity",
+  tileContextMenuManageAccessory: "Manage accessory members",
 
   // Similar accessories modal
   similarAccessories: "Similar Accessories",
@@ -465,6 +468,8 @@ export const enUS: Record<string, string> = {
   entityMgmtCollapsed: "Collapsed",
   entityMgmtGroupSiblings: "Group: {n}",
   entityMgmtNotPrimary: "Not primary",
+  entityMgmtColumnAccessory: "Accessory",
+  entityMgmtFilterByAccessory: "Group by accessory",
 
   // Family sidebar tooltips (removed — sidebar deleted)
 

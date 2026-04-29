@@ -10,6 +10,7 @@ import {
   useRole,
 } from "@floating-ui/react";
 import { cn } from "@tokimo/ui";
+import type { LucideIcon } from "lucide-react";
 import {
   Clock,
   Home,
@@ -19,7 +20,6 @@ import {
   Plus,
   Users,
 } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
 import { useState } from "react";
 
 interface AddMenuProps {

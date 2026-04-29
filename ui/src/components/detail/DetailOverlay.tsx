@@ -2,6 +2,7 @@ import { Settings } from "lucide-react";
 import { type ComponentType, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { formatState, getFriendlyName } from "../../lib/format";
+import { useEntityAccessory } from "../../state/useAccessories";
 import { useDetailOverlay } from "../../state/useDetailOverlay";
 import type { CallParams, EntityState, PendingOp } from "../../types";
 import type { DomainDetailProps } from "./_types";
@@ -16,6 +17,7 @@ import { MediaPlayerDetail } from "./MediaPlayerDetail";
 import { SceneDetail } from "./SceneDetail";
 import { ScriptDetail } from "./ScriptDetail";
 import { SensorDetail } from "./SensorDetail";
+import { SubFunctionList } from "./SubFunctionList";
 import { SwitchDetail } from "./SwitchDetail";
 import { UnsupportedDetail } from "./UnsupportedDetail";
 import { VacuumDetail } from "./VacuumDetail";
@@ -58,7 +60,10 @@ export function DetailOverlay({
   onOpenSettings,
   t,
 }: DetailOverlayProps) {
-  const { currentEntity, closeDetail } = useDetailOverlay();
+  const { currentEntity, closeDetail, openDetail } = useDetailOverlay();
+
+  // P7.4: Fetch accessory sub-functions (must call hook before early return)
+  const accessory = useEntityAccessory(currentEntity?.entityId ?? "");
 
   useEffect(() => {
     if (!currentEntity) return;
@@ -77,6 +82,15 @@ export function DetailOverlay({
   const pending = getPending(currentEntity.entityId);
   const name = entity ? getFriendlyName(entity) : currentEntity.entityId;
   const subtitle = entity ? formatState(entity, t) : "";
+
+  const showSubFunctions =
+    entity?.group_primary === true &&
+    accessory?.subMembers &&
+    accessory.subMembers.length > 0;
+
+  const handleNavigateToSubFunction = (entityId: string) => {
+    openDetail(entityId);
+  };
 
   return createPortal(
     <div
@@ -103,12 +117,22 @@ export function DetailOverlay({
 
         <div className="flex-1 overflow-y-auto px-6 py-4">
           {entity ? (
-            <DomainComponent
-              entity={entity}
-              onCall={onCall}
-              pending={pending}
-              t={t}
-            />
+            <>
+              <DomainComponent
+                entity={entity}
+                onCall={onCall}
+                pending={pending}
+                t={t}
+              />
+              {showSubFunctions && accessory && (
+                <SubFunctionList
+                  subMembers={accessory.subMembers}
+                  onCall={onCall}
+                  onNavigate={handleNavigateToSubFunction}
+                  t={t}
+                />
+              )}
+            </>
           ) : (
             <p className="py-12 text-center text-sm text-zinc-500 dark:text-zinc-400">
               {t("detailEntityMissing")}
