@@ -70,45 +70,30 @@ function SubFunctionRow({
   const control = renderControl(entity, domain, onCall, t);
   const hasControl = control !== null;
 
-  const handleClick = () => {
-    if (!hasControl) {
-      onNavigate(entity_id);
-    }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (!hasControl && (e.key === "Enter" || e.key === " ")) {
-      e.preventDefault();
-      onNavigate(entity_id);
-    }
-  };
+  if (hasControl) {
+    return (
+      <div className="flex items-center gap-3 px-4 py-3">
+        <span className="text-xl">{icon}</span>
+        <span className="flex-1 text-sm font-medium text-zinc-900 dark:text-zinc-100">
+          {name}
+        </span>
+        <div className="flex items-center gap-2">{control}</div>
+      </div>
+    );
+  }
 
   return (
-    <div
-      className={`flex items-center gap-3 px-4 py-3 ${
-        hasControl
-          ? ""
-          : "cursor-pointer transition hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
-      }`}
-      onClick={handleClick}
-      onKeyDown={handleKeyDown}
-      role={hasControl ? undefined : "button"}
-      tabIndex={hasControl ? undefined : 0}
+    <button
+      type="button"
+      onClick={() => onNavigate(entity_id)}
+      className="flex w-full cursor-pointer items-center gap-3 px-4 py-3 text-left transition hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
     >
       <span className="text-xl">{icon}</span>
       <span className="flex-1 text-sm font-medium text-zinc-900 dark:text-zinc-100">
         {name}
       </span>
-      <div className="flex items-center gap-2">
-        {control}
-        {!hasControl && (
-          <ChevronRight
-            size={16}
-            className="text-zinc-400 dark:text-zinc-500"
-          />
-        )}
-      </div>
-    </div>
+      <ChevronRight size={16} className="text-zinc-400 dark:text-zinc-500" />
+    </button>
   );
 }
 

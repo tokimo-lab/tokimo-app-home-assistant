@@ -8,7 +8,10 @@ interface SubFunctionToggleProps {
   onToggle: () => void;
 }
 
-export function SubFunctionToggle({ entity, onToggle }: SubFunctionToggleProps) {
+export function SubFunctionToggle({
+  entity,
+  onToggle,
+}: SubFunctionToggleProps) {
   const isOn = entity.state === "on";
 
   return (
@@ -16,9 +19,7 @@ export function SubFunctionToggle({ entity, onToggle }: SubFunctionToggleProps) 
       type="button"
       onClick={onToggle}
       className={`relative h-8 w-14 cursor-pointer rounded-full transition-colors ${
-        isOn
-          ? "bg-blue-500 dark:bg-blue-600"
-          : "bg-zinc-300 dark:bg-zinc-700"
+        isOn ? "bg-blue-500 dark:bg-blue-600" : "bg-zinc-300 dark:bg-zinc-700"
       }`}
       aria-pressed={isOn}
       aria-label={isOn ? "Turn Off" : "Turn On"}

@@ -11,15 +11,14 @@ interface SubFunctionNumberProps {
 
 export function SubFunctionNumber({ entity, onSet }: SubFunctionNumberProps) {
   const { state, attributes } = entity;
-  const min =
-    typeof attributes.min === "number" ? attributes.min : 0;
-  const max =
-    typeof attributes.max === "number" ? attributes.max : 100;
-  const step =
-    typeof attributes.step === "number" ? attributes.step : 1;
+  const min = typeof attributes.min === "number" ? attributes.min : 0;
+  const max = typeof attributes.max === "number" ? attributes.max : 100;
+  const step = typeof attributes.step === "number" ? attributes.step : 1;
 
   const numericState = Number.parseFloat(state);
-  const [value, setValue] = useState(Number.isNaN(numericState) ? min : numericState);
+  const [value, setValue] = useState(
+    Number.isNaN(numericState) ? min : numericState,
+  );
 
   useEffect(() => {
     const parsed = Number.parseFloat(state);
@@ -40,9 +39,12 @@ export function SubFunctionNumber({ entity, onSet }: SubFunctionNumberProps) {
   };
 
   return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: container for range input, events pass through
     <div
       className="flex items-center gap-2"
       onClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => e.key === " " && e.stopPropagation()}
+      role="presentation"
     >
       <span className="text-xs font-medium text-zinc-500 tabular-nums dark:text-zinc-400">
         {value.toFixed(step < 1 ? 1 : 0)}

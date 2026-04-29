@@ -8,7 +8,10 @@ interface SubFunctionSelectProps {
   onSelect: (option: string) => void;
 }
 
-export function SubFunctionSelect({ entity, onSelect }: SubFunctionSelectProps) {
+export function SubFunctionSelect({
+  entity,
+  onSelect,
+}: SubFunctionSelectProps) {
   const { state, attributes } = entity;
   const options = Array.isArray(attributes.options)
     ? (attributes.options as string[])
@@ -16,9 +19,7 @@ export function SubFunctionSelect({ entity, onSelect }: SubFunctionSelectProps) 
 
   if (options.length === 0) {
     return (
-      <span className="text-sm text-zinc-500 dark:text-zinc-500">
-        {state}
-      </span>
+      <span className="text-sm text-zinc-500 dark:text-zinc-500">{state}</span>
     );
   }
 

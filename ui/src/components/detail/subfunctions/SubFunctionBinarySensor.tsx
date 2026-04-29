@@ -20,8 +20,7 @@ export function SubFunctionBinarySensor({
 
   // Special handling for common device_classes
   if (deviceClass === "motion") {
-    displayText =
-      state === "on" ? t("stateMotionDetected") : t("stateClear");
+    displayText = state === "on" ? t("stateMotionDetected") : t("stateClear");
   } else if (deviceClass === "occupancy") {
     displayText = state === "on" ? t("stateOccupied") : t("stateClear");
   } else if (deviceClass === "presence") {
