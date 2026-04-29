@@ -30,19 +30,16 @@ export const ENV_SENSOR_CLASSES = new Set(["temperature", "humidity"]);
 
 /**
  * Apple-Home style default sizing (§1.x):
- *  - 主控类 (light / switch / fan / lock / climate / cover / input_boolean
- *    / automation / media_player) → medium (2×1 横长矩形)
+ *  - 连续状态主控 (light / climate / cover / media_player) → medium
+ *    (2×1 横长矩形，需要展示亮度/温度/位置/曲目等连续信息)
  *  - 摄像头 (camera) → large (2×2，含封面)
  *  - 传感器 (sensor / binary_sensor) → small，温湿度专门走 medium 以容纳数值
+ *  - 纯开关 / 切换类 (switch / input_boolean / automation / fan / lock) → small
+ *    (1×1 方块，符合 Apple Home 紧凑布局)
  *  - 其他 (scene / script / vacuum / ...) → small
  */
 const MEDIUM_DEFAULT_DOMAINS = new Set([
   "light",
-  "switch",
-  "input_boolean",
-  "automation",
-  "fan",
-  "lock",
   "climate",
   "cover",
   "media_player",
@@ -92,12 +89,19 @@ export function defaultSizeForEntity(entity: EntityState): EntitySize {
  * Resolve the actual size to render for an entity.
  *
  * Backend currently always returns `size: "small"` for entities without a
- * user-issued override (DB column default), which would shadow the domain
- * defaults above. We therefore treat `"small"` from the backend as
- * "unspecified" — only `medium`/`large` are honored as explicit user
- * choices. The size-cycle UI lets users opt into a smaller size by
- * persisting `medium`/`large` and never round-trips through `"small"`
- * unintentionally (see useToggleSizeRegistry).
+ * user-issued override (DB column default in `entity_overrides.size`), so
+ * `"small"` from the backend is indistinguishable from "user explicitly
+ * picked small". To avoid shadowing the medium/large domain defaults
+ * (light / climate / cover / media_player + temperature/humidity sensors)
+ * we treat `"small"` as unspecified and fall back to `defaultSizeForEntity`.
+ *
+ * After tightening MEDIUM_DEFAULT_DOMAINS (switch / input_boolean /
+ * automation / fan / lock now default to small), the small-as-unspecified
+ * conflation is harmless for those domains: backend "small" → default
+ * "small" → renders small ✓. The user can still escalate to medium/large
+ * via the right-click menu. Truly distinguishing "no override" from
+ * "explicit small" for the remaining medium-default domains would require
+ * the backend to expose a nullable size column.
  */
 export function effectiveSizeForEntity(entity: EntityState): EntitySize {
   if (entity.size === "medium" || entity.size === "large") return entity.size;
@@ -324,12 +328,6 @@ export function domainTier(entity: EntityState): DomainTier {
   return 3;
 }
 
-const ON_STATES = new Set(["on", "open", "playing", "heat", "cool", "auto"]);
-
-function isActiveState(entity: EntityState): boolean {
-  return ON_STATES.has(entity.state);
-}
-
 /**
  * Default-home filter: hide Tier 3 entities (passive sensors, buttons …)
  * unless the user has enabled "show all".
@@ -343,7 +341,11 @@ export function passesDefaultHome(
 }
 
 /**
- * Default-home sort: tier asc → active first → friendly_name asc → entity_id.
+ * Default-home sort: tier asc → friendly_name asc → entity_id.
+ *
+ * Order is intentionally independent of runtime state (on/off, playing, …)
+ * so a tile does not jump when the user toggles it — otherwise it could be
+ * pushed past the per-section "Show More" cap and disappear from view.
  *
  * Used when no chip is selected. Chip view keeps its own bySortOrder
  * comparator (user-curated order matters there).
@@ -352,9 +354,6 @@ export function defaultHomeOrder(a: EntityState, b: EntityState): number {
   const ta = domainTier(a);
   const tb = domainTier(b);
   if (ta !== tb) return ta - tb;
-  const aa = isActiveState(a) ? 0 : 1;
-  const ab = isActiveState(b) ? 0 : 1;
-  if (aa !== ab) return aa - ab;
   const na =
     (a.display_name ??
       (a.attributes?.friendly_name as string | undefined) ??
