@@ -1,4 +1,5 @@
 import { cn } from "@tokimo/ui";
+import { motion } from "framer-motion";
 import {
   type CSSProperties,
   type MouseEvent as ReactMouseEvent,
@@ -8,6 +9,13 @@ import {
   useEffect,
   useRef,
 } from "react";
+
+const INNER_LAYOUT_TRANSITION = {
+  type: "spring",
+  stiffness: 380,
+  damping: 32,
+  mass: 0.8,
+} as const;
 
 const LONG_PRESS_MS = 500;
 const MOVE_THRESHOLD_PX = 8;
@@ -223,7 +231,9 @@ export function TileBaseStyle({
       {children}
 
       {/* biome-ignore lint/a11y/noStaticElementInteractions: conditional role=button + onKeyDown applied below. */}
-      <div
+      <motion.div
+        layout="position"
+        transition={INNER_LAYOUT_TRANSITION}
         data-tile-icon
         onClick={
           onIconClick
@@ -255,9 +265,11 @@ export function TileBaseStyle({
         )}
       >
         {icon}
-      </div>
+      </motion.div>
 
-      <div
+      <motion.div
+        layout="position"
+        transition={INNER_LAYOUT_TRANSITION}
         data-tile-labels
         className={cn(
           "relative z-10 min-w-0",
@@ -284,7 +296,7 @@ export function TileBaseStyle({
             {stateText}
           </p>
         )}
-      </div>
+      </motion.div>
     </div>
   );
 }
