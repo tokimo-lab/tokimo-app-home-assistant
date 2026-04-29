@@ -347,6 +347,24 @@ export const enUS: Record<string, string> = {
   roomEnvHumidity: "Humidity",
   domainOther: "Other",
 
+  // Room page – per-domain section titles (P1.4)
+  "room.domain.light": "Lights",
+  "room.domain.switch": "Switches",
+  "room.domain.climate": "Climate",
+  "room.domain.fan": "Fans",
+  "room.domain.cover": "Covers",
+  "room.domain.media_player": "Speakers & TVs",
+  "room.domain.lock": "Locks",
+  "room.domain.scene": "Scenes",
+  "room.domain.script": "Scripts",
+  "room.domain.input_boolean": "Input Booleans",
+  "room.domain.automation": "Automations",
+  "room.domain.vacuum": "Vacuums",
+  "room.domain.camera": "Cameras",
+  "room.domain.binary_sensor": "Sensors",
+  "room.domain.sensor": "Sensors",
+  "room.domain.other": "Other",
+
   // Errors
   errorLoad: "Failed to load",
   errorSave: "Failed to save",

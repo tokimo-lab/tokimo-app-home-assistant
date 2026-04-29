@@ -2,13 +2,15 @@ import type { CallParams, EntityState, PendingOp } from "../../types";
 import { TileGrid } from "../home/TileGrid";
 
 interface RoomDomainSectionProps {
-  /** i18n key resolved by parent (e.g. "domainClimate"). */
+  /** i18n key resolved by parent (e.g. "room.domain.climate"). */
   titleKey: string;
   entities: EntityState[];
   instanceId: string;
   getPending: (entityId: string) => PendingOp | undefined;
   onCall: (params: CallParams) => void;
   t: (k: string) => string;
+  /** When true, parent already rendered the section heading. */
+  hideTitle?: boolean;
 }
 
 /**
@@ -25,13 +27,16 @@ export function RoomDomainSection({
   getPending,
   onCall,
   t,
+  hideTitle = false,
 }: RoomDomainSectionProps) {
   if (entities.length === 0) return null;
   return (
     <section>
-      <h2 className="mb-3 text-base font-semibold text-zinc-900 dark:text-zinc-100">
-        {t(titleKey)}
-      </h2>
+      {!hideTitle && (
+        <h2 className="mb-3 text-base font-semibold text-zinc-900 dark:text-zinc-100">
+          {t(titleKey)}
+        </h2>
+      )}
       <TileGrid
         entities={entities}
         instanceId={instanceId}

@@ -344,6 +344,24 @@ export const zhCN: Record<string, string> = {
   roomEnvHumidity: "湿度",
   domainOther: "其他",
 
+  // Room page – per-domain section titles (P1.4)
+  "room.domain.light": "灯光",
+  "room.domain.switch": "开关",
+  "room.domain.climate": "空调",
+  "room.domain.fan": "风扇",
+  "room.domain.cover": "窗帘",
+  "room.domain.media_player": "音乐 & 电视",
+  "room.domain.lock": "门锁",
+  "room.domain.scene": "场景",
+  "room.domain.script": "脚本",
+  "room.domain.input_boolean": "输入开关",
+  "room.domain.automation": "自动化",
+  "room.domain.vacuum": "扫地机",
+  "room.domain.camera": "摄像头",
+  "room.domain.binary_sensor": "二元传感器",
+  "room.domain.sensor": "传感器",
+  "room.domain.other": "其他",
+
   // Errors
   errorLoad: "加载失败",
   errorSave: "保存失败",

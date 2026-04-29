@@ -1,4 +1,5 @@
-import { Droplet, Thermometer } from "lucide-react";
+import { Activity, Droplet, Gauge, Sun, Thermometer, Wind } from "lucide-react";
+import type { ComponentType } from "react";
 import { getDomain } from "../../lib/domain";
 import type { EntityState } from "../../types";
 
@@ -7,65 +8,91 @@ interface RoomEnvBadgesProps {
   t: (k: string) => string;
 }
 
-interface Range {
-  min: number;
-  max: number;
-}
-
-function computeRange(values: number[]): Range | null {
-  if (values.length === 0) return null;
-  return { min: Math.min(...values), max: Math.max(...values) };
-}
-
-function formatRange(range: Range, unit: string): string {
-  const min = range.min.toFixed(1);
-  const max = range.max.toFixed(1);
-  return min === max ? `${min}${unit}` : `${min}–${max}${unit}`;
-}
-
-function collectByDeviceClass(
-  entities: EntityState[],
-  deviceClass: string,
-): number[] {
-  const out: number[] = [];
-  for (const e of entities) {
-    if (getDomain(e.entity_id) !== "sensor") continue;
-    if (e.attributes.device_class !== deviceClass) continue;
-    const raw = Number.parseFloat(e.state);
-    if (Number.isFinite(raw)) out.push(raw);
-  }
-  return out;
+interface BadgeSpec {
+  deviceClass: string;
+  icon: ComponentType<{ size?: number | string; className?: string }>;
+  defaultUnit: string;
+  /** Decimal places when the value is finite. */
+  digits: number;
 }
 
 /**
- * Top-of-room environment overview. Only renders when the room actually
- * contains temperature / humidity sensors. Climate entities are *not*
- * surfaced here — they get their own ClimateTile in the Climate section.
+ * Recognised environmental sensor device_classes, in display order.
+ * Matches Apple Home's per-room env strip (IMG_2655).
  */
-export function RoomEnvBadges({ entities, t }: RoomEnvBadgesProps) {
-  const tempRange = computeRange(collectByDeviceClass(entities, "temperature"));
-  const humRange = computeRange(collectByDeviceClass(entities, "humidity"));
+const ENV_BADGES: ReadonlyArray<BadgeSpec> = [
+  {
+    deviceClass: "temperature",
+    icon: Thermometer,
+    defaultUnit: "°C",
+    digits: 1,
+  },
+  { deviceClass: "humidity", icon: Droplet, defaultUnit: "%", digits: 0 },
+  { deviceClass: "pm25", icon: Wind, defaultUnit: "µg/m³", digits: 0 },
+  { deviceClass: "pm10", icon: Wind, defaultUnit: "µg/m³", digits: 0 },
+  { deviceClass: "co2", icon: Activity, defaultUnit: "ppm", digits: 0 },
+  { deviceClass: "pressure", icon: Gauge, defaultUnit: "hPa", digits: 0 },
+  { deviceClass: "illuminance", icon: Sun, defaultUnit: "lx", digits: 0 },
+  { deviceClass: "aqi", icon: Activity, defaultUnit: "", digits: 0 },
+];
 
-  if (!tempRange && !humRange) return null;
+/**
+ * Returns the first sensor entity in `entities` whose device_class
+ * matches `deviceClass`. Per spec we intentionally pick the first
+ * (deterministic, avoids cluttering the badge row when a room has
+ * multiple sensors of the same kind).
+ */
+function firstSensor(
+  entities: EntityState[],
+  deviceClass: string,
+): EntityState | undefined {
+  for (const e of entities) {
+    if (getDomain(e.entity_id) !== "sensor") continue;
+    if (e.attributes.device_class === deviceClass) return e;
+  }
+  return undefined;
+}
+
+function formatValue(raw: string, digits: number): string {
+  const n = Number.parseFloat(raw);
+  if (!Number.isFinite(n)) return raw;
+  return digits > 0 ? n.toFixed(digits) : Math.round(n).toString();
+}
+
+/**
+ * Top-of-room environment overview. Renders only when at least one
+ * recognised env sensor exists in the room. Climate entities are
+ * surfaced separately as their own ClimateTile section.
+ */
+export function RoomEnvBadges({ entities, t: _t }: RoomEnvBadgesProps) {
+  const items = ENV_BADGES.map((spec) => {
+    const sensor = firstSensor(entities, spec.deviceClass);
+    if (!sensor) return null;
+    const unit = sensor.attributes.unit_of_measurement ?? spec.defaultUnit;
+    return {
+      key: spec.deviceClass,
+      Icon: spec.icon,
+      value: formatValue(sensor.state, spec.digits),
+      unit,
+    };
+  }).filter((x): x is NonNullable<typeof x> => x !== null);
+
+  if (items.length === 0) return null;
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {tempRange && (
-        <div className="flex items-center gap-1.5 rounded-full bg-black/[0.04] px-3 py-1.5 text-xs text-zinc-700 dark:bg-white/[0.06] dark:text-zinc-300">
-          <Thermometer size={14} />
-          <span>
-            {t("roomEnvTemperature")} {formatRange(tempRange, "°")}
+      {items.map(({ key, Icon, value, unit }) => (
+        <div
+          key={key}
+          className="flex items-center gap-1.5 rounded-full bg-black/[0.04] px-3 py-1.5 text-xs text-zinc-700 dark:bg-white/[0.06] dark:text-zinc-300"
+        >
+          <Icon size={14} />
+          <span className="font-medium tabular-nums">
+            {value}
+            {unit}
           </span>
         </div>
-      )}
-      {humRange && (
-        <div className="flex items-center gap-1.5 rounded-full bg-black/[0.04] px-3 py-1.5 text-xs text-zinc-700 dark:bg-white/[0.06] dark:text-zinc-300">
-          <Droplet size={14} />
-          <span>
-            {t("roomEnvHumidity")} {formatRange(humRange, "%")}
-          </span>
-        </div>
-      )}
+      ))}
     </div>
   );
 }

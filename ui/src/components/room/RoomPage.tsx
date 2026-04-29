@@ -1,5 +1,5 @@
 import type { AppRuntimeCtx } from "@tokimo/sdk";
-import { ChevronLeft, MoreHorizontal, Plus } from "lucide-react";
+import { ChevronLeft, MoreHorizontal } from "lucide-react";
 import { useMemo } from "react";
 import { getDomain } from "../../lib/domain";
 import type {
@@ -25,53 +25,46 @@ interface RoomPageProps {
 }
 
 /**
- * Domain priority inside a room (plan §1.2 chip ordering carried over
- * to per-room sections). `security` aggregates `lock`; `speakers_tvs`
- * aggregates `media_player`. Sensors and other read-only domains fall
- * into the trailing "other" bucket.
+ * Domain rendering order inside a room, per IMG_2655 spec. Anything
+ * not in this list lands in a trailing "other" group.
  */
-const DOMAIN_PRIORITY: ReadonlyArray<{ key: string; domains: string[] }> = [
-  { key: "climate", domains: ["climate"] },
-  { key: "light", domains: ["light"] },
-  { key: "security", domains: ["lock"] },
-  { key: "speakers_tvs", domains: ["media_player"] },
-  { key: "covers", domains: ["cover"] },
-  {
-    key: "switches",
-    domains: ["switch", "input_boolean", "automation", "scene", "script"],
-  },
-  { key: "fans", domains: ["fan"] },
-  { key: "other", domains: ["binary_sensor", "sensor", "camera", "vacuum"] },
-];
-
-const SECTION_TITLE_KEY: Record<string, string> = {
-  climate: "domainClimate",
-  light: "domainLight",
-  security: "domainLock",
-  speakers_tvs: "domainMediaPlayer",
-  covers: "domainCover",
-  switches: "domainSwitch",
-  fans: "domainFan",
-  other: "domainOther",
-};
-
-const RENDERABLE_DOMAINS = new Set([
+const DOMAIN_ORDER: ReadonlyArray<string> = [
   "light",
   "switch",
-  "cover",
   "climate",
   "fan",
-  "lock",
+  "cover",
   "media_player",
+  "lock",
   "scene",
   "script",
-  "binary_sensor",
-  "sensor",
-  "camera",
-  "vacuum",
   "input_boolean",
   "automation",
-]);
+  "vacuum",
+  "camera",
+  "binary_sensor",
+  "sensor",
+];
+
+const DOMAIN_TITLE_KEY: Record<string, string> = {
+  light: "room.domain.light",
+  switch: "room.domain.switch",
+  climate: "room.domain.climate",
+  fan: "room.domain.fan",
+  cover: "room.domain.cover",
+  media_player: "room.domain.media_player",
+  lock: "room.domain.lock",
+  scene: "room.domain.scene",
+  script: "room.domain.script",
+  input_boolean: "room.domain.input_boolean",
+  automation: "room.domain.automation",
+  vacuum: "room.domain.vacuum",
+  camera: "room.domain.camera",
+  binary_sensor: "room.domain.binary_sensor",
+  sensor: "room.domain.sensor",
+};
+
+const RENDERABLE_DOMAINS = new Set(DOMAIN_ORDER);
 
 function isRenderable(entity: EntityState): boolean {
   return (
@@ -101,13 +94,13 @@ function resolveRoomEntities(
   return out;
 }
 
-interface Bucket {
-  key: string;
+interface DomainGroup {
+  domain: string;
   titleKey: string;
   entities: EntityState[];
 }
 
-function bucketize(roomEntities: EntityState[]): Bucket[] {
+function groupByDomain(roomEntities: EntityState[]): DomainGroup[] {
   const byDomain = new Map<string, EntityState[]>();
   for (const e of roomEntities) {
     const d = getDomain(e.entity_id);
@@ -116,44 +109,31 @@ function bucketize(roomEntities: EntityState[]): Bucket[] {
     byDomain.set(d, arr);
   }
 
-  const claimed = new Set<string>();
-  const buckets: Bucket[] = [];
-  for (const { key, domains } of DOMAIN_PRIORITY) {
-    const acc: EntityState[] = [];
-    for (const d of domains) {
-      const list = byDomain.get(d);
-      if (!list) continue;
-      claimed.add(d);
-      acc.push(...list);
-    }
-    if (acc.length > 0) {
-      buckets.push({
-        key,
-        titleKey: SECTION_TITLE_KEY[key] ?? "domainOther",
-        entities: acc,
-      });
-    }
+  const groups: DomainGroup[] = [];
+  const seen = new Set<string>();
+  for (const domain of DOMAIN_ORDER) {
+    const list = byDomain.get(domain);
+    if (!list || list.length === 0) continue;
+    seen.add(domain);
+    groups.push({
+      domain,
+      titleKey: DOMAIN_TITLE_KEY[domain] ?? "room.domain.other",
+      entities: list,
+    });
   }
-
-  // Anything not claimed (e.g. unexpected domains) falls into "other".
+  // Anything unexpected → "other" bucket (defensive).
   const leftover: EntityState[] = [];
   for (const [d, list] of byDomain) {
-    if (!claimed.has(d)) leftover.push(...list);
+    if (!seen.has(d)) leftover.push(...list);
   }
   if (leftover.length > 0) {
-    const existingOther = buckets.find((b) => b.key === "other");
-    if (existingOther) {
-      existingOther.entities.push(...leftover);
-    } else {
-      buckets.push({
-        key: "other",
-        titleKey: "domainOther",
-        entities: leftover,
-      });
-    }
+    groups.push({
+      domain: "other",
+      titleKey: "room.domain.other",
+      entities: leftover,
+    });
   }
-
-  return buckets;
+  return groups;
 }
 
 export function RoomPage({
@@ -173,7 +153,7 @@ export function RoomPage({
     () => (room ? resolveRoomEntities(room, entities) : []),
     [room, entities],
   );
-  const buckets = useMemo(() => bucketize(roomEntities), [roomEntities]);
+  const groups = useMemo(() => groupByDomain(roomEntities), [roomEntities]);
 
   if (!room) {
     return (
@@ -194,56 +174,50 @@ export function RoomPage({
 
   return (
     <div className="flex h-full flex-col overflow-auto">
-      <header className="flex items-center justify-between gap-3 px-6 pt-5 pb-3">
+      <header className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-black/[0.05] bg-white/80 px-6 py-3 backdrop-blur-md dark:border-white/[0.06] dark:bg-zinc-950/80">
         <button
           type="button"
           onClick={onBack}
           className="flex cursor-pointer items-center gap-1 rounded-full px-2 py-1 text-sm text-zinc-700 transition hover:bg-black/[0.05] dark:text-zinc-200 dark:hover:bg-white/[0.08]"
           aria-label={t("roomBack")}
         >
-          <ChevronLeft size={18} />
+          <ChevronLeft size={20} />
           <span>{t("roomBack")}</span>
         </button>
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            disabled
-            className="flex h-9 w-9 items-center justify-center rounded-full text-zinc-400 dark:text-zinc-500"
-            aria-label="add"
-          >
-            <Plus size={18} />
-          </button>
-          <button
-            type="button"
-            disabled
-            className="flex h-9 w-9 items-center justify-center rounded-full text-zinc-400 dark:text-zinc-500"
-            aria-label="more"
-          >
-            <MoreHorizontal size={18} />
-          </button>
-        </div>
-      </header>
-
-      <div className="flex flex-col gap-6 px-6 pb-8">
-        <h1 className="text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+        <h1 className="flex-1 truncate text-center text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
           {room.name}
         </h1>
+        <button
+          type="button"
+          disabled
+          className="flex h-9 w-9 items-center justify-center rounded-full text-zinc-400 dark:text-zinc-500"
+          aria-label="more"
+        >
+          <MoreHorizontal size={20} />
+        </button>
+      </header>
 
+      <div className="flex flex-col gap-4 px-6 pt-4 pb-8">
         <RoomEnvBadges entities={roomEntities} t={t} />
 
-        {buckets.map((b) => (
-          <RoomDomainSection
-            key={b.key}
-            titleKey={b.titleKey}
-            entities={b.entities}
-            instanceId={instance.id}
-            getPending={getPending}
-            onCall={onCall}
-            t={t}
-          />
+        {groups.map((g) => (
+          <section key={g.domain}>
+            <h3 className="mt-4 mb-2 text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+              {t(g.titleKey)}
+            </h3>
+            <RoomDomainSection
+              titleKey={g.titleKey}
+              entities={g.entities}
+              instanceId={instance.id}
+              getPending={getPending}
+              onCall={onCall}
+              t={t}
+              hideTitle
+            />
+          </section>
         ))}
 
-        {buckets.length === 0 && (
+        {groups.length === 0 && (
           <p className="text-sm text-zinc-500 dark:text-zinc-400">
             {t("homeEmpty")}
           </p>
