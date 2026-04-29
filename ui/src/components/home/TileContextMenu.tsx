@@ -8,6 +8,7 @@ import {
 import { Check, EyeOff, Sliders, Star, StarOff } from "lucide-react";
 import { useLayoutEffect } from "react";
 import type { EntitySize, EntityState } from "../../types";
+import { effectiveSizeForEntity } from "./_helpers";
 
 interface TileContextMenuProps {
   entity: EntityState;
@@ -44,7 +45,7 @@ export function TileContextMenu({
   onHide,
   t,
 }: TileContextMenuProps) {
-  const currentSize: EntitySize = entity.size ?? "small";
+  const currentSize: EntitySize = effectiveSizeForEntity(entity);
   const isFav = entity.is_favorite ?? false;
 
   const { refs, floatingStyles, context } = useFloating({

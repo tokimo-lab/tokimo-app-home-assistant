@@ -12,6 +12,7 @@ import type {
   HaRoom,
   UpdateEntityDisplayDto,
 } from "../../types";
+import { effectiveSizeForEntity } from "../home/_helpers";
 
 /**
  * Dev-only flag to surface the "not certified" banner from AppleHome IMG_2664.
@@ -280,7 +281,7 @@ function Body({
       <Section label={t("accessorySectionAdvanced")}>
         <SettingRow label={t("accessoryTileSize")}>
           <Select
-            value={entity.size ?? "small"}
+            value={effectiveSizeForEntity(entity)}
             onChange={(v) => {
               if (typeof v !== "string") return;
               void onPatch({ size: v as EntitySize });
