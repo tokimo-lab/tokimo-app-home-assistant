@@ -34,6 +34,9 @@ pub struct EntityDto {
     pub favorite_order: i32,
     pub size: Option<String>,
     pub sort_order: i32,
+    pub collapsed: bool,
+    pub group_id: Option<String>,
+    pub group_primary: bool,
     /// Device metadata (manufacturer / model / sw_version / serial_number /
     /// name) sourced from HA's device registry. Only populated by the
     /// per-entity `GET /entities/:eid` endpoint — list endpoints leave this
@@ -59,6 +62,9 @@ pub(crate) fn apply_override(state: EntityState, ov: Option<&OverrideRow>) -> En
         favorite_order: ov.map(|o| o.favorite_order).unwrap_or(0),
         size: ov.and_then(|o| o.size.clone()),
         sort_order: ov.map(|o| o.sort_order).unwrap_or(0),
+        collapsed: ov.map(|o| o.collapsed).unwrap_or(false),
+        group_id: ov.and_then(|o| o.group_id.clone()),
+        group_primary: ov.map(|o| o.group_primary).unwrap_or(true),
         device: None,
     }
 }
@@ -83,6 +89,9 @@ pub(crate) fn apply_override_snapshot(
         favorite_order: ov.map(|o| o.favorite_order).unwrap_or(0),
         size: ov.and_then(|o| o.size.clone()),
         sort_order: ov.map(|o| o.sort_order).unwrap_or(0),
+        collapsed: ov.map(|o| o.collapsed).unwrap_or(false),
+        group_id: ov.and_then(|o| o.group_id.clone()),
+        group_primary: ov.map(|o| o.group_primary).unwrap_or(true),
         device: None,
     }
 }
@@ -98,6 +107,9 @@ pub(crate) fn override_row_to_snapshot(o: &OverrideRow) -> crate::state::Overrid
         favorite_order: o.favorite_order,
         size: o.size.clone(),
         sort_order: o.sort_order,
+        collapsed: o.collapsed,
+        group_id: o.group_id.clone(),
+        group_primary: o.group_primary,
     }
 }
 
@@ -111,10 +123,13 @@ pub(crate) struct OverrideRow {
     pub favorite_order: i32,
     pub size: Option<String>,
     pub sort_order: i32,
+    pub collapsed: bool,
+    pub group_id: Option<String>,
+    pub group_primary: bool,
 }
 
 pub(crate) const OVERRIDE_COLS: &str =
-    "entity_id, display_name, custom_icon, area_id, hidden, is_favorite, favorite_order, size, sort_order";
+    "entity_id, display_name, custom_icon, area_id, hidden, is_favorite, favorite_order, size, sort_order, collapsed, group_id, group_primary";
 
 pub(crate) fn row_to_override(r: &sqlx::postgres::PgRow) -> OverrideRow {
     OverrideRow {
@@ -127,6 +142,9 @@ pub(crate) fn row_to_override(r: &sqlx::postgres::PgRow) -> OverrideRow {
         favorite_order: r.get("favorite_order"),
         size: r.get("size"),
         sort_order: r.get("sort_order"),
+        collapsed: r.get("collapsed"),
+        group_id: r.get("group_id"),
+        group_primary: r.get("group_primary"),
     }
 }
 
@@ -287,7 +305,8 @@ pub async fn upsert_override(
                is_favorite  = COALESCE($6, entity_overrides.is_favorite),
                updated_at   = NOW()
            RETURNING entity_id, display_name, custom_icon, hidden, is_favorite, updated_at,
-                     area_id, favorite_order, size, sort_order"#,
+                     area_id, favorite_order, size, sort_order,
+                     collapsed, group_id, group_primary"#,
     )
     .bind(instance_id)
     .bind(&entity_id)
@@ -309,6 +328,9 @@ pub async fn upsert_override(
             favorite_order: r.get("favorite_order"),
             size: r.get("size"),
             sort_order: r.get("sort_order"),
+            collapsed: r.get("collapsed"),
+            group_id: r.get("group_id"),
+            group_primary: r.get("group_primary"),
         };
         instance.override_cache.insert(entity_id.clone(), snapshot);
     }

@@ -46,6 +46,9 @@ CREATE TABLE IF NOT EXISTS entity_overrides (
                         CHECK (size IS NULL OR size IN ('small','medium','large')),
     sort_order      INTEGER NOT NULL DEFAULT 0,
     entity_category TEXT,
+    collapsed       BOOLEAN NOT NULL DEFAULT FALSE,
+    group_id        TEXT,
+    group_primary   BOOLEAN NOT NULL DEFAULT TRUE,
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     PRIMARY KEY (instance_id, entity_id)
 );
@@ -58,3 +61,6 @@ CREATE INDEX IF NOT EXISTS entity_overrides_area_idx
 CREATE INDEX IF NOT EXISTS entity_overrides_category_idx
     ON entity_overrides (instance_id, entity_category)
     WHERE entity_category IS NOT NULL;
+CREATE INDEX IF NOT EXISTS entity_overrides_group_idx
+    ON entity_overrides (instance_id, group_id)
+    WHERE group_id IS NOT NULL;

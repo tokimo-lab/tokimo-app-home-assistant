@@ -94,6 +94,9 @@ pub struct EntityDisplayDto {
     pub display_name: Option<String>,
     pub custom_icon: Option<String>,
     pub area_id: Option<Uuid>,
+    pub collapsed: bool,
+    pub group_id: Option<String>,
+    pub group_primary: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -175,7 +178,8 @@ pub async fn update_display(
                 sort_order     = COALESCE($13, entity_overrides.sort_order),
                 updated_at     = NOW()
            RETURNING entity_id, display_name, custom_icon, area_id,
-                     hidden, size, is_favorite, favorite_order, sort_order"#,
+                     hidden, size, is_favorite, favorite_order, sort_order,
+                     collapsed, group_id, group_primary"#,
     )
     .bind(instance_id)
     .bind(&entity_id)
@@ -207,6 +211,9 @@ pub async fn update_display(
             favorite_order: r.get("favorite_order"),
             size: size_db.clone(),
             sort_order: r.get("sort_order"),
+            collapsed: r.get("collapsed"),
+            group_id: r.get("group_id"),
+            group_primary: r.get("group_primary"),
         };
         instance.override_cache.insert(entity_id.clone(), snapshot);
     }
@@ -238,6 +245,9 @@ pub async fn update_display(
         display_name: r.get("display_name"),
         custom_icon: r.get("custom_icon"),
         area_id: r.get("area_id"),
+        collapsed: r.get("collapsed"),
+        group_id: r.get("group_id"),
+        group_primary: r.get("group_primary"),
     }))
 }
 

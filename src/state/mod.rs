@@ -110,6 +110,9 @@ pub struct OverrideSnapshot {
     pub favorite_order: i32,
     pub size: Option<String>,
     pub sort_order: i32,
+    pub collapsed: bool,
+    pub group_id: Option<String>,
+    pub group_primary: bool,
 }
 
 /// Events broadcast to SSE subscribers.

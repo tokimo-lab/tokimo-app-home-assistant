@@ -503,31 +503,38 @@ pub async fn refresh_registries(instance: &Arc<InstanceCtx>, pool: &sqlx::PgPool
     *instance.device_registry.write().await = Arc::new(device_map);
     *instance.entity_to_device.write().await = Arc::new(e2d_map);
 
-    // Persist HA entity_category onto entity_overrides so we can default-hide
-    // diagnostic/config entities while preserving any existing user choices.
+    // Persist默认 (hidden, collapsed, group_id, group_primary) onto
+    // entity_overrides for entities being seen for the first time. Existing
+    // rows are left untouched so any user manual toggle is preserved.
     {
-        let registry_entries: Vec<sync_visibility::HaEntityRegistryEntry> = entity_arr
+        let mut registry_entries: Vec<sync_visibility::HaEntityRegistryEntry> = entity_arr
             .iter()
             .filter_map(sync_visibility::HaEntityRegistryEntry::from_json)
             .collect();
-        match sync_visibility::mark_default_hidden_for_entities(
+        // Merge friendly_name / supported_features / attribute_count from
+        // the live HA state cache (already populated by get_states).
+        for entry in registry_entries.iter_mut() {
+            if let Some(state) = instance.store.states.get(&entry.entity_id) {
+                entry.merge_attributes(&state.attributes);
+            }
+        }
+        match sync_visibility::sync_default_visibility_and_grouping(
             pool,
             instance.id,
-            &registry_entries,
+            registry_entries,
         )
         .await
         {
             Ok(stats) => debug!(
                 instance_id = %instance.id,
                 inserted = stats.inserted,
-                backfilled_hidden = stats.backfilled_hidden,
-                touched = stats.touched,
-                "HA WS: entity_category sync complete",
+                skipped_existing = stats.skipped_existing,
+                "HA WS: default visibility / grouping sync complete",
             ),
             Err(e) => warn!(
                 instance_id = %instance.id,
                 error = %e.message,
-                "HA WS: failed to sync entity_category / default-hide",
+                "HA WS: failed to sync default visibility / grouping",
             ),
         }
     }
