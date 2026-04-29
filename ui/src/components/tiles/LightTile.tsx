@@ -39,7 +39,7 @@ function LightTileImpl({ entity, instanceId, t, onCall, size }: TileProps) {
       icon={<Lightbulb size={20} />}
       name={name}
       stateText={stateText}
-      onClick={toggle}
+      onClick={() => openDetail(entity_id, instanceId)}
       onIconClick={toggle}
       onLongPress={() => openDetail(entity_id, instanceId)}
     />

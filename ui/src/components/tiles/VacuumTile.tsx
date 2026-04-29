@@ -1,14 +1,16 @@
 import { Wind } from "lucide-react";
 import { memo } from "react";
 import { getFriendlyName } from "../../lib/format";
+import { useDetailOverlay } from "../../state/useDetailOverlay";
 import { type TileProps, tilePropsEqual } from "./_types";
 import { TileBaseStyle } from "./TileBaseStyle";
 
-function VacuumTileImpl({ entity, t, onCall, size }: TileProps) {
+function VacuumTileImpl({ entity, instanceId, t, onCall, size }: TileProps) {
   const { entity_id, state, attributes } = entity;
   const isCleaning = state === "cleaning";
   const name = getFriendlyName(entity);
   const battery = attributes.battery_level;
+  const { openDetail } = useDetailOverlay();
 
   function startOrDock() {
     onCall({
@@ -33,7 +35,9 @@ function VacuumTileImpl({ entity, t, onCall, size }: TileProps) {
       icon={<Wind size={20} />}
       name={name}
       stateText={battery != null ? `${stateText} · ${battery}%` : stateText}
-      onClick={startOrDock}
+      onClick={() => openDetail(entity_id, instanceId)}
+      onIconClick={startOrDock}
+      onLongPress={() => openDetail(entity_id, instanceId)}
     />
   );
 }

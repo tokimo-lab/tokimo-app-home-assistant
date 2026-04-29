@@ -1,15 +1,23 @@
 import { Pause, Play } from "lucide-react";
 import { memo } from "react";
 import { getFriendlyName } from "../../lib/format";
+import { useDetailOverlay } from "../../state/useDetailOverlay";
 import { type TileProps, tilePropsEqual } from "./_types";
 import { TileBaseStyle } from "./TileBaseStyle";
 
-function MediaPlayerTileImpl({ entity, t, onCall, size }: TileProps) {
+function MediaPlayerTileImpl({
+  entity,
+  instanceId,
+  t,
+  onCall,
+  size,
+}: TileProps) {
   const { entity_id, state, attributes } = entity;
   const isPlaying = state === "playing";
   const name = getFriendlyName(entity);
   const mediaTitle =
     attributes.media_title ?? (isPlaying ? t("statePlaying") : state);
+  const { openDetail } = useDetailOverlay();
 
   function playPause() {
     onCall({
@@ -29,7 +37,9 @@ function MediaPlayerTileImpl({ entity, t, onCall, size }: TileProps) {
       icon={isPlaying ? <Pause size={18} /> : <Play size={18} />}
       name={name}
       stateText={mediaTitle}
-      onClick={playPause}
+      onClick={() => openDetail(entity_id, instanceId)}
+      onIconClick={playPause}
+      onLongPress={() => openDetail(entity_id, instanceId)}
     />
   );
 }

@@ -30,7 +30,7 @@ function SwitchTileImpl({ entity, instanceId, t, onCall, size }: TileProps) {
       icon={<Power size={20} />}
       name={name}
       stateText={isOn ? t("stateOn") : t("stateOff")}
-      onClick={toggle}
+      onClick={() => openDetail(entity_id, instanceId)}
       onIconClick={toggle}
       onLongPress={() => openDetail(entity_id, instanceId)}
     />

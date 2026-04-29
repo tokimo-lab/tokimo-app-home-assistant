@@ -29,7 +29,7 @@ function LockTileImpl({ entity, instanceId, t, onCall, size }: TileProps) {
       icon={isLocked ? <Lock size={20} /> : <LockOpen size={20} />}
       name={name}
       stateText={isLocked ? t("stateLocked") : t("stateUnlocked")}
-      onClick={toggle}
+      onClick={() => openDetail(entity_id, instanceId)}
       onIconClick={toggle}
       onLongPress={() => openDetail(entity_id, instanceId)}
     />
