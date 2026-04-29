@@ -1,7 +1,7 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@tokimo/ui";
-import { Maximize2 } from "lucide-react";
+import { ArrowDownRight } from "lucide-react";
 import {
   type CSSProperties,
   type MouseEvent as ReactMouseEvent,
@@ -123,12 +123,12 @@ export function EditableTileWrapper({
           onPointerDown={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
           className={cn(
-            "absolute -top-1.5 -right-1.5 z-10 flex h-7 w-7 items-center justify-center",
+            "absolute -bottom-1.5 -right-1.5 z-10 flex h-7 w-7 items-center justify-center",
             "cursor-pointer rounded-full bg-gray-900 text-white shadow-lg",
             "ring-1 ring-white/60 transition-transform hover:scale-110",
           )}
         >
-          <Maximize2 size={14} />
+          <ArrowDownRight size={14} />
         </button>
       )}
     </div>
@@ -137,12 +137,14 @@ export function EditableTileWrapper({
 
 const CAMERA_DOMAIN = "camera";
 
-const NON_CAMERA_CYCLE: readonly EntitySize[] = ["small", "medium"];
-const CAMERA_CYCLE: readonly EntitySize[] = ["small", "medium", "large"];
+const STANDARD_CYCLE: readonly EntitySize[] = ["small", "medium", "large"];
+const CAMERA_CYCLE: readonly EntitySize[] = ["medium", "large"];
 
 /**
- * Compute the next size in the cycle for a given entity. Cameras have an
- * extra "large" step; everything else just toggles small ↔ medium.
+ * Compute the next size in the cycle for a given entity. Standard tiles
+ * cycle through all three AppleHome sizes (1×1 → 2×1 → 2×2 → 1×1).
+ * Cameras start at medium (1×1 is too small for a thumbnail) and just
+ * toggle between medium and large.
  */
 export function cycleSizeFor(
   entity: EntityState,
@@ -151,7 +153,7 @@ export function cycleSizeFor(
   const cycle =
     getDomain(entity.entity_id) === CAMERA_DOMAIN
       ? CAMERA_CYCLE
-      : NON_CAMERA_CYCLE;
+      : STANDARD_CYCLE;
   const idx = cycle.indexOf(current);
   if (idx < 0) return cycle[0] ?? "small";
   return cycle[(idx + 1) % cycle.length] ?? cycle[0] ?? "small";

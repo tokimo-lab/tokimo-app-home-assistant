@@ -1,5 +1,5 @@
 import { cn } from "@tokimo/ui";
-import type { MouseEvent as ReactMouseEvent } from "react";
+import type { CSSProperties, MouseEvent as ReactMouseEvent } from "react";
 import { getDomain } from "../../lib/domain";
 import { useEditHomeView } from "../../state/useEditHomeView";
 import type {
@@ -9,7 +9,6 @@ import type {
   PendingOp,
 } from "../../types";
 import { EditableTileWrapper } from "../edit/EditableTileWrapper";
-import { ResizeHandle } from "../edit/ResizeHandle";
 import { resolveTile } from "../tiles";
 
 interface TileGridProps {
@@ -20,7 +19,7 @@ interface TileGridProps {
   onContextMenu?: (entity: EntityState, e: ReactMouseEvent) => void;
   /** Force every tile to this size, ignoring per-entity preference. */
   forceSize?: EntitySize;
-  /** Edit-mode flag: enables jiggle + ResizeHandle. */
+  /** Edit-mode flag: enables jiggle + resize handle on selected tile. */
   editMode?: boolean;
   /**
    * dnd-kit container id for SortableContext participation. When set,
@@ -57,6 +56,20 @@ function defaultSizeFor(entity: EntityState): EntitySize {
 }
 
 /**
+ * Deterministic per-entity jiggle delay so tiles don't all rotate in
+ * sync (AppleHome staggers each tile by a small random offset).
+ * Returns a value in (-400ms, 0ms] so every tile starts mid-cycle at a
+ * different phase but they all stay within the same 0.4s loop window.
+ */
+function jiggleDelayMs(entityId: string): number {
+  let hash = 0;
+  for (let i = 0; i < entityId.length; i++) {
+    hash = (hash * 31 + entityId.charCodeAt(i)) | 0;
+  }
+  return -(Math.abs(hash) % 400);
+}
+
+/**
  * Responsive tile grid using Tailwind v4 CSS container queries
  * (named container `tiles`).
  *
@@ -81,7 +94,10 @@ export function TileGrid({
   sortableContainerId,
   t,
 }: TileGridProps) {
-  const { selectedTileId, toggleSize } = useEditHomeView();
+  // Subscribing to selection changes so the grid re-renders when the
+  // selected tile changes (EditableTileWrapper renders the resize handle
+  // based on this same store).
+  useEditHomeView();
   if (entities.length === 0) return null;
 
   return (
@@ -99,7 +115,6 @@ export function TileGrid({
         {entities.map((entity) => {
           const Tile = resolveTile(entity);
           const size = forceSize ?? entity.size ?? defaultSizeFor(entity);
-          const isSelected = editMode && selectedTileId === entity.entity_id;
 
           const tile = (
             <Tile
@@ -112,12 +127,15 @@ export function TileGrid({
           );
 
           if (editMode) {
+            const jiggleStyle: CSSProperties = {
+              animationDelay: `${jiggleDelayMs(entity.entity_id)}ms`,
+            };
             return (
               <div
                 key={entity.entity_id}
                 className={cn(SIZE_SPAN[size], "relative")}
               >
-                <div className="tile-jiggle h-full w-full">
+                <div className="tile-jiggle h-full w-full" style={jiggleStyle}>
                   <EditableTileWrapper
                     entity={entity}
                     sortableContainerId={sortableContainerId}
@@ -125,12 +143,6 @@ export function TileGrid({
                     {tile}
                   </EditableTileWrapper>
                 </div>
-                {isSelected && (
-                  <ResizeHandle
-                    onClick={() => void toggleSize(entity.entity_id)}
-                    t={t}
-                  />
-                )}
               </div>
             );
           }
