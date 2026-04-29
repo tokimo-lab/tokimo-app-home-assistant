@@ -249,7 +249,8 @@ export function TileBaseStyle({
         className={cn(
           "relative z-10 flex items-center justify-center",
           isLarge ? "h-12 w-12" : "h-8 w-8 self-start",
-          onIconClick && "cursor-pointer",
+          onIconClick &&
+            "cursor-pointer rounded-full transition-shadow hover:ring-4 hover:ring-white/15",
           active ? "text-white" : "text-gray-400 dark:text-gray-400",
         )}
       >
