@@ -209,9 +209,64 @@ const SWITCH_NOISE_KEYWORDS = [
   "bitrate",
   "帧率",
   "fps",
+  // camera control / motion
+  "摄像机控制",
+  "移动侦测",
+  "微光全彩",
+  "移动追踪",
+  "宽动态",
+  "宽动态范围",
+  "巡航",
+  "巡航功能",
+  // power / charge / lock / state config
+  "充电保护",
+  "物理控制锁",
+  "默认上电状态",
+  "弹窗是否弹出过",
+  "存储卡管理",
+  // diagnostic state strings
+  "状态，true",
+  "状态,true",
+  "状态true",
+  "true：启用中",
+  // 小爱音箱 / speaker noise
+  "闹钟 开关",
+  "勿扰 勿扰",
+  "勿扰",
+  "睡眠模式",
+  // sleep / power-save
+  "自动休眠",
+  "弱电箱风扇自动休眠",
+  // power limits / countdown
+  "自定义功率保护",
+  "最大功率限制",
+  "快捷倒计时",
+  "倒计时关闭",
+  // door / appliance config
+  "门禁静音",
+  "auto drying",
+  "self-clean",
+  "cleaning sequence",
+  "auto open",
+  "intercom auto open",
+  // mute toggles
+  "扬声器 静音",
+  "静音",
 ];
 
-const BINARY_SENSOR_NOISE_KEYWORDS = ["滤网", "滤芯", "故障", "报警", "fault"];
+const BINARY_SENSOR_NOISE_KEYWORDS = [
+  "滤网",
+  "滤芯",
+  "故障",
+  "报警",
+  "fault",
+  // diagnostic / config status sensors paralleling the switch noise list
+  "存储卡",
+  "弹窗",
+  "默认上电状态",
+  "状态，true",
+  "状态,true",
+];
 
 const BINARY_SENSOR_CRITICAL_KEYWORDS = [
   "门",
