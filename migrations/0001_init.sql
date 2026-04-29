@@ -70,3 +70,16 @@ CREATE INDEX IF NOT EXISTS entity_overrides_group_idx
 -- requiring a DB reset. NULL means "use frontend default" (1 decimal place).
 ALTER TABLE entity_overrides
   ADD COLUMN IF NOT EXISTS decimal_places INTEGER;
+
+-- Idempotent migration: add visibility/grouping defaults columns to existing
+-- deployments. The CREATE TABLE block above only fires on fresh databases;
+-- pre-existing entity_overrides tables (created before these features
+-- shipped) need explicit ALTERs. Defaults match the post-`sync_default_*`
+-- baseline so existing rows look "untouched" until the next sync rewrites
+-- them with computed values.
+ALTER TABLE entity_overrides
+  ADD COLUMN IF NOT EXISTS collapsed BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE entity_overrides
+  ADD COLUMN IF NOT EXISTS group_id TEXT;
+ALTER TABLE entity_overrides
+  ADD COLUMN IF NOT EXISTS group_primary BOOLEAN NOT NULL DEFAULT TRUE;

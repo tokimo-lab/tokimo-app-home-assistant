@@ -3,8 +3,16 @@
 //!
 //! Strategy: for every HA entity we know about, compute the four "default
 //! presentation" fields *once*, on first import, and `INSERT ... ON CONFLICT
-//! DO NOTHING`. Existing rows are never touched — any user manual toggle is
-//! sacred.
+//! DO UPDATE` — but the UPDATE branch is guarded so it only fires for rows
+//! still at post-migration defaults (`collapsed=FALSE` AND `group_id IS NULL`
+//! AND `group_primary=TRUE`). Any user manual toggle is sacred: once a row
+//! diverges from the pristine pattern, subsequent syncs leave it alone.
+//!
+//! This guarded-UPDATE form (rather than plain `DO NOTHING`) is what
+//! backfills pre-existing deployments after the `collapsed` / `group_id` /
+//! `group_primary` columns were added by an idempotent ALTER TABLE: their
+//! 2k+ existing rows match the pristine pattern and get sealed on the next
+//! sync without losing any user customisation made via the UI.
 //!
 //! Why固化 in DB instead of recomputing per-render in the frontend:
 //!   * The frontend used to run a chain of dynamic filters (noise keyword
@@ -332,7 +340,14 @@ pub async fn sync_default_visibility_and_grouping(
                 instance_id, entity_id, hidden, entity_category, \
                 collapsed, group_id, group_primary \
              ) VALUES ($1, $2, $3, $4, $5, $6, $7) \
-             ON CONFLICT (instance_id, entity_id) DO NOTHING",
+             ON CONFLICT (instance_id, entity_id) DO UPDATE SET \
+                collapsed = EXCLUDED.collapsed, \
+                group_id = EXCLUDED.group_id, \
+                group_primary = EXCLUDED.group_primary \
+             WHERE \
+                entity_overrides.collapsed = FALSE \
+                AND entity_overrides.group_id IS NULL \
+                AND entity_overrides.group_primary = TRUE",
         )
         .bind(instance_id)
         .bind(&e.entity_id)
