@@ -11,7 +11,7 @@ function buildProxyUrl(instanceId: string, entityId: string): string {
   return `/api/apps/home-assistant/instances/${encodeURIComponent(instanceId)}/camera_proxy/${encodeURIComponent(entityId)}`;
 }
 
-function CameraTileImpl({ entity, instanceId, t }: TileProps) {
+function CameraTileImpl({ entity, instanceId, t, size }: TileProps) {
   const { entity_id } = entity;
   const name = getFriendlyName(entity);
   const [imgSrc, setImgSrc] = useState<string>(() =>
@@ -46,7 +46,7 @@ function CameraTileImpl({ entity, instanceId, t }: TileProps) {
         <TileBaseStyle
           domain="camera"
           isOn
-          size="large"
+          size={size}
           icon={<Camera size={28} />}
           name={name}
           stateText={t("stateOn")}

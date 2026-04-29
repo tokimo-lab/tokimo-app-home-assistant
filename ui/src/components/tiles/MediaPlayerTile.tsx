@@ -4,7 +4,7 @@ import { getFriendlyName } from "../../lib/format";
 import { type TileProps, tilePropsEqual } from "./_types";
 import { TileBaseStyle } from "./TileBaseStyle";
 
-function MediaPlayerTileImpl({ entity, t, onCall }: TileProps) {
+function MediaPlayerTileImpl({ entity, t, onCall, size }: TileProps) {
   const { entity_id, state, attributes } = entity;
   const isPlaying = state === "playing";
   const name = getFriendlyName(entity);
@@ -24,6 +24,7 @@ function MediaPlayerTileImpl({ entity, t, onCall }: TileProps) {
   return (
     <TileBaseStyle
       domain="media_player"
+      size={size}
       isOn={isPlaying}
       icon={isPlaying ? <Pause size={18} /> : <Play size={18} />}
       name={name}

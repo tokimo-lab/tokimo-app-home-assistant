@@ -5,7 +5,7 @@ import { useDetailOverlay } from "../../state/useDetailOverlay";
 import { type TileProps, tilePropsEqual } from "./_types";
 import { TileBaseStyle } from "./TileBaseStyle";
 
-function ClimateTileImpl({ entity, instanceId }: TileProps) {
+function ClimateTileImpl({ entity, instanceId, size }: TileProps) {
   const { entity_id, state, attributes } = entity;
   const name = getFriendlyName(entity);
   const currentTemp = attributes.current_temperature;
@@ -27,6 +27,7 @@ function ClimateTileImpl({ entity, instanceId }: TileProps) {
   return (
     <TileBaseStyle
       domain="climate"
+      size={size}
       isOn={isActive}
       icon={<Thermometer size={20} />}
       name={name}

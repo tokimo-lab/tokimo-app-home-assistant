@@ -62,6 +62,7 @@ export function CamerasSection({
                 pending={getPending(entity.entity_id)}
                 onCall={onCall}
                 t={t}
+                size="large"
               />
             </div>
           );

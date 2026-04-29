@@ -4,7 +4,7 @@ import { getFriendlyName } from "../../lib/format";
 import { type TileProps, tilePropsEqual } from "./_types";
 import { TileBaseStyle } from "./TileBaseStyle";
 
-function FanTileImpl({ entity, t, onCall }: TileProps) {
+function FanTileImpl({ entity, t, onCall, size }: TileProps) {
   const { entity_id, state, attributes } = entity;
   const isOn = state === "on";
   const name = getFriendlyName(entity);
@@ -23,6 +23,7 @@ function FanTileImpl({ entity, t, onCall }: TileProps) {
   return (
     <TileBaseStyle
       domain="fan"
+      size={size}
       isOn={isOn}
       icon={
         <Fan

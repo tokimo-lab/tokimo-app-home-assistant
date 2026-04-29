@@ -4,7 +4,7 @@ import { formatState, getFriendlyName } from "../../lib/format";
 import { type TileProps, tilePropsEqual } from "./_types";
 import { TileBaseStyle } from "./TileBaseStyle";
 
-function BinarySensorTileImpl({ entity, t }: TileProps) {
+function BinarySensorTileImpl({ entity, t, size }: TileProps) {
   const { state } = entity;
   const isActive = state === "on";
   const name = getFriendlyName(entity);
@@ -12,6 +12,7 @@ function BinarySensorTileImpl({ entity, t }: TileProps) {
   return (
     <TileBaseStyle
       domain="binary_sensor"
+      size={size}
       isOn={isActive}
       icon={<Zap size={20} />}
       name={name}

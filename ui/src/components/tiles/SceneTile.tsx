@@ -4,7 +4,7 @@ import { getFriendlyName } from "../../lib/format";
 import { type TileProps, tilePropsEqual } from "./_types";
 import { TileBaseStyle } from "./TileBaseStyle";
 
-function SceneTileImpl({ entity, t, onCall }: TileProps) {
+function SceneTileImpl({ entity, t, onCall, size }: TileProps) {
   const { entity_id } = entity;
   const name = getFriendlyName(entity);
 
@@ -20,6 +20,7 @@ function SceneTileImpl({ entity, t, onCall }: TileProps) {
   return (
     <TileBaseStyle
       domain="scene"
+      size={size}
       isOn={false}
       icon={<PlaySquare size={20} />}
       name={name}

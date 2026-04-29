@@ -4,7 +4,7 @@ import { getFriendlyName } from "../../lib/format";
 import { type TileProps, tilePropsEqual } from "./_types";
 import { TileBaseStyle } from "./TileBaseStyle";
 
-function ScriptTileImpl({ entity, t, onCall }: TileProps) {
+function ScriptTileImpl({ entity, t, onCall, size }: TileProps) {
   const { entity_id, state } = entity;
   const isRunning = state === "on";
   const name = getFriendlyName(entity);
@@ -21,6 +21,7 @@ function ScriptTileImpl({ entity, t, onCall }: TileProps) {
   return (
     <TileBaseStyle
       domain="script"
+      size={size}
       isOn={isRunning}
       icon={<Cpu size={20} />}
       name={name}

@@ -4,7 +4,7 @@ import { getFriendlyName } from "../../lib/format";
 import { type TileProps, tilePropsEqual } from "./_types";
 import { TileBaseStyle } from "./TileBaseStyle";
 
-function SensorTileImpl({ entity, t: _t }: TileProps) {
+function SensorTileImpl({ entity, t: _t, size }: TileProps) {
   const { state, attributes } = entity;
   const name = getFriendlyName(entity);
   const unit = attributes.unit_of_measurement ?? "";
@@ -12,6 +12,7 @@ function SensorTileImpl({ entity, t: _t }: TileProps) {
   return (
     <TileBaseStyle
       domain="sensor"
+      size={size}
       isOn={false}
       icon={<Radio size={16} />}
       name={name}

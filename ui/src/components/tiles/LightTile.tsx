@@ -5,7 +5,7 @@ import { useDetailOverlay } from "../../state/useDetailOverlay";
 import { type TileProps, tilePropsEqual } from "./_types";
 import { TileBaseStyle } from "./TileBaseStyle";
 
-function LightTileImpl({ entity, instanceId, t, onCall }: TileProps) {
+function LightTileImpl({ entity, instanceId, t, onCall, size }: TileProps) {
   const { entity_id, state, attributes } = entity;
   const isOn = state === "on";
   const name = getFriendlyName(entity);
@@ -34,6 +34,7 @@ function LightTileImpl({ entity, instanceId, t, onCall }: TileProps) {
   return (
     <TileBaseStyle
       domain="light"
+      size={size}
       isOn={isOn}
       icon={<Lightbulb size={20} />}
       name={name}

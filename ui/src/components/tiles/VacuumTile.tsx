@@ -4,7 +4,7 @@ import { getFriendlyName } from "../../lib/format";
 import { type TileProps, tilePropsEqual } from "./_types";
 import { TileBaseStyle } from "./TileBaseStyle";
 
-function VacuumTileImpl({ entity, t, onCall }: TileProps) {
+function VacuumTileImpl({ entity, t, onCall, size }: TileProps) {
   const { entity_id, state, attributes } = entity;
   const isCleaning = state === "cleaning";
   const name = getFriendlyName(entity);
@@ -28,6 +28,7 @@ function VacuumTileImpl({ entity, t, onCall }: TileProps) {
   return (
     <TileBaseStyle
       domain="vacuum"
+      size={size}
       isOn={isCleaning || state === "returning"}
       icon={<Wind size={20} />}
       name={name}

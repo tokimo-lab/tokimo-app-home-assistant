@@ -113,6 +113,7 @@ export function TileGrid({
               pending={getPending(entity.entity_id)}
               onCall={onCall}
               t={t}
+              size={size}
             />
           );
 

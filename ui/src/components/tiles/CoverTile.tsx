@@ -5,7 +5,7 @@ import { useDetailOverlay } from "../../state/useDetailOverlay";
 import { type TileProps, tilePropsEqual } from "./_types";
 import { TileBaseStyle } from "./TileBaseStyle";
 
-function CoverTileImpl({ entity, instanceId, t, onCall }: TileProps) {
+function CoverTileImpl({ entity, instanceId, t, onCall, size }: TileProps) {
   const { entity_id, state, attributes } = entity;
   const isOpen = state === "open";
   const name = getFriendlyName(entity);
@@ -32,6 +32,7 @@ function CoverTileImpl({ entity, instanceId, t, onCall }: TileProps) {
   return (
     <TileBaseStyle
       domain="cover"
+      size={size}
       isOn={isOpen}
       icon={<Blinds size={20} />}
       name={name}

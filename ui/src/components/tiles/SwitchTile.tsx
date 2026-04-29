@@ -5,7 +5,7 @@ import { useDetailOverlay } from "../../state/useDetailOverlay";
 import { type TileProps, tilePropsEqual } from "./_types";
 import { TileBaseStyle } from "./TileBaseStyle";
 
-function SwitchTileImpl({ entity, instanceId, t, onCall }: TileProps) {
+function SwitchTileImpl({ entity, instanceId, t, onCall, size }: TileProps) {
   const { entity_id, state } = entity;
   const isOn = state === "on";
   const name = getFriendlyName(entity);
@@ -25,6 +25,7 @@ function SwitchTileImpl({ entity, instanceId, t, onCall }: TileProps) {
   return (
     <TileBaseStyle
       domain={domain}
+      size={size}
       isOn={isOn}
       icon={<Power size={20} />}
       name={name}
