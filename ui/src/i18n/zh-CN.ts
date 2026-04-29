@@ -447,11 +447,7 @@ export const zhCN: Record<string, string> = {
   currentlyShown: "当前展示",
   noSimilarAccessories: "无相似配件",
 
-  // Family sidebar tooltips
-  sidebarNewFamily: "新建家庭",
-  sidebarSettings: "家庭设置",
-  sidebarExpand: "展开侧边栏",
-  sidebarCollapse: "收起侧边栏",
+  // Family sidebar tooltips (removed — sidebar deleted)
 
   // Rooms tab (settings)
   roomsSyncDescription: "从 Home Assistant 同步区域为房间，并管理排序与图标",

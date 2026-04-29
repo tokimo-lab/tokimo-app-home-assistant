@@ -451,11 +451,7 @@ export const enUS: Record<string, string> = {
   currentlyShown: "Currently Shown",
   noSimilarAccessories: "No similar accessories",
 
-  // Family sidebar tooltips
-  sidebarNewFamily: "New Family",
-  sidebarSettings: "Family Settings",
-  sidebarExpand: "Expand sidebar",
-  sidebarCollapse: "Collapse sidebar",
+  // Family sidebar tooltips (removed — sidebar deleted)
 
   // Rooms tab (settings)
   roomsSyncDescription:

@@ -21,7 +21,6 @@ import {
   type SettingsTab,
 } from "./components/settings/SettingsPane";
 import { AnimatedSettingsPane } from "./components/shell/AnimatedSettingsPane";
-import { AppShell } from "./components/shell/AppShell";
 import { HomeAssistantMenuBar } from "./components/shell/HomeAssistantMenuBar";
 import { enUS, zhCN } from "./i18n";
 // @ts-expect-error -- side-effect css import
@@ -113,10 +112,8 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
   // ── Settings pane (Family settings) ──────────────────────────────────────
   const [settingsTab, setSettingsTab] = useState<SettingsTab | null>(null);
   const [settingsTargetId, setSettingsTargetId] = useState<string | null>(null);
-  const [creatingFamily, setCreatingFamily] = useState(false);
   const openSettings = (opts: { tab: SettingsTab; instanceId?: string }) => {
     const targetId = opts.instanceId ?? effectiveInstanceId;
-    setCreatingFamily(false);
     setSettingsTargetId(targetId);
     setSettingsTab(opts.tab);
   };
@@ -124,12 +121,6 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
     setSettingsTab(null);
     setSettingsTargetId(null);
   };
-  const openCreateFamily = () => {
-    setSettingsTab(null);
-    setSettingsTargetId(null);
-    setCreatingFamily(true);
-  };
-  const closeCreateFamily = () => setCreatingFamily(false);
 
   // ── Sync activeInstanceStore + reset transient stacks on instance change ─
   useEffect(() => {
@@ -226,7 +217,6 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
   }
 
   function handleFamilyCreated(created: import("./types").HaInstance) {
-    setCreatingFamily(false);
     void reloadInstances();
     nav.navigate(
       `/instance/${created.id}/home`,
@@ -252,22 +242,7 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
       t={t}
       reloadInstances={reloadInstances}
     >
-      <AppShell
-        instances={instances}
-        activeInstanceId={effectiveInstanceId}
-        settingsActive={settingsTab !== null || creatingFamily}
-        onNavigate={navigateTo}
-        onCreateInstance={openCreateFamily}
-        onOpenSettings={() => openSettings({ tab: "family" })}
-        onContextMenuInstance={(id, e) => {
-          e.preventDefault();
-          if (id !== instanceId) {
-            navigateTo(`/instance/${id}/home`);
-          }
-          openSettings({ tab: "family", instanceId: id });
-        }}
-        t={t}
-      >
+      <div className="relative h-full w-full overflow-hidden">
         {parsed.page === "home" && activeInstance && (
           <>
             <HomePage
@@ -333,17 +308,7 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
             />
           )}
         </AnimatedSettingsPane>
-
-        <AnimatedSettingsPane open={creatingFamily}>
-          {creatingFamily && (
-            <SetupPage
-              t={t}
-              onCreated={handleFamilyCreated}
-              onCancel={closeCreateFamily}
-            />
-          )}
-        </AnimatedSettingsPane>
-      </AppShell>
+      </div>
     </HomeAssistantMenuBar>
   );
 }
