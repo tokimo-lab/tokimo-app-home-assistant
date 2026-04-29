@@ -65,6 +65,11 @@ pub struct EntityDisplayUpdate {
     pub custom_icon: Option<Option<String>>,
     #[serde(default, deserialize_with = "deserialize_double_option_uuid")]
     pub area_id: Option<Option<Uuid>>,
+    pub collapsed: Option<bool>,
+    /// Only `Some(true)` is accepted. Setting `false` directly is rejected
+    /// with 400 — clients must elect a new primary by PATCHing another
+    /// entity in the same group with `group_primary=true`.
+    pub group_primary: Option<bool>,
 }
 
 fn deserialize_double_option_string<'de, D>(deserializer: D) -> Result<Option<Option<String>>, D::Error>
@@ -139,6 +144,16 @@ pub async fn update_display(
     Path((instance_id, entity_id)): Path<(Uuid, String)>,
     Json(req): Json<EntityDisplayUpdate>,
 ) -> Result<Json<EntityDisplayDto>, AppError> {
+    // Reject group_primary=false: there is no well-defined "next primary"
+    // for a group with no leader, and silently auto-electing one would
+    // surprise the user. The only legal path to demote A is to promote B.
+    if matches!(req.group_primary, Some(false)) {
+        return Err(AppError::bad_request(
+            "cannot set group_primary=false directly; \
+             use PATCH on another entity with group_primary=true to elect a new primary",
+        ));
+    }
+
     ensure_instance(&ctx.pool, instance_id).await?;
 
     // For nullable patch fields we pass (set_flag, value): when the flag is
@@ -153,11 +168,43 @@ pub async fn update_display(
     let area_id_value = req.area_id.unwrap_or(None);
     let size_str = req.size.map(|s| s.as_db());
 
+    // Wrap promote-then-upsert in a single transaction so a race between
+    // "demote siblings" and "promote self" cannot leave the group with no
+    // (or two) primaries.
+    let mut tx = ctx.pool.begin().await?;
+
+    // If the client is electing this entity as primary, demote every other
+    // member of its group in one UPDATE. The subquery resolves the group_id
+    // from the target row, so the caller doesn't have to know it. No-op
+    // when the entity has group_id=NULL or no override row yet.
+    let mut demoted_siblings: Vec<String> = Vec::new();
+    if matches!(req.group_primary, Some(true)) {
+        let rows = sqlx::query_scalar::<_, String>(
+            "UPDATE entity_overrides
+                SET group_primary = (entity_id = $2),
+                    updated_at    = NOW()
+              WHERE instance_id = $1
+                AND group_id = (
+                    SELECT group_id FROM entity_overrides
+                     WHERE instance_id = $1 AND entity_id = $2
+                )
+                AND group_id IS NOT NULL
+                AND entity_id <> $2
+              RETURNING entity_id",
+        )
+        .bind(instance_id)
+        .bind(&entity_id)
+        .fetch_all(&mut *tx)
+        .await?;
+        demoted_siblings = rows;
+    }
+
     let r = sqlx::query(
         r#"INSERT INTO entity_overrides (
                 instance_id, entity_id,
                 display_name, custom_icon, area_id,
-                hidden, size, is_favorite, favorite_order, sort_order
+                hidden, size, is_favorite, favorite_order, sort_order,
+                collapsed, group_primary
            ) VALUES (
                 $1, $2,
                 $4, $6, $8,
@@ -165,7 +212,9 @@ pub async fn update_display(
                 $10,
                 COALESCE($11, FALSE),
                 COALESCE($12, 0),
-                COALESCE($13, 0)
+                COALESCE($13, 0),
+                COALESCE($14, FALSE),
+                COALESCE($15, TRUE)
            )
            ON CONFLICT (instance_id, entity_id) DO UPDATE SET
                 display_name   = CASE WHEN $3 THEN $4  ELSE entity_overrides.display_name END,
@@ -176,6 +225,8 @@ pub async fn update_display(
                 is_favorite    = COALESCE($11, entity_overrides.is_favorite),
                 favorite_order = COALESCE($12, entity_overrides.favorite_order),
                 sort_order     = COALESCE($13, entity_overrides.sort_order),
+                collapsed      = COALESCE($14, entity_overrides.collapsed),
+                group_primary  = COALESCE($15, entity_overrides.group_primary),
                 updated_at     = NOW()
            RETURNING entity_id, display_name, custom_icon, area_id,
                      hidden, size, is_favorite, favorite_order, sort_order,
@@ -194,8 +245,12 @@ pub async fn update_display(
     .bind(req.is_favorite)
     .bind(req.favorite_order)
     .bind(req.sort_order)
-    .fetch_one(&ctx.pool)
+    .bind(req.collapsed)
+    .bind(req.group_primary)
+    .fetch_one(&mut *tx)
     .await?;
+
+    tx.commit().await?;
 
     let size_db: Option<String> = r.get("size");
     let size_typed: Option<EntitySize> = size_db.as_deref().map(EntitySize::from_db).transpose()?;
@@ -216,15 +271,47 @@ pub async fn update_display(
             group_primary: r.get("group_primary"),
         };
         instance.override_cache.insert(entity_id.clone(), snapshot);
+
+        // Refresh cache for any siblings we just demoted, and broadcast
+        // EntityEvent::Updated for each so SSE clients see the role swap
+        // immediately. We refetch the new override rows in one query to
+        // keep the cache consistent without re-loading the whole instance.
+        if !demoted_siblings.is_empty() {
+            let sibling_rows = sqlx::query(&format!(
+                "SELECT {cols} FROM entity_overrides \
+                 WHERE instance_id = $1 AND entity_id = ANY($2)",
+                cols = crate::handlers::entities::OVERRIDE_COLS,
+            ))
+            .bind(instance_id)
+            .bind(&demoted_siblings)
+            .fetch_all(&ctx.pool)
+            .await?;
+
+            for row in &sibling_rows {
+                let ov = crate::handlers::entities::row_to_override(row);
+                let snap = crate::handlers::entities::override_row_to_snapshot(&ov);
+                instance.override_cache.insert(ov.entity_id.clone(), snap);
+            }
+
+            for sibling_id in &demoted_siblings {
+                if let Some(state) = instance.store.states.get(sibling_id) {
+                    let _ = instance.store.tx.send(crate::state::EntityEvent::Updated {
+                        entity: Arc::new(state.clone()),
+                        context_id: None,
+                    });
+                }
+            }
+        }
     }
 
-    // Broadcast EntityEvent::Updated so SSE clients see size/is_favorite/
-    // hidden/area_id override changes immediately, instead of waiting for
-    // the next upstream HA state_changed. The SSE handler itself re-fetches
-    // the override row and merges it into an EntityDto, so we only need to
-    // ship the current raw EntityState here. If HA hasn't pushed this entity
-    // yet (no state in the store), skip the broadcast — there's nothing to
-    // merge against, and the next HA push will pick up the override anyway.
+    // Broadcast EntityEvent::Updated for the patched entity itself so SSE
+    // clients see size/is_favorite/hidden/area_id/collapsed/group_primary
+    // changes immediately, instead of waiting for the next upstream HA
+    // state_changed. The SSE handler re-fetches the override row and merges
+    // it into an EntityDto, so we only need to ship the current raw
+    // EntityState here. If HA hasn't pushed this entity yet (no state in
+    // the store), skip the broadcast — there's nothing to merge against,
+    // and the next HA push will pick up the override anyway.
     if let Some(instance) = ctx.conn_pool.instances.get(&instance_id)
         && let Some(state) = instance.store.states.get(&entity_id)
     {
@@ -436,5 +523,26 @@ mod tests {
     fn display_update_accepts_sort_order() {
         let req: EntityDisplayUpdate = serde_json::from_str(r#"{"sort_order":42}"#).unwrap();
         assert_eq!(req.sort_order, Some(42));
+    }
+
+    #[test]
+    fn display_update_accepts_collapsed() {
+        let req: EntityDisplayUpdate = serde_json::from_str(r#"{"collapsed":true}"#).unwrap();
+        assert_eq!(req.collapsed, Some(true));
+    }
+
+    #[test]
+    fn display_update_accepts_group_primary_true() {
+        let req: EntityDisplayUpdate = serde_json::from_str(r#"{"group_primary":true}"#).unwrap();
+        assert_eq!(req.group_primary, Some(true));
+    }
+
+    #[test]
+    fn display_update_parses_group_primary_false_for_handler_to_reject() {
+        // The handler rejects this with 400; the type still needs to parse
+        // it so we can produce a meaningful error message rather than a
+        // generic "invalid request body" decode failure.
+        let req: EntityDisplayUpdate = serde_json::from_str(r#"{"group_primary":false}"#).unwrap();
+        assert_eq!(req.group_primary, Some(false));
     }
 }
