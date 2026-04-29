@@ -239,7 +239,7 @@ export function HomePage({
             className={cn(
               "px-6 py-3",
               selectedChip !== null &&
-                "sticky top-0 z-10 bg-white/70 backdrop-blur-xl dark:bg-zinc-950/70",
+                "sticky top-0 z-20 border-b border-zinc-200/40 bg-white/85 backdrop-blur-xl dark:border-white/10 dark:bg-zinc-950/85",
             )}
           >
             <FilterChipBar
