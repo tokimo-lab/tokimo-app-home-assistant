@@ -1,4 +1,4 @@
-import { Eye, Home, Layers, Sparkles } from "lucide-react";
+import { Home, Lock, Sparkles, Users } from "lucide-react";
 
 interface WelcomePageProps {
   t: (k: string) => string;
@@ -32,11 +32,11 @@ export function WelcomePage({ t, onGetStarted }: WelcomePageProps) {
             text={t("welcomeFeatureControl")}
           />
           <FeatureRow
-            icon={<Eye size={20} className="text-pink-300" />}
-            text={t("welcomeFeatureVisual")}
+            icon={<Lock size={20} className="text-emerald-300" />}
+            text={t("welcomeFeatureLocal")}
           />
           <FeatureRow
-            icon={<Layers size={20} className="text-amber-300" />}
+            icon={<Users size={20} className="text-amber-300" />}
             text={t("welcomeFeatureMulti")}
           />
         </div>

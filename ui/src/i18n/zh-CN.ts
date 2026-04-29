@@ -472,7 +472,7 @@ export const zhCN: Record<string, string> = {
   welcomeTitle: "欢迎使用 Home Assistant",
   welcomeSlogan: "将整个家居生态汇聚到一处，掌控由你定义",
   welcomeFeatureControl: "一键控制灯光、温控、安防与场景",
-  welcomeFeatureVisual: "实时画面与传感器状态尽收眼底",
+  welcomeFeatureLocal: "数据始终留在本地网络，自托管自掌控",
   welcomeFeatureMulti: "支持多家庭、多房间、跨设备协同",
   welcomeCta: "开始使用",
   back: "返回",

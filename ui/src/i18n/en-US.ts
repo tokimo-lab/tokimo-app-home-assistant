@@ -476,7 +476,7 @@ export const enUS: Record<string, string> = {
   welcomeTitle: "Welcome to Home Assistant",
   welcomeSlogan: "Bring your entire smart home together — your way",
   welcomeFeatureControl: "Control lights, climate, security, and scenes",
-  welcomeFeatureVisual: "Live cameras and sensor status at a glance",
+  welcomeFeatureLocal: "Self-hosted — your data never leaves your network",
   welcomeFeatureMulti: "Multi-home, multi-room, cross-device automations",
   welcomeCta: "Get Started",
   back: "Back",
