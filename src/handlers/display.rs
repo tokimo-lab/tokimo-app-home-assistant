@@ -86,7 +86,7 @@ where
 pub struct EntityDisplayDto {
     pub instance_id: Uuid,
     pub entity_id: String,
-    pub size: EntitySize,
+    pub size: Option<EntitySize>,
     pub is_favorite: bool,
     pub favorite_order: i32,
     pub hidden: bool,
@@ -159,7 +159,7 @@ pub async fn update_display(
                 $1, $2,
                 $4, $6, $8,
                 COALESCE($9, FALSE),
-                COALESCE($10, 'small'),
+                $10,
                 COALESCE($11, FALSE),
                 COALESCE($12, 0),
                 COALESCE($13, 0)
@@ -193,7 +193,8 @@ pub async fn update_display(
     .fetch_one(&ctx.pool)
     .await?;
 
-    let size_db: String = r.get("size");
+    let size_db: Option<String> = r.get("size");
+    let size_typed: Option<EntitySize> = size_db.as_deref().map(EntitySize::from_db).transpose()?;
 
     // Update cache after successful DB write.
     if let Some(instance) = ctx.conn_pool.instances.get(&instance_id) {
@@ -229,7 +230,7 @@ pub async fn update_display(
     Ok(Json(EntityDisplayDto {
         instance_id,
         entity_id: r.get("entity_id"),
-        size: EntitySize::from_db(&size_db)?,
+        size: size_typed,
         is_favorite: r.get("is_favorite"),
         favorite_order: r.get("favorite_order"),
         hidden: r.get("hidden"),

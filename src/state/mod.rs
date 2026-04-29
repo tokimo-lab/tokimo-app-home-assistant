@@ -108,7 +108,7 @@ pub struct OverrideSnapshot {
     pub hidden: bool,
     pub is_favorite: bool,
     pub favorite_order: i32,
-    pub size: String,
+    pub size: Option<String>,
     pub sort_order: i32,
 }
 

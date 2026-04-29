@@ -32,7 +32,7 @@ pub struct EntityDto {
     pub hidden: bool,
     pub is_favorite: bool,
     pub favorite_order: i32,
-    pub size: String,
+    pub size: Option<String>,
     pub sort_order: i32,
     /// Device metadata (manufacturer / model / sw_version / serial_number /
     /// name) sourced from HA's device registry. Only populated by the
@@ -57,7 +57,7 @@ pub(crate) fn apply_override(state: EntityState, ov: Option<&OverrideRow>) -> En
         hidden: ov.map(|o| o.hidden).unwrap_or(false),
         is_favorite: ov.map(|o| o.is_favorite).unwrap_or(false),
         favorite_order: ov.map(|o| o.favorite_order).unwrap_or(0),
-        size: ov.map(|o| o.size.clone()).unwrap_or_else(|| "small".to_string()),
+        size: ov.and_then(|o| o.size.clone()),
         sort_order: ov.map(|o| o.sort_order).unwrap_or(0),
         device: None,
     }
@@ -81,7 +81,7 @@ pub(crate) fn apply_override_snapshot(
         hidden: ov.map(|o| o.hidden).unwrap_or(false),
         is_favorite: ov.map(|o| o.is_favorite).unwrap_or(false),
         favorite_order: ov.map(|o| o.favorite_order).unwrap_or(0),
-        size: ov.map(|o| o.size.clone()).unwrap_or_else(|| "small".to_string()),
+        size: ov.and_then(|o| o.size.clone()),
         sort_order: ov.map(|o| o.sort_order).unwrap_or(0),
         device: None,
     }
@@ -109,7 +109,7 @@ pub(crate) struct OverrideRow {
     pub hidden: bool,
     pub is_favorite: bool,
     pub favorite_order: i32,
-    pub size: String,
+    pub size: Option<String>,
     pub sort_order: i32,
 }
 

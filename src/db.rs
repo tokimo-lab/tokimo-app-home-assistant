@@ -1,32 +1,16 @@
-//! PostgreSQL pool + migrations for the Home Assistant app.
+//! PostgreSQL pool + schema bootstrap for the Home Assistant app.
 //!
 //! Connects with `DATABASE_URL`; ensures `DB_SCHEMA` (default: `home_assistant`) exists;
-//! sets `search_path` on every new connection; applies embedded migrations.
+//! sets `search_path` on every new connection; applies the consolidated init SQL.
+//!
+//! HA app is in active development: we ship a single `migrations/0001_init.sql`
+//! with the final schema state and no per-version ledger. Schema files use
+//! `CREATE … IF NOT EXISTS`, so re-running on an existing schema is a no-op.
 
 use sqlx::postgres::{PgConnectOptions, PgPool, PgPoolOptions};
-use sqlx::{ConnectOptions, Executor, Row};
+use sqlx::{ConnectOptions, Executor};
 use std::str::FromStr;
-use tracing::{debug, info};
-
-const MIGRATIONS: &[(&str, &str)] = &[
-    ("0001_init", include_str!("../migrations/0001_init.sql")),
-    (
-        "0002_rooms_instance_id",
-        include_str!("../migrations/0002_rooms_instance_id.sql"),
-    ),
-    (
-        "0003_entity_display",
-        include_str!("../migrations/0003_entity_display.sql"),
-    ),
-    (
-        "0004_entity_overrides_multi_instance",
-        include_str!("../migrations/0004_entity_overrides_multi_instance.sql"),
-    ),
-    (
-        "0005_entity_category",
-        include_str!("../migrations/0005_entity_category.sql"),
-    ),
-];
+use tracing::info;
 
 pub async fn init_pool() -> anyhow::Result<PgPool> {
     let url = std::env::var("DATABASE_URL").map_err(|_| anyhow::anyhow!("DATABASE_URL is required"))?;
@@ -59,39 +43,13 @@ pub async fn init_pool() -> anyhow::Result<PgPool> {
 pub async fn run_migrations(pool: &PgPool) -> anyhow::Result<()> {
     let schema = std::env::var("DB_SCHEMA").unwrap_or_else(|_| "home_assistant".to_string());
 
-    // Idempotent schema bootstrap.
     let create = format!("CREATE SCHEMA IF NOT EXISTS \"{schema}\"");
     sqlx::query(&create).execute(pool).await?;
 
-    // Migration ledger lives inside the app's own schema.
-    sqlx::query(
-        r#"CREATE TABLE IF NOT EXISTS _migrations (
-            id          TEXT PRIMARY KEY,
-            applied_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        )"#,
-    )
-    .execute(pool)
-    .await?;
-
-    for (id, sql) in MIGRATIONS {
-        let exists: bool = sqlx::query("SELECT EXISTS(SELECT 1 FROM _migrations WHERE id = $1)")
-            .bind(id)
-            .fetch_one(pool)
-            .await?
-            .try_get(0)?;
-        if exists {
-            debug!(migration = %id, "skip (already applied)");
-            continue;
-        }
-        info!(migration = %id, "applying");
-        let mut tx = pool.begin().await?;
-        sqlx::raw_sql(sql).execute(&mut *tx).await?;
-        sqlx::query("INSERT INTO _migrations(id) VALUES ($1)")
-            .bind(id)
-            .execute(&mut *tx)
-            .await?;
-        tx.commit().await?;
-    }
+    info!("home-assistant: applying 0001_init.sql");
+    sqlx::raw_sql(include_str!("../migrations/0001_init.sql"))
+        .execute(pool)
+        .await?;
 
     Ok(())
 }

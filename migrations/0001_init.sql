@@ -1,4 +1,4 @@
--- Home Assistant integration: instance config + local rooms
+-- HA app schema. Single-file init. CREATE … IF NOT EXISTS for idempotency.
 
 CREATE TABLE IF NOT EXISTS instances (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -11,21 +11,19 @@ CREATE TABLE IF NOT EXISTS instances (
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- v1 only allows one row in instances; enforced in application layer.
-
 CREATE TABLE IF NOT EXISTS rooms (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    instance_id     UUID NOT NULL REFERENCES instances(id) ON DELETE CASCADE,
     name            TEXT NOT NULL,
     icon            TEXT,
     accent          TEXT,
     sort_order      INTEGER NOT NULL DEFAULT 0,
-    -- when NULL the room was hand-created locally; when set it mirrors a HA area_id
-    ha_area_id      TEXT UNIQUE,
+    ha_area_id      TEXT,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (instance_id, ha_area_id)
 );
-
-CREATE INDEX IF NOT EXISTS rooms_sort_order_idx ON rooms (sort_order);
+CREATE INDEX IF NOT EXISTS rooms_instance_sort_idx ON rooms (instance_id, sort_order);
 
 CREATE TABLE IF NOT EXISTS room_entities (
     room_id         UUID NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
@@ -33,15 +31,30 @@ CREATE TABLE IF NOT EXISTS room_entities (
     sort_order      INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (room_id, entity_id)
 );
-
 CREATE INDEX IF NOT EXISTS room_entities_entity_id_idx ON room_entities (entity_id);
 
--- Per-entity overrides (custom name / hide / favourite). Sparse table.
 CREATE TABLE IF NOT EXISTS entity_overrides (
-    entity_id       TEXT PRIMARY KEY,
-    custom_name     TEXT,
+    instance_id     UUID NOT NULL REFERENCES instances(id) ON DELETE CASCADE,
+    entity_id       TEXT NOT NULL,
+    display_name    TEXT,
     custom_icon     TEXT,
+    area_id         UUID REFERENCES rooms(id) ON DELETE SET NULL,
     hidden          BOOLEAN NOT NULL DEFAULT FALSE,
-    favourite       BOOLEAN NOT NULL DEFAULT FALSE,
-    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    is_favorite     BOOLEAN NOT NULL DEFAULT FALSE,
+    favorite_order  INTEGER NOT NULL DEFAULT 0,
+    size            TEXT
+                        CHECK (size IS NULL OR size IN ('small','medium','large')),
+    sort_order      INTEGER NOT NULL DEFAULT 0,
+    entity_category TEXT,
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (instance_id, entity_id)
 );
+CREATE INDEX IF NOT EXISTS entity_overrides_favorites_idx
+    ON entity_overrides (instance_id, is_favorite, favorite_order)
+    WHERE is_favorite = TRUE;
+CREATE INDEX IF NOT EXISTS entity_overrides_area_idx
+    ON entity_overrides (instance_id, area_id, sort_order)
+    WHERE area_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS entity_overrides_category_idx
+    ON entity_overrides (instance_id, entity_category)
+    WHERE entity_category IS NOT NULL;
