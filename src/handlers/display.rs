@@ -75,6 +75,10 @@ pub struct EntityDisplayUpdate {
     /// the column untouched. Validated to be in `0..=4`.
     #[serde(default, deserialize_with = "deserialize_double_option_i32")]
     pub decimal_places: Option<Option<i32>>,
+    /// Sub-function role within an accessory. `Some(Some(role))` sets it,
+    /// `Some(None)` clears it (set to NULL), `None` leaves the column untouched.
+    #[serde(default, deserialize_with = "deserialize_double_option_string")]
+    pub sub_function_role: Option<Option<String>>,
 }
 
 fn deserialize_double_option_i32<'de, D>(deserializer: D) -> Result<Option<Option<i32>>, D::Error>
@@ -115,6 +119,7 @@ pub struct EntityDisplayDto {
     pub group_id: Option<String>,
     pub group_primary: bool,
     pub decimal_places: Option<i32>,
+    pub sub_function_role: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -188,6 +193,8 @@ pub async fn update_display(
     let area_id_value = req.area_id.unwrap_or(None);
     let set_decimal_places = req.decimal_places.is_some();
     let decimal_places_value = req.decimal_places.unwrap_or(None);
+    let set_sub_function_role = req.sub_function_role.is_some();
+    let sub_function_role_value = req.sub_function_role.unwrap_or(None);
     let size_str = req.size.map(|s| s.as_db());
 
     // Wrap promote-then-upsert in a single transaction so a race between
@@ -226,7 +233,7 @@ pub async fn update_display(
                 instance_id, entity_id,
                 display_name, custom_icon, area_id,
                 hidden, size, is_favorite, favorite_order, sort_order,
-                collapsed, group_primary, decimal_places
+                collapsed, group_primary, decimal_places, sub_function_role
            ) VALUES (
                 $1, $2,
                 $4, $6, $8,
@@ -237,24 +244,26 @@ pub async fn update_display(
                 COALESCE($13, 0),
                 COALESCE($14, FALSE),
                 COALESCE($15, TRUE),
-                CASE WHEN $16 THEN $17 ELSE NULL END
+                CASE WHEN $16 THEN $17 ELSE NULL END,
+                $19
            )
            ON CONFLICT (instance_id, entity_id) DO UPDATE SET
-                display_name   = CASE WHEN $3 THEN $4  ELSE entity_overrides.display_name END,
-                custom_icon    = CASE WHEN $5 THEN $6  ELSE entity_overrides.custom_icon  END,
-                area_id        = CASE WHEN $7 THEN $8  ELSE entity_overrides.area_id      END,
-                hidden         = COALESCE($9,  entity_overrides.hidden),
-                size           = COALESCE($10, entity_overrides.size),
-                is_favorite    = COALESCE($11, entity_overrides.is_favorite),
-                favorite_order = COALESCE($12, entity_overrides.favorite_order),
-                sort_order     = COALESCE($13, entity_overrides.sort_order),
-                collapsed      = COALESCE($14, entity_overrides.collapsed),
-                group_primary  = COALESCE($15, entity_overrides.group_primary),
-                decimal_places = CASE WHEN $16 THEN $17 ELSE entity_overrides.decimal_places END,
-                updated_at     = NOW()
+                display_name      = CASE WHEN $3 THEN $4  ELSE entity_overrides.display_name END,
+                custom_icon       = CASE WHEN $5 THEN $6  ELSE entity_overrides.custom_icon  END,
+                area_id           = CASE WHEN $7 THEN $8  ELSE entity_overrides.area_id      END,
+                hidden            = COALESCE($9,  entity_overrides.hidden),
+                size              = COALESCE($10, entity_overrides.size),
+                is_favorite       = COALESCE($11, entity_overrides.is_favorite),
+                favorite_order    = COALESCE($12, entity_overrides.favorite_order),
+                sort_order        = COALESCE($13, entity_overrides.sort_order),
+                collapsed         = COALESCE($14, entity_overrides.collapsed),
+                group_primary     = COALESCE($15, entity_overrides.group_primary),
+                decimal_places    = CASE WHEN $16 THEN $17 ELSE entity_overrides.decimal_places END,
+                sub_function_role = CASE WHEN $18 THEN $19 ELSE entity_overrides.sub_function_role END,
+                updated_at        = NOW()
            RETURNING entity_id, display_name, custom_icon, area_id,
                      hidden, size, is_favorite, favorite_order, sort_order,
-                     collapsed, group_id, group_primary, decimal_places"#,
+                     collapsed, group_id, group_primary, decimal_places, sub_function_role"#,
     )
     .bind(instance_id)
     .bind(&entity_id)
@@ -273,6 +282,8 @@ pub async fn update_display(
     .bind(req.group_primary)
     .bind(set_decimal_places)
     .bind(decimal_places_value)
+    .bind(set_sub_function_role)
+    .bind(&sub_function_role_value)
     .fetch_one(&mut *tx)
     .await?;
 
@@ -296,6 +307,7 @@ pub async fn update_display(
             group_id: r.get("group_id"),
             group_primary: r.get("group_primary"),
             decimal_places: r.get("decimal_places"),
+            sub_function_role: r.get("sub_function_role"),
         };
         instance.override_cache.insert(entity_id.clone(), snapshot);
 
@@ -363,6 +375,7 @@ pub async fn update_display(
         group_id: r.get("group_id"),
         group_primary: r.get("group_primary"),
         decimal_places: r.get("decimal_places"),
+        sub_function_role: r.get("sub_function_role"),
     }))
 }
 

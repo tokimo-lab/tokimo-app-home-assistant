@@ -118,6 +118,10 @@ pub struct OverrideSnapshot {
     /// most numeric domains, 0 for percentage-style values). Set via the
     /// Accessory Settings page; nulled out to revert to default.
     pub decimal_places: Option<i32>,
+    /// Sub-function role within an accessory. `None` = normal sub-function
+    /// (shown in detail card). `Some("hidden_in_aggregate")` = user marked
+    /// as hidden within the accessory context.
+    pub sub_function_role: Option<String>,
 }
 
 /// Events broadcast to SSE subscribers.

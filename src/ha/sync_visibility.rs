@@ -288,38 +288,56 @@ impl HaEntityRegistryEntry {
         None
     }
 
-    /// Domain priority for primary selection within an accessory.
-    /// Lower value = higher priority.
-    fn domain_priority(&self) -> u8 {
-        match self.domain.as_str() {
-            "light" => 0,
-            "climate" => 1,
-            "cover" => 2,
-            "media_player" => 3,
-            "fan" => 4,
-            "lock" => 5,
-            "switch" => 6,
-            "input_boolean" => 7,
-            "sensor" => 8,
-            "binary_sensor" => 9,
-            _ => 10,
-        }
-    }
-
     /// Sort key for primary selection within an accessory. Lower rank wins.
     /// Order: domain priority, then most supported_features, then shortest
     /// friendly_name, then entity_id.
     fn primary_sort_key(&self) -> (u8, i64, usize, &str) {
-        let priority = self.domain_priority();
-        // Negate count_ones to sort descending (more features = lower sort key)
-        let features = 0 - (self.supported_features.unwrap_or(0).count_ones() as i64);
-        let name_len = self
-            .friendly_name
-            .as_ref()
-            .map(|s| s.chars().count())
-            .unwrap_or(usize::MAX);
-        (priority, features, name_len, self.entity_id.as_str())
+        primary_sort_key(
+            &self.domain,
+            self.supported_features.unwrap_or(0),
+            self.friendly_name.as_deref(),
+            &self.entity_id,
+        )
     }
+}
+
+/// Domain priority for primary selection within an accessory.
+/// Lower value = higher priority.
+///
+/// Exported for use in accessory member management endpoints (add/remove member
+/// operations that need to re-elect a primary when the current one leaves).
+pub fn domain_priority(domain: &str) -> u8 {
+    match domain {
+        "light" => 0,
+        "climate" => 1,
+        "cover" => 2,
+        "media_player" => 3,
+        "fan" => 4,
+        "lock" => 5,
+        "switch" => 6,
+        "input_boolean" => 7,
+        "sensor" => 8,
+        "binary_sensor" => 9,
+        _ => 10,
+    }
+}
+
+/// Sort key for primary selection within an accessory. Lower rank wins.
+/// Order: domain priority, then most supported_features, then shortest
+/// friendly_name, then entity_id.
+///
+/// Exported for use in accessory member management endpoints.
+pub fn primary_sort_key<'a>(
+    domain: &str,
+    supported_features: i64,
+    friendly_name: Option<&'a str>,
+    entity_id: &'a str,
+) -> (u8, i64, usize, &'a str) {
+    let priority = domain_priority(domain);
+    // Negate count_ones to sort descending (more features = lower sort key)
+    let features = 0 - (supported_features.count_ones() as i64);
+    let name_len = friendly_name.map(|s| s.chars().count()).unwrap_or(usize::MAX);
+    (priority, features, name_len, entity_id)
 }
 
 /// Per-entity decision baked at first import.
@@ -738,7 +756,7 @@ mod tests {
     fn domain_priority_light_beats_switch() {
         let light = entry("light.a");
         let switch = entry("switch.b");
-        assert!(light.domain_priority() < switch.domain_priority());
+        assert!(domain_priority(&light.domain) < domain_priority(&switch.domain));
     }
 
     #[test]

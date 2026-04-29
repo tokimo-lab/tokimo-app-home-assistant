@@ -77,7 +77,7 @@ pub async fn spawn(service: &str, ctx: Arc<AppCtx>) -> anyhow::Result<DataPlaneS
 }
 
 fn build_router(ctx: Arc<AppCtx>) -> Router {
-    use handlers::{camera, display, entities, groups, instances, rooms, services, sse, summary};
+    use handlers::{accessories, camera, display, entities, groups, instances, rooms, services, sse, summary};
 
     Router::new()
         // ── Instance CRUD ─────────────────────────────────────────────────
@@ -102,6 +102,20 @@ fn build_router(ctx: Arc<AppCtx>) -> Router {
             "/instances/{id}/entities/groups/{group_id}",
             get(groups::list_by_group),
         )
+        // ── Accessories (accessory members management) ──────────────────
+        .route(
+            "/instances/{id}/accessories/{group_id}",
+            get(accessories::list_members),
+        )
+        .route(
+            "/instances/{id}/accessories/{group_id}/members",
+            post(accessories::add_member),
+        )
+        .route(
+            "/instances/{id}/accessories/{group_id}/members/{entity_id}",
+            delete(accessories::remove_member),
+        )
+        // ─────────────────────────────────────────────────────────────────
         .route(
             "/instances/{id}/entities/{entity_id}/override",
             post(entities::upsert_override),
