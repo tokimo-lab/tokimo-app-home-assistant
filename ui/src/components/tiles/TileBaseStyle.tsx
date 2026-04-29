@@ -12,9 +12,9 @@ import {
 
 const INNER_LAYOUT_TRANSITION = {
   type: "spring",
-  stiffness: 380,
-  damping: 32,
-  mass: 0.8,
+  stiffness: 220,
+  damping: 28,
+  mass: 1,
 } as const;
 
 const LONG_PRESS_MS = 500;

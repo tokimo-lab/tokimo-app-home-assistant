@@ -46,9 +46,9 @@ const SIZE_SPAN: Record<EntitySize, string> = {
 
 const LAYOUT_SPRING = {
   type: "spring",
-  stiffness: 380,
-  damping: 32,
-  mass: 0.8,
+  stiffness: 220,
+  damping: 28,
+  mass: 1,
 } as const;
 
 /**
