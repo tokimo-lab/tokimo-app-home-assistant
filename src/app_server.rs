@@ -77,7 +77,7 @@ pub async fn spawn(service: &str, ctx: Arc<AppCtx>) -> anyhow::Result<DataPlaneS
 }
 
 fn build_router(ctx: Arc<AppCtx>) -> Router {
-    use handlers::{camera, display, entities, instances, rooms, services, sse, summary};
+    use handlers::{camera, display, entities, groups, instances, rooms, services, sse, summary};
 
     Router::new()
         // ── Instance CRUD ─────────────────────────────────────────────────
@@ -98,6 +98,10 @@ fn build_router(ctx: Arc<AppCtx>) -> Router {
         // ── Entities ─────────────────────────────────────────────────────
         .route("/instances/{id}/entities", get(entities::list))
         .route("/instances/{id}/entities/{entity_id}", get(entities::get))
+        .route(
+            "/instances/{id}/entities/groups/{group_id}",
+            get(groups::list_by_group),
+        )
         .route(
             "/instances/{id}/entities/{entity_id}/override",
             post(entities::upsert_override),

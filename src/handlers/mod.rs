@@ -12,6 +12,7 @@
 pub mod camera;
 pub mod display;
 pub mod entities;
+pub mod groups;
 pub mod instances;
 pub mod rooms;
 pub mod services;
