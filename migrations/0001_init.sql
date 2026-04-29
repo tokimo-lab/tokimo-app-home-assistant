@@ -83,3 +83,9 @@ ALTER TABLE entity_overrides
   ADD COLUMN IF NOT EXISTS group_id TEXT;
 ALTER TABLE entity_overrides
   ADD COLUMN IF NOT EXISTS group_primary BOOLEAN NOT NULL DEFAULT TRUE;
+
+-- Idempotent migration: add sub_function_role for accessory member
+-- annotation. NULL means default sub-function behavior.
+ALTER TABLE entity_overrides
+  ADD COLUMN IF NOT EXISTS sub_function_role TEXT
+    CHECK (sub_function_role IS NULL OR sub_function_role IN ('hidden_in_aggregate','promoted_to_tile'));

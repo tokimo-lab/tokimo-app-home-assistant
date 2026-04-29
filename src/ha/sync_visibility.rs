@@ -2,21 +2,16 @@
 //! onto `entity_overrides`.
 //!
 //! Strategy: for every HA entity we know about, compute the four "default
-//! presentation" fields and `INSERT ... ON CONFLICT DO UPDATE`. The
-//! UPDATE branch unconditionally rewrites `collapsed` / `group_id` /
-//! `group_primary` from the latest domain rule on every sync. There is
-//! no version gate — re-syncing intentionally resets user manual
-//! `collapsed` toggles back to the domain default. This is acceptable
-//! for the test environment; if persistent user overrides become a
-//! requirement later, gate the UPDATE explicitly.
+//! presentation" fields and `INSERT ... ON CONFLICT DO NOTHING`. Existing
+//! rows are left unchanged to preserve user manual adjustments. Only new
+//! entities get the computed default values.
 //!
 //! Why seal in DB instead of recomputing per-render in the frontend:
 //!   * The frontend used to run a chain of dynamic filters (noise keyword
 //!     match, domain-tier demotion, dedup-by-device) on every render which
 //!     made debugging "where did 次卧灯 go?" extremely hard.
 //!   * Persisting the decision means user can override any one cell by
-//!     hand and the override sticks across reconnects / refreshes
-//!     (until the next full sync).
+//!     hand and the override sticks across reconnects / refreshes.
 //!
 //! The default rules:
 //!   * `hidden` — `entity_category` ∈ {`diagnostic`, `config`}.
@@ -25,13 +20,19 @@
 //!     trigger-style domains (`sensor`, `binary_sensor`, `automation`,
 //!     `script`, `scene`, …) default collapsed. Plus a per-entity
 //!     name-keyword demotion for noise switches.
-//!   * `group_id` — `device::{device_id}::{domain}` when device_id is known,
-//!     else `name::{normalized_name}::{domain}`, else `None` (singleton).
-//!   * `group_primary` — within a group, the entity with the most features
-//!     wins. See `primary_sort_key` for the full sort key.
+//!   * `group_id` (Accessory ID) — three-layer fallback:
+//!     1. Same device_id → `device::{device_id}` (no domain suffix)
+//!     2. Same via_device + area → `via::{root_device_id}::{area_id}`
+//!     3. Same area + LCP clustering → `name::{base_sha1}::{area_id}`
+//!     4. None of above → `None` (singleton)
+//!   * `group_primary` — within an accessory, the entity with the highest
+//!     domain priority (light > climate > cover > media_player > fan >
+//!     lock > switch > input_boolean > sensor > binary_sensor > others),
+//!     then most supported_features, then shortest friendly_name wins.
 
 use std::collections::HashMap;
 
+use sha1::{Digest, Sha1};
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -181,15 +182,15 @@ pub struct HaEntityRegistryEntry {
     /// HA entity category: `"diagnostic"`, `"config"`, or `None` for normal entities.
     pub entity_category: Option<String>,
     pub device_id: Option<String>,
+    /// The parent device this entity's device is connected through (hub/gateway).
+    pub via_device_id: Option<String>,
     pub friendly_name: Option<String>,
     /// `entity_id` prefix before the dot. Always present (lowercase).
     pub domain: String,
     pub supported_features: Option<i64>,
     pub attribute_count: Option<i32>,
     /// Effective area: entity-level `area_id` if set, else inherited from
-    /// the device's area. `None` for unassigned entities. Used purely for
-    /// per-(area, domain) K-cap; not persisted (the user-overridable area
-    /// lives on `entity_overrides.area_id` keyed by tokimo room UUID).
+    /// the device's area. `None` for unassigned entities.
     pub area_id: Option<String>,
 }
 
@@ -205,6 +206,11 @@ impl HaEntityRegistryEntry {
             .and_then(|c| c.as_str())
             .filter(|s| !s.is_empty())
             .map(str::to_string);
+        let via_device_id = v
+            .get("via_device_id")
+            .and_then(|c| c.as_str())
+            .filter(|s| !s.is_empty())
+            .map(str::to_string);
         let area_id = v
             .get("area_id")
             .and_then(|c| c.as_str())
@@ -214,6 +220,7 @@ impl HaEntityRegistryEntry {
             entity_id,
             entity_category,
             device_id,
+            via_device_id,
             friendly_name: None,
             domain,
             supported_features: None,
@@ -269,31 +276,49 @@ impl HaEntityRegistryEntry {
         false
     }
 
-    /// Compute the group identifier used to dedupe duplicate entities that
-    /// belong to the same physical device + domain. Returns `None` for
-    /// "no group" — the entity is its own primary.
+    /// Compute the group identifier (accessory ID) using Layer 1 only:
+    /// Same device_id → `device::{device_id}` (no domain, allowing cross-domain aggregation)
+    /// This is used in tests and as part of the layer-1 logic.
+    #[cfg(test)]
     fn compute_group_id(&self) -> Option<String> {
+        // Layer 1: Same device_id
         if let Some(device_id) = &self.device_id {
-            return Some(format!("device::{}::{}", device_id, self.domain));
-        }
-        if let Some(name) = &self.friendly_name {
-            let normalized = name.trim().to_lowercase();
-            if !normalized.is_empty() {
-                return Some(format!("name::{}::{}", normalized, self.domain));
-            }
+            return Some(format!("device::{}", device_id));
         }
         None
     }
 
-    /// Sort key for primary selection within a group. Higher rank wins.
-    /// Order: most supported_features bits, then most attributes, then
-    /// shortest friendly_name, then shortest entity_id, then lex entity_id.
-    fn primary_sort_key(&self) -> (i32, i32, i32, i32, &str) {
-        let bits = self.supported_features.map(|v| -(v.count_ones() as i32)).unwrap_or(0);
-        let attrs = -self.attribute_count.unwrap_or(0);
-        let name_len = self.friendly_name.as_ref().map(|s| s.len() as i32).unwrap_or(i32::MAX);
-        let eid_len = self.entity_id.len() as i32;
-        (bits, attrs, name_len, eid_len, self.entity_id.as_str())
+    /// Domain priority for primary selection within an accessory.
+    /// Lower value = higher priority.
+    fn domain_priority(&self) -> u8 {
+        match self.domain.as_str() {
+            "light" => 0,
+            "climate" => 1,
+            "cover" => 2,
+            "media_player" => 3,
+            "fan" => 4,
+            "lock" => 5,
+            "switch" => 6,
+            "input_boolean" => 7,
+            "sensor" => 8,
+            "binary_sensor" => 9,
+            _ => 10,
+        }
+    }
+
+    /// Sort key for primary selection within an accessory. Lower rank wins.
+    /// Order: domain priority, then most supported_features, then shortest
+    /// friendly_name, then entity_id.
+    fn primary_sort_key(&self) -> (u8, i64, usize, &str) {
+        let priority = self.domain_priority();
+        // Negate count_ones to sort descending (more features = lower sort key)
+        let features = 0 - (self.supported_features.unwrap_or(0).count_ones() as i64);
+        let name_len = self
+            .friendly_name
+            .as_ref()
+            .map(|s| s.chars().count())
+            .unwrap_or(usize::MAX);
+        (priority, features, name_len, self.entity_id.as_str())
     }
 }
 
@@ -305,6 +330,79 @@ struct Decision {
     group_primary: bool,
 }
 
+/// Union-Find data structure for clustering entities.
+struct UnionFind {
+    parent: Vec<usize>,
+    rank: Vec<usize>,
+}
+
+impl UnionFind {
+    fn new(size: usize) -> Self {
+        Self {
+            parent: (0..size).collect(),
+            rank: vec![0; size],
+        }
+    }
+
+    fn find(&mut self, x: usize) -> usize {
+        if self.parent[x] != x {
+            self.parent[x] = self.find(self.parent[x]);
+        }
+        self.parent[x]
+    }
+
+    fn union(&mut self, x: usize, y: usize) {
+        let root_x = self.find(x);
+        let root_y = self.find(y);
+        if root_x == root_y {
+            return;
+        }
+        match self.rank[root_x].cmp(&self.rank[root_y]) {
+            std::cmp::Ordering::Less => self.parent[root_x] = root_y,
+            std::cmp::Ordering::Greater => self.parent[root_y] = root_x,
+            std::cmp::Ordering::Equal => {
+                self.parent[root_y] = root_x;
+                self.rank[root_x] += 1;
+            }
+        }
+    }
+
+    fn clusters(&mut self) -> HashMap<usize, Vec<usize>> {
+        let mut clusters: HashMap<usize, Vec<usize>> = HashMap::new();
+        for i in 0..self.parent.len() {
+            let root = self.find(i);
+            clusters.entry(root).or_default().push(i);
+        }
+        clusters
+    }
+}
+
+/// Compute longest common prefix (LCP) of two strings, char-level.
+/// Supports Chinese, Latin, and mixed text.
+fn longest_common_prefix(a: &str, b: &str) -> String {
+    a.chars()
+        .zip(b.chars())
+        .take_while(|(ca, cb)| ca == cb)
+        .map(|(c, _)| c)
+        .collect()
+}
+
+/// Count characters in a string (not bytes).
+fn char_count(s: &str) -> usize {
+    s.chars().count()
+}
+
+/// Check if a character is Chinese (CJK Unified Ideographs).
+fn is_chinese_char(c: char) -> bool {
+    matches!(c, '\u{4E00}'..='\u{9FFF}')
+}
+
+/// Trim trailing whitespace and separators from a string.
+fn trim_suffix(s: &str) -> String {
+    s.trim_end_matches(|c: char| c.is_whitespace() || "·｜-/：　".contains(c))
+        .to_string()
+}
+
 /// Outcome of a single sync pass, useful for logging / tests.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct SyncStats {
@@ -312,34 +410,149 @@ pub struct SyncStats {
     pub skipped_existing: usize,
 }
 
-/// Pure in-memory passes (1, 2) that turn `entries` into per-entity
-/// `Decision`s. Extracted from `sync_default_visibility_and_grouping` so
-/// the heuristic can be unit-tested without spinning up Postgres.
+/// Pure in-memory passes that turn `entries` into per-entity `Decision`s.
+/// Implements three-layer fallback for group_id:
+/// 1. Same device_id (no domain suffix) → cross-domain aggregation
+/// 2. Same via_device + area → hub-based aggregation
+/// 3. Same area + LCP clustering → name-based aggregation
+/// 4. None of above → singleton
 fn compute_decisions(entries: &[HaEntityRegistryEntry]) -> Vec<Decision> {
-    // Pass 1: per-entity (hidden, collapsed, group_id).
-    let mut groups: HashMap<String, Vec<usize>> = HashMap::new();
-    let mut decisions: Vec<Decision> = Vec::with_capacity(entries.len());
-    for (idx, e) in entries.iter().enumerate() {
-        let group_id = e.compute_group_id();
-        if let Some(g) = &group_id {
-            groups.entry(g.clone()).or_default().push(idx);
-        }
-        decisions.push(Decision {
+    let mut decisions: Vec<Decision> = entries
+        .iter()
+        .map(|e| Decision {
             hidden: e.default_hidden(),
             collapsed: e.default_collapsed(),
-            group_id,
+            group_id: None,
             group_primary: true,
-        });
+        })
+        .collect();
+
+    // Layer 1: Device-based grouping (no domain suffix)
+    let mut device_groups: HashMap<String, Vec<usize>> = HashMap::new();
+    for (idx, e) in entries.iter().enumerate() {
+        if let Some(device_id) = &e.device_id {
+            let group_id = format!("device::{}", device_id);
+            decisions[idx].group_id = Some(group_id.clone());
+            device_groups.entry(group_id).or_default().push(idx);
+        }
     }
 
-    // Pass 2: within each group, demote non-primaries.
-    for member_idxs in groups.values() {
+    // Layer 2: Via-device grouping (hub-based, same area)
+    let mut via_groups: HashMap<String, Vec<usize>> = HashMap::new();
+    for (idx, e) in entries.iter().enumerate() {
+        if decisions[idx].group_id.is_some() {
+            continue; // Already grouped by device_id
+        }
+        if let (Some(via_device), Some(area)) = (&e.via_device_id, &e.area_id) {
+            let group_id = format!("via::{}::{}", via_device, area);
+            decisions[idx].group_id = Some(group_id.clone());
+            via_groups.entry(group_id).or_default().push(idx);
+        }
+    }
+
+    // Layer 3: LCP clustering per area
+    let mut area_entities: HashMap<String, Vec<usize>> = HashMap::new();
+    for (idx, e) in entries.iter().enumerate() {
+        if decisions[idx].group_id.is_some() {
+            continue; // Already grouped
+        }
+        if let Some(area) = &e.area_id {
+            area_entities.entry(area.clone()).or_default().push(idx);
+        }
+    }
+
+    for (area, indices) in area_entities.iter() {
+        if indices.len() < 2 {
+            continue; // No clustering needed for single entity
+        }
+
+        // Build Union-Find for this area
+        let mut uf = UnionFind::new(indices.len());
+
+        // Compare all pairs for LCP
+        for i in 0..indices.len() {
+            for j in (i + 1)..indices.len() {
+                let idx_a = indices[i];
+                let idx_b = indices[j];
+                let name_a = entries[idx_a].friendly_name.as_deref().unwrap_or("");
+                let name_b = entries[idx_b].friendly_name.as_deref().unwrap_or("");
+
+                if name_a.is_empty() || name_b.is_empty() {
+                    continue;
+                }
+
+                let lcp = longest_common_prefix(name_a, name_b);
+                let lcp_len = char_count(&lcp);
+                let shorter_len = char_count(name_a).min(char_count(name_b));
+
+                // Check threshold: LCP ≥ 50% of shorter name
+                if shorter_len == 0 {
+                    continue;
+                }
+                let ratio = (lcp_len * 100) / shorter_len;
+
+                // Minimum length check: ≥2 Chinese chars or ≥3 Latin chars
+                let min_len = if lcp.chars().any(is_chinese_char) { 2 } else { 3 };
+
+                if lcp_len >= min_len && ratio >= 50 {
+                    uf.union(i, j);
+                }
+            }
+        }
+
+        // Extract clusters (size ≥ 2)
+        let clusters = uf.clusters();
+        for (_, cluster) in clusters {
+            if cluster.len() < 2 {
+                continue;
+            }
+
+            // Compute base name: LCP of all members in cluster
+            let mut base_name = entries[indices[cluster[0]]]
+                .friendly_name
+                .as_deref()
+                .unwrap_or("")
+                .to_string();
+            for &local_idx in cluster.iter().skip(1) {
+                let global_idx = indices[local_idx];
+                let name = entries[global_idx].friendly_name.as_deref().unwrap_or("");
+                base_name = longest_common_prefix(&base_name, name);
+            }
+            base_name = trim_suffix(&base_name);
+
+            if base_name.is_empty() {
+                continue;
+            }
+
+            // Generate group_id: sha1(base_name::area_id).truncate(16)
+            let input = format!("{}::{}", base_name, area);
+            let hash = Sha1::digest(input.as_bytes());
+            let hash_hex = format!("{:x}", hash);
+            let group_id = format!("name::{}", &hash_hex[..16.min(hash_hex.len())]);
+
+            // Assign group_id to all cluster members
+            for &local_idx in &cluster {
+                let global_idx = indices[local_idx];
+                decisions[global_idx].group_id = Some(group_id.clone());
+            }
+
+            // Add to groups for primary selection
+            via_groups.insert(group_id, cluster.iter().map(|&i| indices[i]).collect());
+        }
+    }
+
+    // Collect all groups for primary selection
+    let mut all_groups = device_groups;
+    all_groups.extend(via_groups);
+
+    // Primary selection: within each group, pick the best entity
+    for member_idxs in all_groups.values() {
         if member_idxs.len() <= 1 {
             continue;
         }
-        let mut ranked: Vec<usize> = member_idxs.clone();
-        ranked.sort_by(|&a, &b| entries[a].primary_sort_key().cmp(&entries[b].primary_sort_key()));
-        // First entry in ranked = primary; rest = demoted.
+        let mut ranked = member_idxs.clone();
+        ranked.sort_by_key(|&idx| entries[idx].primary_sort_key());
+        // First = primary, rest = secondary
         for &idx in ranked.iter().skip(1) {
             decisions[idx].group_primary = false;
         }
@@ -349,12 +562,8 @@ fn compute_decisions(entries: &[HaEntityRegistryEntry]) -> Vec<Decision> {
 }
 
 /// Sync default visibility / grouping: insert (hidden, collapsed, group_id,
-/// group_primary) for every HA entity. Existing rows have their
-/// `collapsed` / `group_id` / `group_primary` unconditionally rewritten
-/// from the latest domain rule on every sync — there is no version gate.
-/// User manual toggles via `PATCH /entities/:eid/display` are made AFTER
-/// import; subsequent re-imports will reset them. This is intentional for
-/// the test environment.
+/// group_primary) for every HA entity. Uses `INSERT ... ON CONFLICT DO NOTHING`
+/// to preserve user manual adjustments. Only new entities get computed defaults.
 pub async fn sync_default_visibility_and_grouping(
     pool: &PgPool,
     instance_id: Uuid,
@@ -366,7 +575,7 @@ pub async fn sync_default_visibility_and_grouping(
 
     let decisions = compute_decisions(&entries);
 
-    // Pass 3: persist. Single transaction, INSERT ... ON CONFLICT DO UPDATE.
+    // Pass 3: persist. Single transaction, INSERT ... ON CONFLICT DO NOTHING.
     let mut tx = pool.begin().await?;
     let mut inserted = 0usize;
     let mut skipped = 0usize;
@@ -377,10 +586,7 @@ pub async fn sync_default_visibility_and_grouping(
                 instance_id, entity_id, hidden, entity_category, \
                 collapsed, group_id, group_primary \
              ) VALUES ($1, $2, $3, $4, $5, $6, $7) \
-             ON CONFLICT (instance_id, entity_id) DO UPDATE SET \
-                collapsed = EXCLUDED.collapsed, \
-                group_id = EXCLUDED.group_id, \
-                group_primary = EXCLUDED.group_primary",
+             ON CONFLICT (instance_id, entity_id) DO NOTHING",
         )
         .bind(instance_id)
         .bind(&e.entity_id)
@@ -417,6 +623,7 @@ mod tests {
             entity_id: eid.to_string(),
             entity_category: None,
             device_id: None,
+            via_device_id: None,
             friendly_name: None,
             domain: eid.split('.').next().unwrap().to_string(),
             supported_features: None,
@@ -482,31 +689,34 @@ mod tests {
     }
 
     #[test]
-    fn group_id_prefers_device_id() {
+    fn group_id_layer1_same_device_no_domain() {
         let mut e = entry("light.foo");
         e.device_id = Some("dev123".into());
-        e.friendly_name = Some("Foo Lamp".into());
-        assert_eq!(e.compute_group_id().as_deref(), Some("device::dev123::light"));
+        assert_eq!(e.compute_group_id().as_deref(), Some("device::dev123"));
+
+        // Cross-domain: same device should group
+        let mut switch = entry("switch.bar");
+        switch.device_id = Some("dev123".into());
+        assert_eq!(switch.compute_group_id().as_deref(), Some("device::dev123"));
     }
 
     #[test]
-    fn group_id_falls_back_to_name() {
-        let mut e = entry("light.foo");
-        e.friendly_name = Some("  Bedroom Light  ".into());
-        assert_eq!(e.compute_group_id().as_deref(), Some("name::bedroom light::light"));
-    }
-
-    #[test]
-    fn group_id_none_without_name_or_device() {
+    fn group_id_none_without_device_or_via() {
         let e = entry("light.foo");
         assert!(e.compute_group_id().is_none());
     }
 
     #[test]
-    fn from_json_extracts_device_id() {
-        let v = json!({"entity_id": "light.kitchen", "device_id": "abc", "entity_category": null});
+    fn from_json_extracts_device_id_and_via_device() {
+        let v = json!({
+            "entity_id": "light.kitchen",
+            "device_id": "abc",
+            "via_device_id": "hub123",
+            "entity_category": null
+        });
         let e = HaEntityRegistryEntry::from_json(&v).unwrap();
         assert_eq!(e.device_id.as_deref(), Some("abc"));
+        assert_eq!(e.via_device_id.as_deref(), Some("hub123"));
         assert_eq!(e.domain, "light");
     }
 
@@ -525,46 +735,244 @@ mod tests {
     }
 
     #[test]
-    fn primary_election_picks_richest_entity() {
-        let mut a = entry("light.a");
-        a.friendly_name = Some("Lamp".into());
-        a.supported_features = Some(0b111); // 3 bits
-        a.attribute_count = Some(5);
-
-        let mut b = entry("light.b");
-        b.friendly_name = Some("Lamp".into());
-        b.supported_features = Some(0b1); // 1 bit
-        b.attribute_count = Some(2);
-
-        // a should outrank b
-        assert!(a.primary_sort_key() < b.primary_sort_key());
+    fn domain_priority_light_beats_switch() {
+        let light = entry("light.a");
+        let switch = entry("switch.b");
+        assert!(light.domain_priority() < switch.domain_priority());
     }
 
     #[test]
-    fn from_json_extracts_area_id() {
-        let v = json!({"entity_id": "light.kitchen", "area_id": "kitchen"});
-        let e = HaEntityRegistryEntry::from_json(&v).unwrap();
-        assert_eq!(e.area_id.as_deref(), Some("kitchen"));
+    fn primary_election_picks_by_domain_then_features() {
+        let mut light = entry("light.a");
+        light.friendly_name = Some("Lamp".into());
+        light.supported_features = Some(0b1); // 1 bit
 
-        let v2 = json!({"entity_id": "light.kitchen", "area_id": ""});
-        let e2 = HaEntityRegistryEntry::from_json(&v2).unwrap();
-        assert!(e2.area_id.is_none());
+        let mut switch = entry("switch.b");
+        switch.friendly_name = Some("Lamp".into());
+        switch.supported_features = Some(0b111); // 3 bits
+
+        // light domain priority beats switch even with fewer features
+        assert!(light.primary_sort_key() < switch.primary_sort_key());
+    }
+
+    #[test]
+    fn lcp_chinese_mixed() {
+        assert_eq!(
+            longest_common_prefix("次卧吸顶灯 灯", "次卧吸顶灯 凌动开关"),
+            "次卧吸顶灯 "
+        );
+        assert_eq!(
+            longest_common_prefix("Living Room Light", "Living Room Switch"),
+            "Living Room "
+        );
+        assert_eq!(longest_common_prefix("客厅灯", "客厅窗帘"), "客厅");
+    }
+
+    #[test]
+    fn char_count_works_for_chinese() {
+        assert_eq!(char_count("次卧吸顶灯"), 5);
+        assert_eq!(char_count("abc"), 3);
+        assert_eq!(char_count("次ab卧"), 4);
+    }
+
+    #[test]
+    fn is_chinese_char_detection() {
+        assert!(is_chinese_char('次'));
+        assert!(is_chinese_char('灯'));
+        assert!(!is_chinese_char('a'));
+        assert!(!is_chinese_char(' '));
+    }
+
+    #[test]
+    fn trim_suffix_removes_separators() {
+        assert_eq!(trim_suffix("次卧吸顶灯 "), "次卧吸顶灯");
+        assert_eq!(trim_suffix("客厅·"), "客厅");
+        assert_eq!(trim_suffix("Living Room - "), "Living Room");
+    }
+
+    #[test]
+    fn union_find_clusters_pairs() {
+        let mut uf = UnionFind::new(4);
+        uf.union(0, 1);
+        uf.union(2, 3);
+        let clusters = uf.clusters();
+        assert_eq!(clusters.len(), 2);
+    }
+
+    #[test]
+    fn lcp_clustering_same_area_chinese() {
+        let entries = vec![
+            {
+                let mut e = entry("light.a");
+                e.friendly_name = Some("次卧吸顶灯 灯".into());
+                e.area_id = Some("bedroom".into());
+                e
+            },
+            {
+                let mut e = entry("light.b");
+                e.friendly_name = Some("次卧吸顶灯 灯2".into());
+                e.area_id = Some("bedroom".into());
+                e
+            },
+            {
+                let mut e = entry("switch.c");
+                e.friendly_name = Some("次卧吸顶灯 凌动开关".into());
+                e.area_id = Some("bedroom".into());
+                e
+            },
+        ];
+
+        let decisions = compute_decisions(&entries);
+
+        // All three should be grouped (LCP = "次卧吸顶灯", 5 chars, ≥50% threshold)
+        let group_ids: Vec<_> = decisions.iter().filter_map(|d| d.group_id.as_ref()).collect();
+        assert_eq!(group_ids.len(), 3);
+        assert_eq!(group_ids[0], group_ids[1]);
+        assert_eq!(group_ids[1], group_ids[2]);
+
+        // light should be primary (domain priority)
+        assert!(decisions[0].group_primary);
+        assert!(!decisions[1].group_primary);
+        assert!(!decisions[2].group_primary);
+    }
+
+    #[test]
+    fn lcp_clustering_different_area_no_group() {
+        let entries = vec![
+            {
+                let mut e = entry("light.a");
+                e.friendly_name = Some("次卧吸顶灯".into());
+                e.area_id = Some("bedroom".into());
+                e
+            },
+            {
+                let mut e = entry("light.b");
+                e.friendly_name = Some("次卧吸顶灯2".into());
+                e.area_id = Some("kitchen".into());
+                e
+            },
+        ];
+
+        let decisions = compute_decisions(&entries);
+
+        // Different areas should not group
+        assert!(decisions[0].group_id.is_none());
+        assert!(decisions[1].group_id.is_none());
+    }
+
+    #[test]
+    fn lcp_threshold_not_met_no_group() {
+        let entries = vec![
+            {
+                let mut e = entry("light.a");
+                e.friendly_name = Some("客厅吸顶灯".into());
+                e.area_id = Some("living".into());
+                e
+            },
+            {
+                let mut e = entry("cover.b");
+                e.friendly_name = Some("厨房窗帘控制器".into());
+                e.area_id = Some("living".into());
+                e
+            },
+        ];
+
+        let decisions = compute_decisions(&entries);
+
+        // Different prefixes (客厅 vs 厨房), should not group
+        assert!(decisions[0].group_id.is_none());
+        assert!(decisions[1].group_id.is_none());
+    }
+
+    #[test]
+    fn via_device_grouping_same_area() {
+        let entries = vec![
+            {
+                let mut e = entry("light.a");
+                e.via_device_id = Some("hub1".into());
+                e.area_id = Some("bedroom".into());
+                e
+            },
+            {
+                let mut e = entry("switch.b");
+                e.via_device_id = Some("hub1".into());
+                e.area_id = Some("bedroom".into());
+                e
+            },
+        ];
+
+        let decisions = compute_decisions(&entries);
+
+        // Same via_device + area should group
+        assert!(decisions[0].group_id.is_some());
+        assert_eq!(decisions[0].group_id, decisions[1].group_id);
+        assert!(decisions[0].group_id.as_ref().unwrap().starts_with("via::hub1::"));
+    }
+
+    #[test]
+    fn device_id_priority_over_via_device() {
+        let entries = vec![{
+            let mut e = entry("light.a");
+            e.device_id = Some("dev1".into());
+            e.via_device_id = Some("hub1".into());
+            e.area_id = Some("bedroom".into());
+            e
+        }];
+
+        let decisions = compute_decisions(&entries);
+
+        // device_id should take priority over via_device_id
+        assert!(decisions[0].group_id.as_ref().unwrap().starts_with("device::dev1"));
     }
 
     #[test]
     fn compute_decisions_does_not_apply_per_room_cap() {
-        // 30 lights in one room must all stay visible — domain table is
-        // the only collapsed gate, no overflow demotion.
-        let entries: Vec<HaEntityRegistryEntry> = (0..30)
-            .map(|i| {
-                let mut e = entry(&format!("light.l{i}"));
-                e.area_id = Some("kitchen".into());
-                e.friendly_name = Some(format!("Light {i}"));
-                e
-            })
-            .collect();
+        // 30 lights with completely different names — no LCP match, all independent
+        let entries: Vec<HaEntityRegistryEntry> = vec![
+            "Kitchen Ceiling",
+            "Dining Table",
+            "Counter Strip",
+            "Pantry Bulb",
+            "Island Pendant",
+            "Window Spot",
+            "Cabinet Under",
+            "Drawer LED",
+            "Stove Hood",
+            "Sink Fixture",
+            "Breakfast Nook",
+            "Corner Lamp",
+            "Entryway Sconce",
+            "Hallway Runner",
+            "Closet Pull",
+            "Microwave Light",
+            "Oven Interior",
+            "Fridge Inside",
+            "Dishwasher Glow",
+            "Trash Sensor",
+            "Toaster Indicator",
+            "Coffee Maker",
+            "Kettle Base",
+            "Blender Ring",
+            "Mixer Dial",
+            "Food Processor",
+            "Can Opener",
+            "Wine Cooler",
+            "Tea Station",
+            "Spice Rack",
+        ]
+        .iter()
+        .enumerate()
+        .map(|(i, name)| {
+            let mut e = entry(&format!("light.l{i}"));
+            e.area_id = Some("kitchen".into());
+            e.friendly_name = Some(name.to_string());
+            e
+        })
+        .collect();
+
         let decisions = compute_decisions(&entries);
         let visible = decisions.iter().filter(|d| !d.collapsed && d.group_primary).count();
+        // All unique names, no clustering, all should be independent primaries
         assert_eq!(visible, 30, "all 30 lights stay visible without K-cap");
     }
 }
