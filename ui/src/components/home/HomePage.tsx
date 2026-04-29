@@ -212,7 +212,7 @@ export function HomePage({
   if (allEntities.length === 0) {
     return (
       <>
-        <div className="flex h-full flex-col pt-10 pr-20 pb-6 pl-20">
+        <div className="flex h-full flex-col px-6 pt-10 pb-6">
           {headerEl}
           <div className="flex flex-1 items-center justify-center">
             <EmptyState title={t("homeEmpty")} />
@@ -231,10 +231,10 @@ export function HomePage({
 
   return (
     <>
-      <div className="relative flex h-full flex-col">
-        <div className="shrink-0 pt-10 pr-20 pb-3 pl-20">{headerEl}</div>
+      <div className="relative h-full overflow-y-auto">
+        <div className="px-6 pt-10 pb-3">{headerEl}</div>
         {!reorderSections && (
-          <div className="shrink-0 px-6 pb-3">
+          <div className="sticky top-0 z-10 bg-white/70 px-6 py-3 backdrop-blur-xl dark:bg-zinc-950/70">
             <FilterChipBar
               availableChips={availableChips}
               selectedChip={selectedChip}
@@ -244,7 +244,7 @@ export function HomePage({
             />
           </div>
         )}
-        <div className="flex flex-1 flex-col gap-5 overflow-auto px-6 pb-6">
+        <div className="flex flex-col gap-5 px-6 pb-6">
           <HomePageSections
             instance={instance}
             entities={entities}
