@@ -7,8 +7,40 @@ import type {
 } from "../types";
 import { apiFetch } from "./client";
 
-export function listEntities(instanceId: string): Promise<EntityState[]> {
-  return apiFetch(`/instances/${encodeURIComponent(instanceId)}/entities`);
+export interface ListEntitiesParams {
+  /**
+   * When true, hidden entities are included in the response. Backend
+   * default is false — UI surfaces that need the full set (entity
+   * management, debug views) must opt in explicitly.
+   */
+  includeHidden?: boolean;
+}
+
+export function listEntities(
+  instanceId: string,
+  params: ListEntitiesParams = {},
+): Promise<EntityState[]> {
+  const qs = new URLSearchParams();
+  if (params.includeHidden) qs.set("include_hidden", "true");
+  const suffix = qs.toString() ? `?${qs}` : "";
+  return apiFetch(
+    `/instances/${encodeURIComponent(instanceId)}/entities${suffix}`,
+  );
+}
+
+/**
+ * Fetch every entity in a group (`device::…` or `name::…` key from the
+ * backend's first-import固化 logic). Returns members regardless of
+ * `hidden`, `collapsed`, or `group_primary` — use this to render a
+ * "show all members" expansion of a collapsed primary tile.
+ */
+export function listEntitiesByGroup(
+  instanceId: string,
+  groupId: string,
+): Promise<EntityState[]> {
+  return apiFetch(
+    `/instances/${encodeURIComponent(instanceId)}/entities/groups/${encodeURIComponent(groupId)}`,
+  );
 }
 
 /**
