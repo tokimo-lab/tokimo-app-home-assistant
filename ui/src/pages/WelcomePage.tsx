@@ -7,7 +7,7 @@ interface WelcomePageProps {
 
 export function WelcomePage({ t, onGetStarted }: WelcomePageProps) {
   return (
-    <div className="flex h-full w-full items-center justify-center overflow-auto bg-[var(--surface-base,#0b0f17)] px-8 py-12">
+    <div className="flex h-full w-full items-center justify-center overflow-auto bg-[var(--bg-glass)] px-8 py-12 backdrop-blur-xl">
       <div className="flex w-full max-w-md flex-col items-center gap-10 text-center">
         <div className="relative flex h-24 w-24 items-center justify-center rounded-3xl bg-gradient-to-br from-indigo-400 via-purple-500 to-pink-500 shadow-[0_20px_60px_-15px_rgba(120,80,255,0.6)]">
           <Home size={44} className="text-white" strokeWidth={2.2} />
@@ -18,10 +18,10 @@ export function WelcomePage({ t, onGetStarted }: WelcomePageProps) {
         </div>
 
         <div className="flex flex-col items-center gap-3">
-          <h1 className="text-3xl font-bold tracking-tight text-white">
+          <h1 className="text-3xl font-bold tracking-tight text-[var(--text-primary)]">
             {t("welcomeTitle")}
           </h1>
-          <p className="max-w-xs text-base leading-relaxed text-white/60">
+          <p className="max-w-xs text-base leading-relaxed text-[var(--text-secondary)]">
             {t("welcomeSlogan")}
           </p>
         </div>
@@ -55,11 +55,13 @@ export function WelcomePage({ t, onGetStarted }: WelcomePageProps) {
 
 function FeatureRow({ icon, text }: { icon: React.ReactNode; text: string }) {
   return (
-    <div className="flex items-center gap-3 rounded-2xl bg-white/[0.04] px-4 py-3 text-left">
-      <div className="flex h-10 w-10 flex-none items-center justify-center rounded-xl bg-white/[0.06]">
+    <div className="flex items-center gap-3 rounded-2xl bg-[var(--fill-tertiary)] px-4 py-3 text-left">
+      <div className="flex h-10 w-10 flex-none items-center justify-center rounded-xl bg-[var(--fill-secondary)]">
         {icon}
       </div>
-      <span className="text-sm leading-snug text-white/85">{text}</span>
+      <span className="text-sm leading-snug text-[var(--text-primary)]">
+        {text}
+      </span>
     </div>
   );
 }
