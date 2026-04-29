@@ -7,6 +7,7 @@ import { useDragHandlers } from "../../state/useDragHandlers";
 import { useEditHomeView } from "../../state/useEditHomeView";
 import { useFilterChip } from "../../state/useFilterChip";
 import { useHomePageData } from "../../state/useHomePageData";
+import { useShowAll } from "../../state/useShowAll";
 import { useTileContextMenu } from "../../state/useTileContextMenu";
 import { useToggleSizeRegistry } from "../../state/useToggleSizeRegistry";
 import type {
@@ -54,6 +55,7 @@ export function HomePage({
   t,
 }: HomePageProps) {
   const { selectedChip, selectChip, availableChips } = useFilterChip();
+  const { showAll, toggleShowAll } = useShowAll();
   const { patch, reorderFavoritesOptimistic, reorderRoomEntitiesOptimistic } =
     useDisplayPatch(instance.id, ctx, t);
   const {
@@ -65,7 +67,14 @@ export function HomePage({
   } = useEditHomeView();
 
   const { allEntities, entitiesByRoom, cameras, favorites, headerTitle } =
-    useHomePageData({ instance, entities, rooms, selectedChip, t });
+    useHomePageData({
+      instance,
+      entities,
+      rooms,
+      selectedChip,
+      showAll,
+      t,
+    });
 
   const { menu, openMenu, closeMenu, onSetSize, onToggleFavorite, onHide } =
     useTileContextMenu(patch);
@@ -118,6 +127,8 @@ export function HomePage({
       onEnterReorderSections={enterReorderSections}
       onOpenRoom={onOpenRoom}
       onRescan={() => setRescanOpen(true)}
+      showAll={showAll}
+      onToggleShowAll={toggleShowAll}
     />
   );
 
@@ -174,6 +185,7 @@ export function HomePage({
             onCall={onCall}
             onContextMenu={openMenu}
             onOpenRoom={onOpenRoom}
+            disableRoomCap={!!selectedChip || showAll}
             t={t}
           />
         </div>

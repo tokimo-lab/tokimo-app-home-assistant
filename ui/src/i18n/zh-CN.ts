@@ -414,6 +414,10 @@ export const zhCN: Record<string, string> = {
   menuOpen: "打开菜单",
   menuReload: "重新加载",
   menuRescan: "重新扫描设备",
+  menuShowAll: "显示全部配件",
+  menuShowPriority: "只显示主要配件",
+  roomShowMore: "显示更多 ({n})",
+  roomShowLess: "收起",
   rescanModalTitle: "重新扫描",
   rescanClearLabel: "清空再扫描",
   rescanClearHint:

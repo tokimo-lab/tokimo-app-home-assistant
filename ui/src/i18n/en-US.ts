@@ -418,6 +418,10 @@ export const enUS: Record<string, string> = {
   menuOpen: "Open menu",
   menuReload: "Reload",
   menuRescan: "Rescan Entities",
+  menuShowAll: "Show All Accessories",
+  menuShowPriority: "Show Priority Only",
+  roomShowMore: "Show {n} More",
+  roomShowLess: "Show Less",
   rescanModalTitle: "Rescan Entities",
   rescanClearLabel: "Clear and rescan",
   rescanClearHint:

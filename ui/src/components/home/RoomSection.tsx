@@ -1,10 +1,13 @@
 import { rectSortingStrategy, SortableContext } from "@dnd-kit/sortable";
-import { ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import type { MouseEvent as ReactMouseEvent } from "react";
+import { useState } from "react";
 import { useEditHomeView } from "../../state/useEditHomeView";
 import type { CallParams, EntityState, HaRoom, PendingOp } from "../../types";
 import { DroppableSection } from "../edit/DroppableSection";
 import { TileGrid } from "./TileGrid";
+
+const ROOM_TILE_CAP = 12;
 
 interface RoomSectionProps {
   room: HaRoom;
@@ -14,6 +17,8 @@ interface RoomSectionProps {
   onCall: (params: CallParams) => void;
   onContextMenu?: (entity: EntityState, e: ReactMouseEvent) => void;
   onOpenRoom: (roomId: string) => void;
+  /** When true, render every entity (chip view, edit mode, "show all"). */
+  disableCap?: boolean;
   t: (k: string) => string;
 }
 
@@ -29,12 +34,21 @@ export function RoomSection({
   onCall,
   onContextMenu,
   onOpenRoom,
+  disableCap,
   t: _t,
 }: RoomSectionProps) {
   const { editMode } = useEditHomeView();
+  const [expanded, setExpanded] = useState(false);
   if (entities.length === 0 && !editMode) return null;
 
   const containerId = roomContainerId(room.id);
+
+  const capActive =
+    !disableCap && !editMode && !expanded && entities.length > ROOM_TILE_CAP;
+  const visibleEntities = capActive
+    ? entities.slice(0, ROOM_TILE_CAP)
+    : entities;
+  const hiddenCount = capActive ? entities.length - ROOM_TILE_CAP : 0;
 
   const header = editMode ? (
     // In edit mode the section title is plain (no chevron, no nav); the
@@ -55,7 +69,7 @@ export function RoomSection({
 
   const grid = (
     <TileGrid
-      entities={entities}
+      entities={visibleEntities}
       instanceId={instanceId}
       getPending={getPending}
       onCall={onCall}
@@ -65,6 +79,25 @@ export function RoomSection({
       t={_t}
     />
   );
+
+  const showMoreButton =
+    hiddenCount > 0 || (expanded && !disableCap && !editMode) ? (
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="mt-3 flex cursor-pointer items-center gap-1 text-sm text-[var(--text-secondary)] transition hover:text-[var(--text-primary)]"
+      >
+        <ChevronDown
+          size={16}
+          className={expanded ? "rotate-180 transition" : "transition"}
+        />
+        <span>
+          {expanded
+            ? _t("roomShowLess")
+            : _t("roomShowMore").replace("{n}", String(hiddenCount))}
+        </span>
+      </button>
+    ) : null;
 
   if (editMode) {
     return (
@@ -84,6 +117,7 @@ export function RoomSection({
     <section>
       {header}
       {grid}
+      {showMoreButton}
     </section>
   );
 }

@@ -104,6 +104,112 @@ export function effectiveSizeForEntity(entity: EntityState): EntitySize {
   return defaultSizeForEntity(entity);
 }
 
+/**
+ * Apple-Home default home page domain prioritisation:
+ *  - Tier 1: actionable controls — shown first.
+ *  - Tier 2: scenes / scripts / automations — shown after Tier 1.
+ *  - Tier 3: passive sensors / buttons — hidden by default; surfaced via
+ *    chip filter or the explicit "show all" toggle.
+ *
+ * binary_sensor entities with a critical device_class (door / window /
+ * motion / smoke …) are promoted to Tier 2 so the user still sees them
+ * on the default page (Apple Home shows door/motion sensors per room).
+ */
+const TIER1_DOMAINS = new Set([
+  "light",
+  "switch",
+  "input_boolean",
+  "climate",
+  "cover",
+  "fan",
+  "lock",
+  "media_player",
+  "vacuum",
+  "water_heater",
+  "humidifier",
+  "alarm_control_panel",
+]);
+
+const TIER2_DOMAINS = new Set(["scene", "script", "automation"]);
+
+const CRITICAL_BINARY_SENSOR_CLASSES = new Set([
+  "door",
+  "window",
+  "garage_door",
+  "opening",
+  "motion",
+  "occupancy",
+  "presence",
+  "smoke",
+  "gas",
+  "moisture",
+  "lock",
+  "safety",
+  "tamper",
+  "co",
+]);
+
+export type DomainTier = 1 | 2 | 3;
+
+export function domainTier(entity: EntityState): DomainTier {
+  const d = getDomain(entity.entity_id);
+  if (TIER1_DOMAINS.has(d)) return 1;
+  if (TIER2_DOMAINS.has(d)) return 2;
+  if (d === "binary_sensor") {
+    const dc = entity.attributes?.device_class;
+    if (typeof dc === "string" && CRITICAL_BINARY_SENSOR_CLASSES.has(dc)) {
+      return 2;
+    }
+  }
+  return 3;
+}
+
+const ON_STATES = new Set(["on", "open", "playing", "heat", "cool", "auto"]);
+
+function isActiveState(entity: EntityState): boolean {
+  return ON_STATES.has(entity.state);
+}
+
+/**
+ * Default-home filter: hide Tier 3 entities (passive sensors, buttons …)
+ * unless the user has enabled "show all".
+ */
+export function passesDefaultHome(
+  entity: EntityState,
+  showAll: boolean,
+): boolean {
+  if (showAll) return true;
+  return domainTier(entity) <= 2;
+}
+
+/**
+ * Default-home sort: tier asc → active first → friendly_name asc → entity_id.
+ *
+ * Used when no chip is selected. Chip view keeps its own bySortOrder
+ * comparator (user-curated order matters there).
+ */
+export function defaultHomeOrder(a: EntityState, b: EntityState): number {
+  const ta = domainTier(a);
+  const tb = domainTier(b);
+  if (ta !== tb) return ta - tb;
+  const aa = isActiveState(a) ? 0 : 1;
+  const ab = isActiveState(b) ? 0 : 1;
+  if (aa !== ab) return aa - ab;
+  const na =
+    (a.display_name ??
+      (a.attributes?.friendly_name as string | undefined) ??
+      a.entity_id) ||
+    "";
+  const nb =
+    (b.display_name ??
+      (b.attributes?.friendly_name as string | undefined) ??
+      b.entity_id) ||
+    "";
+  const cmp = na.localeCompare(nb);
+  if (cmp !== 0) return cmp;
+  return a.entity_id.localeCompare(b.entity_id);
+}
+
 export const CHIP_LABEL_KEY: Record<ChipId, string> = {
   climate: "chipClimate",
   lights: "chipLights",

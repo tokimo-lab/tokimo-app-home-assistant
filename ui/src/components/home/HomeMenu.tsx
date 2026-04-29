@@ -12,6 +12,8 @@ import {
 import { cn } from "@tokimo/ui";
 import {
   Cog,
+  Eye,
+  EyeOff,
   LayoutGrid,
   MoreHorizontal,
   Pencil,
@@ -37,6 +39,8 @@ interface HomeMenuProps {
   onReorderSections?: () => void;
   onOpenRoom: (roomId: string) => void;
   onRescan?: () => void;
+  showAll?: boolean;
+  onToggleShowAll?: () => void;
 }
 
 export function HomeMenu({
@@ -48,6 +52,8 @@ export function HomeMenu({
   onReorderSections,
   onOpenRoom,
   onRescan,
+  showAll,
+  onToggleShowAll,
 }: HomeMenuProps) {
   const [open, setOpen] = useState(false);
 
@@ -151,6 +157,13 @@ export function HomeMenu({
                 icon={<RefreshCw size={16} />}
                 label={t("menuRescan")}
                 onClick={handle(onRescan)}
+              />
+            )}
+            {onToggleShowAll && (
+              <MenuItem
+                icon={showAll ? <EyeOff size={16} /> : <Eye size={16} />}
+                label={showAll ? t("menuShowPriority") : t("menuShowAll")}
+                onClick={handle(onToggleShowAll)}
               />
             )}
 

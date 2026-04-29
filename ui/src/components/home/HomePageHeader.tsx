@@ -12,6 +12,8 @@ export interface HomePageHeaderProps {
   onEnterReorderSections: () => void;
   onOpenRoom: (id: string) => void;
   onRescan?: () => void;
+  showAll?: boolean;
+  onToggleShowAll?: () => void;
 }
 
 /**
@@ -29,6 +31,8 @@ export function HomePageHeader({
   onEnterReorderSections,
   onOpenRoom,
   onRescan,
+  showAll,
+  onToggleShowAll,
 }: HomePageHeaderProps) {
   return (
     <div className="flex items-center justify-between">
@@ -64,6 +68,8 @@ export function HomePageHeader({
           onReorderSections={onEnterReorderSections}
           onOpenRoom={onOpenRoom}
           onRescan={onRescan}
+          showAll={showAll}
+          onToggleShowAll={onToggleShowAll}
         />
       </div>
     </div>

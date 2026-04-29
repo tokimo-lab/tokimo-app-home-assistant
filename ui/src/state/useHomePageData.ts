@@ -2,8 +2,10 @@ import { useMemo } from "react";
 import {
   bySortOrder,
   CHIP_LABEL_KEY,
+  defaultHomeOrder,
   isRenderable,
   passesChip,
+  passesDefaultHome,
 } from "../components/home/_helpers";
 import { getDomain } from "../lib/domain";
 import type { EntityState, HaInstance, HaRoom } from "../types";
@@ -14,6 +16,12 @@ export interface UseHomePageDataParams {
   entities: ReadonlyMap<string, EntityState>;
   rooms: HaRoom[];
   selectedChip: ChipId | null;
+  /**
+   * When true, the default-home Tier 3 filter is bypassed — every
+   * renderable entity is shown and the per-room cap is also lifted by
+   * the consumer. No effect when a chip is selected.
+   */
+  showAll: boolean;
   t: (k: string) => string;
 }
 
@@ -42,6 +50,7 @@ export function useHomePageData({
   entities,
   rooms,
   selectedChip,
+  showAll,
   t,
 }: UseHomePageDataParams): HomePageData {
   const allEntities = useMemo(
@@ -55,9 +64,14 @@ export function useHomePageData({
   );
 
   const visibleEntities = useMemo(() => {
-    if (!selectedChip || !chipDomains) return allEntities;
-    return allEntities.filter((e) => passesChip(e, selectedChip, chipDomains));
-  }, [allEntities, selectedChip, chipDomains]);
+    if (selectedChip && chipDomains) {
+      return allEntities.filter((e) =>
+        passesChip(e, selectedChip, chipDomains),
+      );
+    }
+    if (showAll) return allEntities;
+    return allEntities.filter((e) => passesDefaultHome(e, false));
+  }, [allEntities, selectedChip, chipDomains, showAll]);
 
   const entityRoomId = useMemo(() => {
     const map = new Map<string, string>();
@@ -81,8 +95,12 @@ export function useHomePageData({
       arr.push(e);
       map.set(rid, arr);
     }
+    // Apply the right comparator inside each bucket. Chip view keeps the
+    // user-curated sort_order; default home uses domain-priority order.
+    const cmp = selectedChip ? bySortOrder : defaultHomeOrder;
+    for (const arr of map.values()) arr.sort(cmp);
     return map;
-  }, [visibleEntities, entityRoomId]);
+  }, [visibleEntities, entityRoomId, selectedChip]);
 
   const cameras = useMemo(
     () =>

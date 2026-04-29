@@ -34,6 +34,7 @@ interface HomePageSectionsProps {
   onCall: (params: CallParams) => void;
   onContextMenu: (entity: EntityState, e: ReactMouseEvent) => void;
   onOpenRoom: (roomId: string) => void;
+  disableRoomCap: boolean;
   t: (k: string) => string;
 }
 
@@ -61,6 +62,7 @@ export function HomePageSections(props: HomePageSectionsProps) {
     onCall,
     onContextMenu,
     onOpenRoom,
+    disableRoomCap,
     t,
   } = props;
 
@@ -86,6 +88,7 @@ export function HomePageSections(props: HomePageSectionsProps) {
     favorites,
     rooms,
     entitiesByRoom,
+    disableRoomCap,
   };
 
   if (reorderSections) {

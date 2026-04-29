@@ -6,7 +6,6 @@ import type {
   HaRoom,
   PendingOp,
 } from "../../types";
-import { bySortOrder } from "./_helpers";
 import { CamerasSection } from "./CamerasSection";
 import { FavoritesSection } from "./FavoritesSection";
 import { RoomSection } from "./RoomSection";
@@ -16,7 +15,7 @@ export interface HomePageDefaultProps {
   cameras: EntityState[];
   favorites: EntityState[];
   rooms: HaRoom[];
-  /** Pre-sorted, pre-filtered entities per room (sorted by sort_order). */
+  /** Pre-sorted, pre-filtered entities per room. */
   entitiesByRoom: ReadonlyMap<string, EntityState[]>;
   getPending: (entityId: string) => PendingOp | undefined;
   onCall: (params: CallParams) => void;
@@ -24,6 +23,8 @@ export interface HomePageDefaultProps {
   onOpenRoom: (roomId: string) => void;
   t: (k: string) => string;
   editMode: boolean;
+  /** Skip the per-room cap (chip view, edit mode, or "show all"). */
+  disableRoomCap?: boolean;
   /** Passed through to TileGrid so tiles participate in the parent DndContext. */
   sortableContainerId?: string;
 }
@@ -46,6 +47,7 @@ export function HomePageDefault({
   onOpenRoom,
   t,
   editMode,
+  disableRoomCap,
 }: HomePageDefaultProps) {
   return (
     <>
@@ -68,9 +70,7 @@ export function HomePageDefault({
         t={t}
       />
       {rooms.map((room) => {
-        const list = (entitiesByRoom.get(room.id) ?? [])
-          .slice()
-          .sort(bySortOrder);
+        const list = entitiesByRoom.get(room.id) ?? [];
         if (list.length === 0 && !editMode) return null;
         return (
           <RoomSection
@@ -82,6 +82,7 @@ export function HomePageDefault({
             onCall={onCall}
             onContextMenu={onContextMenu}
             onOpenRoom={onOpenRoom}
+            disableCap={disableRoomCap || editMode}
             t={t}
           />
         );
