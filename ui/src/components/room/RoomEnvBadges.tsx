@@ -1,6 +1,7 @@
 import { Activity, Droplet, Gauge, Sun, Thermometer, Wind } from "lucide-react";
 import type { ComponentType } from "react";
 import { getDomain } from "../../lib/domain";
+import { formatNumeric } from "../../lib/format-number";
 import type { EntityState } from "../../types";
 
 interface RoomEnvBadgesProps {
@@ -53,10 +54,12 @@ function firstSensor(
   return undefined;
 }
 
-function formatValue(raw: string, digits: number): string {
-  const n = Number.parseFloat(raw);
-  if (!Number.isFinite(n)) return raw;
-  return digits > 0 ? n.toFixed(digits) : Math.round(n).toString();
+function formatValue(
+  raw: string,
+  override: number | null | undefined,
+  digits: number,
+): string {
+  return formatNumeric(raw, override, digits) ?? raw;
 }
 
 /**
@@ -72,7 +75,7 @@ export function RoomEnvBadges({ entities, t: _t }: RoomEnvBadgesProps) {
     return {
       key: spec.deviceClass,
       Icon: spec.icon,
-      value: formatValue(sensor.state, spec.digits),
+      value: formatValue(sensor.state, sensor.decimal_places, spec.digits),
       unit,
     };
   }).filter((x): x is NonNullable<typeof x> => x !== null);

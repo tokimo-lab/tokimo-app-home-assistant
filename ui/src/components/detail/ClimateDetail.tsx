@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { formatNumeric } from "../../lib/format-number";
 import type { DomainDetailProps } from "./_types";
 
 const ARC_DEG = 280;
@@ -227,7 +228,8 @@ export function ClimateDetail({ entity, onCall, t }: DomainDetailProps) {
               dominantBaseline="middle"
               className="fill-zinc-500 text-sm dark:fill-zinc-400"
             >
-              {t("detailClimateCurrent")}: {current}
+              {t("detailClimateCurrent")}:{" "}
+              {formatNumeric(current, entity.decimal_places, 1) ?? current}
               {unit}
             </text>
           )}

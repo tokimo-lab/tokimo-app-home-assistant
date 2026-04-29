@@ -70,6 +70,18 @@ pub struct EntityDisplayUpdate {
     /// with 400 — clients must elect a new primary by PATCHing another
     /// entity in the same group with `group_primary=true`.
     pub group_primary: Option<bool>,
+    /// Per-entity numeric precision. `Some(Some(n))` sets it (n=0/1/2),
+    /// `Some(None)` clears it back to the frontend default, `None` leaves
+    /// the column untouched. Validated to be in `0..=4`.
+    #[serde(default, deserialize_with = "deserialize_double_option_i32")]
+    pub decimal_places: Option<Option<i32>>,
+}
+
+fn deserialize_double_option_i32<'de, D>(deserializer: D) -> Result<Option<Option<i32>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Option::<i32>::deserialize(deserializer).map(Some)
 }
 
 fn deserialize_double_option_string<'de, D>(deserializer: D) -> Result<Option<Option<String>>, D::Error>
@@ -102,6 +114,7 @@ pub struct EntityDisplayDto {
     pub collapsed: bool,
     pub group_id: Option<String>,
     pub group_primary: bool,
+    pub decimal_places: Option<i32>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -154,6 +167,13 @@ pub async fn update_display(
         ));
     }
 
+    // Validate decimal_places range when caller is setting a concrete value.
+    if let Some(Some(n)) = req.decimal_places
+        && !(0..=4).contains(&n)
+    {
+        return Err(AppError::bad_request("decimal_places must be in 0..=4"));
+    }
+
     ensure_instance(&ctx.pool, instance_id).await?;
 
     // For nullable patch fields we pass (set_flag, value): when the flag is
@@ -166,6 +186,8 @@ pub async fn update_display(
     let custom_icon_value = req.custom_icon.unwrap_or(None);
     let set_area_id = req.area_id.is_some();
     let area_id_value = req.area_id.unwrap_or(None);
+    let set_decimal_places = req.decimal_places.is_some();
+    let decimal_places_value = req.decimal_places.unwrap_or(None);
     let size_str = req.size.map(|s| s.as_db());
 
     // Wrap promote-then-upsert in a single transaction so a race between
@@ -204,7 +226,7 @@ pub async fn update_display(
                 instance_id, entity_id,
                 display_name, custom_icon, area_id,
                 hidden, size, is_favorite, favorite_order, sort_order,
-                collapsed, group_primary
+                collapsed, group_primary, decimal_places
            ) VALUES (
                 $1, $2,
                 $4, $6, $8,
@@ -214,7 +236,8 @@ pub async fn update_display(
                 COALESCE($12, 0),
                 COALESCE($13, 0),
                 COALESCE($14, FALSE),
-                COALESCE($15, TRUE)
+                COALESCE($15, TRUE),
+                CASE WHEN $16 THEN $17 ELSE NULL END
            )
            ON CONFLICT (instance_id, entity_id) DO UPDATE SET
                 display_name   = CASE WHEN $3 THEN $4  ELSE entity_overrides.display_name END,
@@ -227,10 +250,11 @@ pub async fn update_display(
                 sort_order     = COALESCE($13, entity_overrides.sort_order),
                 collapsed      = COALESCE($14, entity_overrides.collapsed),
                 group_primary  = COALESCE($15, entity_overrides.group_primary),
+                decimal_places = CASE WHEN $16 THEN $17 ELSE entity_overrides.decimal_places END,
                 updated_at     = NOW()
            RETURNING entity_id, display_name, custom_icon, area_id,
                      hidden, size, is_favorite, favorite_order, sort_order,
-                     collapsed, group_id, group_primary"#,
+                     collapsed, group_id, group_primary, decimal_places"#,
     )
     .bind(instance_id)
     .bind(&entity_id)
@@ -247,6 +271,8 @@ pub async fn update_display(
     .bind(req.sort_order)
     .bind(req.collapsed)
     .bind(req.group_primary)
+    .bind(set_decimal_places)
+    .bind(decimal_places_value)
     .fetch_one(&mut *tx)
     .await?;
 
@@ -269,6 +295,7 @@ pub async fn update_display(
             collapsed: r.get("collapsed"),
             group_id: r.get("group_id"),
             group_primary: r.get("group_primary"),
+            decimal_places: r.get("decimal_places"),
         };
         instance.override_cache.insert(entity_id.clone(), snapshot);
 
@@ -335,6 +362,7 @@ pub async fn update_display(
         collapsed: r.get("collapsed"),
         group_id: r.get("group_id"),
         group_primary: r.get("group_primary"),
+        decimal_places: r.get("decimal_places"),
     }))
 }
 

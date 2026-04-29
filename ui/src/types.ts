@@ -94,6 +94,8 @@ export interface EntityDisplay {
   collapsed: boolean;
   group_id: string | null;
   group_primary: boolean;
+  /** Per-entity numeric precision. `null` means "use frontend default". */
+  decimal_places?: number | null;
   updated_at?: string;
 }
 
@@ -114,6 +116,13 @@ export interface UpdateEntityDisplayDto {
    * previous primary in the same transaction).
    */
   group_primary?: true;
+  /**
+   * Per-entity numeric precision (0..=4).
+   * - `number`: set the precision explicitly
+   * - `null`: clear back to frontend default
+   * - omitted: leave unchanged
+   */
+  decimal_places?: number | null;
 }
 
 export interface RoomReorderItem {
@@ -179,6 +188,8 @@ export interface EntityState {
    * any time; demoted siblings still appear in the snapshot but a
    * card-list view should usually render only the primary. */
   group_primary?: boolean;
+  /** Per-entity numeric precision override; `null`/undefined → frontend default. */
+  decimal_places?: number | null;
   /** Forward-compat: device grouping id from HA's entity_registry. */
   device_id?: string | null;
   /** Only populated by GET /entities/:eid single-fetch path. */

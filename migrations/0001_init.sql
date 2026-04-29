@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS entity_overrides (
     collapsed       BOOLEAN NOT NULL DEFAULT FALSE,
     group_id        TEXT,
     group_primary   BOOLEAN NOT NULL DEFAULT TRUE,
+    decimal_places  INTEGER,
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     PRIMARY KEY (instance_id, entity_id)
 );
@@ -64,3 +65,8 @@ CREATE INDEX IF NOT EXISTS entity_overrides_category_idx
 CREATE INDEX IF NOT EXISTS entity_overrides_group_idx
     ON entity_overrides (instance_id, group_id)
     WHERE group_id IS NOT NULL;
+
+-- Idempotent migration: add decimal_places to existing deployments without
+-- requiring a DB reset. NULL means "use frontend default" (1 decimal place).
+ALTER TABLE entity_overrides
+  ADD COLUMN IF NOT EXISTS decimal_places INTEGER;

@@ -113,6 +113,11 @@ pub struct OverrideSnapshot {
     pub collapsed: bool,
     pub group_id: Option<String>,
     pub group_primary: bool,
+    /// User-chosen decimal precision for numeric entity states. `None` means
+    /// "fall back to the frontend default" (currently 1 decimal place for
+    /// most numeric domains, 0 for percentage-style values). Set via the
+    /// Accessory Settings page; nulled out to revert to default.
+    pub decimal_places: Option<i32>,
 }
 
 /// Events broadcast to SSE subscribers.

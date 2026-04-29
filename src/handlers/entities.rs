@@ -37,6 +37,10 @@ pub struct EntityDto {
     pub collapsed: bool,
     pub group_id: Option<String>,
     pub group_primary: bool,
+    /// Per-entity numeric precision override. `None` → frontend chooses a
+    /// sensible default (1 for most numeric entities, 0 for percentage-style
+    /// fields). Configured from the Accessory Settings page.
+    pub decimal_places: Option<i32>,
     /// Device metadata (manufacturer / model / sw_version / serial_number /
     /// name) sourced from HA's device registry. Only populated by the
     /// per-entity `GET /entities/:eid` endpoint — list endpoints leave this
@@ -65,6 +69,7 @@ pub(crate) fn apply_override(state: EntityState, ov: Option<&OverrideRow>) -> En
         collapsed: ov.map(|o| o.collapsed).unwrap_or(false),
         group_id: ov.and_then(|o| o.group_id.clone()),
         group_primary: ov.map(|o| o.group_primary).unwrap_or(true),
+        decimal_places: ov.and_then(|o| o.decimal_places),
         device: None,
     }
 }
@@ -89,6 +94,7 @@ pub(crate) fn apply_override_snapshot(state: EntityState, ov: Option<&crate::sta
         collapsed: ov.map(|o| o.collapsed).unwrap_or(false),
         group_id: ov.and_then(|o| o.group_id.clone()),
         group_primary: ov.map(|o| o.group_primary).unwrap_or(true),
+        decimal_places: ov.and_then(|o| o.decimal_places),
         device: None,
     }
 }
@@ -107,6 +113,7 @@ pub(crate) fn override_row_to_snapshot(o: &OverrideRow) -> crate::state::Overrid
         collapsed: o.collapsed,
         group_id: o.group_id.clone(),
         group_primary: o.group_primary,
+        decimal_places: o.decimal_places,
     }
 }
 
@@ -123,9 +130,10 @@ pub(crate) struct OverrideRow {
     pub collapsed: bool,
     pub group_id: Option<String>,
     pub group_primary: bool,
+    pub decimal_places: Option<i32>,
 }
 
-pub(crate) const OVERRIDE_COLS: &str = "entity_id, display_name, custom_icon, area_id, hidden, is_favorite, favorite_order, size, sort_order, collapsed, group_id, group_primary";
+pub(crate) const OVERRIDE_COLS: &str = "entity_id, display_name, custom_icon, area_id, hidden, is_favorite, favorite_order, size, sort_order, collapsed, group_id, group_primary, decimal_places";
 
 pub(crate) fn row_to_override(r: &sqlx::postgres::PgRow) -> OverrideRow {
     OverrideRow {
@@ -141,6 +149,7 @@ pub(crate) fn row_to_override(r: &sqlx::postgres::PgRow) -> OverrideRow {
         collapsed: r.get("collapsed"),
         group_id: r.get("group_id"),
         group_primary: r.get("group_primary"),
+        decimal_places: r.get("decimal_places"),
     }
 }
 
@@ -320,7 +329,7 @@ pub async fn upsert_override(
                updated_at   = NOW()
            RETURNING entity_id, display_name, custom_icon, hidden, is_favorite, updated_at,
                      area_id, favorite_order, size, sort_order,
-                     collapsed, group_id, group_primary"#,
+                     collapsed, group_id, group_primary, decimal_places"#,
     )
     .bind(instance_id)
     .bind(&entity_id)
@@ -345,6 +354,7 @@ pub async fn upsert_override(
             collapsed: r.get("collapsed"),
             group_id: r.get("group_id"),
             group_primary: r.get("group_primary"),
+            decimal_places: r.get("decimal_places"),
         };
         instance.override_cache.insert(entity_id.clone(), snapshot);
     }

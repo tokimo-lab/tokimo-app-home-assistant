@@ -1,6 +1,7 @@
 import { Thermometer } from "lucide-react";
 import { memo } from "react";
 import { getFriendlyName } from "../../lib/format";
+import { formatNumeric } from "../../lib/format-number";
 import { useDetailOverlay } from "../../state/useDetailOverlay";
 import { type TileProps, tilePropsEqual } from "./_types";
 import { TileBaseStyle } from "./TileBaseStyle";
@@ -13,11 +14,22 @@ function ClimateTileImpl({ entity, instanceId, size }: TileProps) {
   const isActive = state !== "off";
   const { openDetail } = useDetailOverlay();
 
+  const curStr =
+    currentTemp != null
+      ? (formatNumeric(currentTemp, entity.decimal_places, 1) ??
+        String(currentTemp))
+      : null;
+  const tgtStr =
+    targetTemp != null
+      ? (formatNumeric(targetTemp, entity.decimal_places, 1) ??
+        String(targetTemp))
+      : null;
+
   const stateText =
-    currentTemp != null && targetTemp != null
-      ? `${currentTemp}° → ${targetTemp}°`
-      : currentTemp != null
-        ? `${currentTemp}°`
+    curStr != null && tgtStr != null
+      ? `${curStr}° → ${tgtStr}°`
+      : curStr != null
+        ? `${curStr}°`
         : state;
 
   // Climate has no clean on/off toggle (modes vary by device); both single-tap

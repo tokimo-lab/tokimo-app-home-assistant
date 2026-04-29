@@ -1,4 +1,5 @@
 import type { EntityState } from "../types";
+import { formatNumeric } from "./format-number";
 
 export function getFriendlyName(entity: EntityState): string {
   return (
@@ -43,8 +44,14 @@ export function formatState(
       const cur = attributes.current_temperature;
       const target = attributes.temperature;
       const unit = attributes.unit_of_measurement ?? "°";
-      if (cur != null) return `${cur}${unit}`;
-      if (target != null) return `${target}${unit}`;
+      if (cur != null) {
+        const fmt = formatNumeric(cur, entity.decimal_places, 1);
+        return `${fmt ?? cur}${unit}`;
+      }
+      if (target != null) {
+        const fmt = formatNumeric(target, entity.decimal_places, 1);
+        return `${fmt ?? target}${unit}`;
+      }
       return state;
     }
 
@@ -71,10 +78,13 @@ export function formatState(
         ? t(`vacuumState_${state}`)
         : state;
 
-    case "sensor":
+    case "sensor": {
+      const fmt = formatNumeric(state, entity.decimal_places, 1);
+      const display = fmt ?? state;
       return attributes.unit_of_measurement
-        ? `${state} ${attributes.unit_of_measurement}`
-        : state;
+        ? `${display} ${attributes.unit_of_measurement}`
+        : display;
+    }
 
     case "switch":
     case "input_boolean":

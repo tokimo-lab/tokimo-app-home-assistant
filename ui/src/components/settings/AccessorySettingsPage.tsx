@@ -295,9 +295,49 @@ function Body({
             className="min-w-36"
           />
         </SettingRow>
+        {isNumericEntity(entity) && (
+          <SettingRow label={t("accessoryDecimalPlaces")}>
+            <Select
+              value={
+                entity.decimal_places == null
+                  ? ""
+                  : String(entity.decimal_places)
+              }
+              onChange={(v) => {
+                if (typeof v !== "string") return;
+                void onPatch({
+                  decimal_places: v === "" ? null : Number(v),
+                });
+              }}
+              options={[
+                { value: "", label: t("accessoryDecimalPlacesDefault") },
+                { value: "0", label: t("accessoryDecimalPlaces0") },
+                { value: "1", label: t("accessoryDecimalPlaces1") },
+                { value: "2", label: t("accessoryDecimalPlaces2") },
+              ]}
+              size="small"
+              className="min-w-36"
+            />
+          </SettingRow>
+        )}
       </Section>
     </div>
   );
+}
+
+/**
+ * Whether the entity exposes a numeric state worth offering decimal-place
+ * control for. Sensors with a finite-number state, plus all climate
+ * entities (which surface `current_temperature` / `temperature` floats).
+ */
+function isNumericEntity(entity: EntityState): boolean {
+  const domain = entity.entity_id.split(".")[0];
+  if (domain === "climate") return true;
+  if (domain === "sensor") {
+    const n = Number(entity.state);
+    return Number.isFinite(n);
+  }
+  return false;
 }
 
 function NameEditor({

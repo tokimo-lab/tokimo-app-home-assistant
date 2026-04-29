@@ -8,6 +8,7 @@ import {
   Zap,
 } from "lucide-react";
 import type { ComponentType } from "react";
+import { formatNumeric } from "../../lib/format-number";
 import type { DomainDetailProps } from "./_types";
 
 const DEVICE_CLASS_ICON: Record<
@@ -34,7 +35,10 @@ export function SensorDetail({ entity, t }: DomainDetailProps) {
   const Icon = DEVICE_CLASS_ICON[deviceClass] ?? Activity;
 
   const isUnknown = state === "unknown" || state === "unavailable";
-  const display = isUnknown ? t(`state${capitalize(state)}`) || state : state;
+  const formatted = formatNumeric(state, entity.decimal_places, 1);
+  const display = isUnknown
+    ? t(`state${capitalize(state)}`) || state
+    : (formatted ?? state);
 
   return (
     <div className="flex flex-col items-center gap-4 py-8">
