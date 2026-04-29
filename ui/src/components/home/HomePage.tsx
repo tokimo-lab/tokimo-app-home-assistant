@@ -1,47 +1,23 @@
-import { closestCenter, DndContext } from "@dnd-kit/core";
-import {
-  SortableContext,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
 import type { AppRuntimeCtx } from "@tokimo/sdk";
-import { Plus } from "lucide-react";
-import {
-  type MouseEvent as ReactMouseEvent,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
-import { getDomain } from "../../lib/domain";
 import { useDisplayPatch } from "../../state/useDisplayPatch";
 import { useDragHandlers } from "../../state/useDragHandlers";
-import {
-  registerToggleSize,
-  useEditHomeView,
-} from "../../state/useEditHomeView";
-import { domainsForChip, useFilterChip } from "../../state/useFilterChip";
+import { useEditHomeView } from "../../state/useEditHomeView";
+import { useFilterChip } from "../../state/useFilterChip";
+import { useHomePageData } from "../../state/useHomePageData";
+import { useTileContextMenu } from "../../state/useTileContextMenu";
+import { useToggleSizeRegistry } from "../../state/useToggleSizeRegistry";
 import type {
   CallParams,
-  EntitySize,
   EntityState,
   HaInstance,
   HaRoom,
   PendingOp,
 } from "../../types";
 import { EmptyState } from "../EmptyState";
-import { cycleSizeFor } from "../edit/EditableTileWrapper";
 import { EditModeToolbar } from "../edit/EditModeToolbar";
-import { SectionDragRow } from "../edit/SectionDragHandle";
-import {
-  bySortOrder,
-  CHIP_LABEL_KEY,
-  defaultSizeForEntity,
-  isRenderable,
-  passesChip,
-} from "./_helpers";
 import { FilterChipBar } from "./FilterChipBar";
-import { HomeMenu } from "./HomeMenu";
-import { HomePageDefault } from "./HomePageDefault";
-import { HomePageFiltered } from "./HomePageFiltered";
+import { HomePageHeader } from "./HomePageHeader";
+import { HomePageSections } from "./HomePageSections";
 import { TileContextMenu } from "./TileContextMenu";
 
 interface HomePageProps {
@@ -56,12 +32,12 @@ interface HomePageProps {
   t: (k: string) => string;
 }
 
-interface MenuState {
-  entity: EntityState;
-  x: number;
-  y: number;
-}
-
+/**
+ * Top-level orchestration for the Home page: composes the chip filter,
+ * data hooks, drag handlers, context menu, and edit-mode toolbar around
+ * the section renderer. Layout/data details live in dedicated hooks +
+ * sub-components.
+ */
 export function HomePage({
   instance,
   entities,
@@ -83,92 +59,14 @@ export function HomePage({
     enterEditMode,
     enterReorderSections,
   } = useEditHomeView();
-  const [menu, setMenu] = useState<MenuState | null>(null);
 
-  const allEntities = useMemo(
-    () => Array.from(entities.values()).filter(isRenderable),
-    [entities],
-  );
+  const { allEntities, entitiesByRoom, cameras, favorites, headerTitle } =
+    useHomePageData({ instance, entities, rooms, selectedChip, t });
 
-  useEffect(() => {
-    registerToggleSize(async (entityId: string) => {
-      const entity = entities.get(entityId);
-      if (!entity) return;
-      const current: EntitySize = entity.size ?? defaultSizeForEntity(entity);
-      const next = cycleSizeFor(entity, current);
-      if (next === current) return;
-      await patch(entityId, { size: next });
-    });
-    return () => {
-      registerToggleSize(null);
-    };
-  }, [entities, patch]);
+  const { menu, openMenu, closeMenu, onSetSize, onToggleFavorite, onHide } =
+    useTileContextMenu(patch);
 
-  const chipDomains = useMemo<ReadonlySet<string> | null>(
-    () => (selectedChip ? new Set(domainsForChip(selectedChip)) : null),
-    [selectedChip],
-  );
-  const visibleEntities = useMemo(() => {
-    if (!selectedChip || !chipDomains) return allEntities;
-    return allEntities.filter((e) => passesChip(e, selectedChip, chipDomains));
-  }, [allEntities, selectedChip, chipDomains]);
-
-  const entityRoomId = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const e of allEntities) {
-      if (e.area_id) map.set(e.entity_id, e.area_id);
-    }
-    for (const room of rooms) {
-      for (const re of room.entities) {
-        if (!map.has(re.entity_id)) map.set(re.entity_id, room.id);
-      }
-    }
-    return map;
-  }, [allEntities, rooms]);
-
-  const entitiesByRoom = useMemo(() => {
-    const map = new Map<string, EntityState[]>();
-    for (const e of visibleEntities) {
-      const rid = entityRoomId.get(e.entity_id);
-      if (!rid) continue;
-      const arr = map.get(rid) ?? [];
-      arr.push(e);
-      map.set(rid, arr);
-    }
-    return map;
-  }, [visibleEntities, entityRoomId]);
-
-  const cameras = useMemo(
-    () =>
-      allEntities
-        .filter((e) => getDomain(e.entity_id) === "camera")
-        .sort(bySortOrder),
-    [allEntities],
-  );
-  const favorites = useMemo(
-    () =>
-      allEntities
-        .filter((e) => e.is_favorite)
-        .sort((a, b) => (a.favorite_order ?? 0) - (b.favorite_order ?? 0)),
-    [allEntities],
-  );
-  const headerTitle = useMemo(
-    () => (selectedChip ? t(CHIP_LABEL_KEY[selectedChip]) : instance.name),
-    [selectedChip, instance.name, t],
-  );
-
-  const onContextMenu = (entity: EntityState, e: ReactMouseEvent) =>
-    setMenu({ entity, x: e.clientX, y: e.clientY });
-  const closeMenu = () => setMenu(null);
-  const onSetSize = (size: EntitySize) => {
-    if (menu) void patch(menu.entity.entity_id, { size });
-  };
-  const onToggleFavorite = (next: boolean) => {
-    if (menu) void patch(menu.entity.entity_id, { is_favorite: next });
-  };
-  const onHide = () => {
-    if (menu) void patch(menu.entity.entity_id, { hidden: true });
-  };
+  useToggleSizeRegistry(entities, patch);
 
   const { sensors, handleDragEnd, handleSectionDragEnd } = useDragHandlers({
     instanceId: instance.id,
@@ -181,30 +79,6 @@ export function HomePage({
     reorderRoomEntitiesOptimistic,
   });
 
-  const sharedSectionProps = {
-    instance,
-    getPending,
-    onCall,
-    onContextMenu,
-    onOpenRoom,
-    t,
-    editMode,
-  };
-  const filteredProps = {
-    ...sharedSectionProps,
-    entities,
-    cameras,
-    rooms,
-    entitiesByRoom,
-  };
-  const defaultProps = {
-    ...sharedSectionProps,
-    cameras,
-    favorites,
-    rooms,
-    entitiesByRoom,
-  };
-
   const headerEl = editMode ? (
     <EditModeToolbar
       title={instance.name}
@@ -214,7 +88,7 @@ export function HomePage({
       t={t}
     />
   ) : (
-    <Header
+    <HomePageHeader
       title={headerTitle}
       instanceId={instance.id}
       rooms={rooms}
@@ -249,46 +123,25 @@ export function HomePage({
           t={t}
         />
       )}
-      {reorderSections ? (
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragEnd={handleSectionDragEnd}
-        >
-          <SortableContext
-            id="sections"
-            items={rooms.map((r) => r.id)}
-            strategy={verticalListSortingStrategy}
-          >
-            <div className="flex flex-col gap-2">
-              {rooms.map((room) => (
-                <SectionDragRow
-                  key={room.id}
-                  room={room}
-                  count={(entitiesByRoom.get(room.id) ?? []).length}
-                  t={t}
-                />
-              ))}
-            </div>
-          </SortableContext>
-        </DndContext>
-      ) : editMode ? (
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragEnd={handleDragEnd}
-        >
-          {selectedChip ? (
-            <HomePageFiltered {...filteredProps} selectedChip={selectedChip} />
-          ) : (
-            <HomePageDefault {...defaultProps} />
-          )}
-        </DndContext>
-      ) : selectedChip ? (
-        <HomePageFiltered {...filteredProps} selectedChip={selectedChip} />
-      ) : (
-        <HomePageDefault {...defaultProps} />
-      )}
+      <HomePageSections
+        instance={instance}
+        entities={entities}
+        rooms={rooms}
+        cameras={cameras}
+        favorites={favorites}
+        entitiesByRoom={entitiesByRoom}
+        selectedChip={selectedChip}
+        editMode={editMode}
+        reorderSections={reorderSections}
+        sensors={sensors}
+        onDragEnd={handleDragEnd}
+        onSectionDragEnd={handleSectionDragEnd}
+        getPending={getPending}
+        onCall={onCall}
+        onContextMenu={openMenu}
+        onOpenRoom={onOpenRoom}
+        t={t}
+      />
       {menu && (
         <TileContextMenu
           entity={menu.entity}
@@ -301,55 +154,6 @@ export function HomePage({
           t={t}
         />
       )}
-    </div>
-  );
-}
-
-function Header({
-  title,
-  instanceId,
-  rooms,
-  t,
-  onOpenSettings,
-  onEnterEditMode,
-  onEnterReorderSections,
-  onOpenRoom,
-}: {
-  title: string;
-  instanceId: string;
-  rooms: HaRoom[];
-  t: (k: string) => string;
-  onOpenSettings: () => void;
-  onEnterEditMode: () => void;
-  onEnterReorderSections: () => void;
-  onOpenRoom: (id: string) => void;
-}) {
-  return (
-    <div className="flex items-center justify-between">
-      <h1 className="text-2xl font-semibold text-[var(--text-primary)]">
-        {title}
-      </h1>
-      <div className="flex items-center gap-1">
-        <button
-          type="button"
-          aria-label={t("homeAdd")}
-          onClick={() => {
-            console.log("[HomePage] add accessory clicked");
-          }}
-          className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-[var(--text-secondary)] transition hover:bg-white/[0.06]"
-        >
-          <Plus size={20} />
-        </button>
-        <HomeMenu
-          instanceId={instanceId}
-          rooms={rooms}
-          t={t}
-          onOpenSettings={onOpenSettings}
-          onEditHomeView={onEnterEditMode}
-          onReorderSections={onEnterReorderSections}
-          onOpenRoom={onOpenRoom}
-        />
-      </div>
     </div>
   );
 }
