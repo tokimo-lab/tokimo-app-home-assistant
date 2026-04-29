@@ -74,11 +74,16 @@ export function chipHasEntities(
   chip: ChipId,
   entities: ReadonlyMap<
     string,
-    { entity_id: string; attributes?: Record<string, unknown> }
+    {
+      entity_id: string;
+      attributes?: Record<string, unknown>;
+      hidden?: boolean;
+    }
   >,
 ): boolean {
   const domains = new Set(CHIP_TO_DOMAINS[chip]);
   for (const ent of entities.values()) {
+    if (ent.hidden) continue;
     const d = entityIdDomain(ent.entity_id);
     if (!domains.has(d)) continue;
     if (chip === "climate" && d === "sensor") {
