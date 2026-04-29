@@ -444,4 +444,16 @@ export const zhCN: Record<string, string> = {
   roomsSyncDescription: "从 Home Assistant 同步区域为房间，并管理排序与图标",
   roomsIconPlaceholder: "🏠 或 mdi:sofa",
   roomsIconEditTitle: "点击编辑图标",
+
+  // Top menu bar — actions
+  menuActions: "操作",
+  syncFamilyItem: "同步「{name}」",
+  syncModalTitle: "同步家庭",
+  syncClearLabel: "清空数据重新同步",
+  syncClearHint:
+    "勾选后将删除该家庭中所有设备并重新完整同步，适合修复数据异常。",
+  syncConfirm: "开始同步",
+  syncCancel: "取消",
+  syncStartedToast: "同步已开始",
+  syncFailedToast: "同步失败",
 };

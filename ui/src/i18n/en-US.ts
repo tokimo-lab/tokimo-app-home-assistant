@@ -449,4 +449,16 @@ export const enUS: Record<string, string> = {
     "Sync areas from Home Assistant as rooms, and manage order and icons.",
   roomsIconPlaceholder: "🏠 or mdi:sofa",
   roomsIconEditTitle: "Click to edit icon",
+
+  // Top menu bar — actions
+  menuActions: "Actions",
+  syncFamilyItem: 'Sync "{name}"',
+  syncModalTitle: "Sync Family",
+  syncClearLabel: "Clear data and resync",
+  syncClearHint:
+    "When checked, all devices in this family will be removed and fully re-synced. Use this to recover from data inconsistencies.",
+  syncConfirm: "Start Sync",
+  syncCancel: "Cancel",
+  syncStartedToast: "Sync started",
+  syncFailedToast: "Sync failed",
 };

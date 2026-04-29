@@ -2,10 +2,9 @@ import {
   type AppRuntimeCtx,
   type Dispose,
   defineApp,
-  type MenuBarConfig,
   makeTranslator,
 } from "@tokimo/sdk";
-import { useShellMenuBar, useShellWindowNav } from "@tokimo/sdk/react";
+import { useShellWindowNav } from "@tokimo/sdk/react";
 import {
   ConfigProvider,
   ToastProvider,
@@ -24,6 +23,7 @@ import {
 } from "./components/settings/SettingsPane";
 import { AnimatedSettingsPane } from "./components/shell/AnimatedSettingsPane";
 import { AppShell } from "./components/shell/AppShell";
+import { HomeAssistantMenuBar } from "./components/shell/HomeAssistantMenuBar";
 import { enUS, zhCN } from "./i18n";
 // @ts-expect-error -- side-effect css import
 import "./index.css";
@@ -165,26 +165,7 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
   }, [ctx, t]);
 
   // ── MenuBar ──────────────────────────────────────────────────────────────
-  const menuBarConfig = useMemo<MenuBarConfig>(
-    () => ({
-      menus: [
-        {
-          key: "home-assistant",
-          label: "Home Assistant",
-          items: [
-            {
-              key: "reload",
-              label: t("menuReload"),
-              onClick: () => void reloadInstances(),
-            },
-          ],
-        },
-      ],
-      about: { description: "Home Assistant", version: "0.1.0" },
-    }),
-    [t, reloadInstances],
-  );
-  useShellMenuBar(ctx, menuBarConfig);
+  // Configured inside <HomeAssistantMenuBar> wrapper below.
 
   // ── Redirect from "/" ────────────────────────────────────────────────────
   useEffect(() => {
@@ -251,110 +232,117 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
   const activeInstance = instances.find((i) => i.id === instanceId) ?? null;
 
   return (
-    <AppShell
+    <HomeAssistantMenuBar
+      ctx={ctx}
       instances={instances}
-      activeInstanceId={effectiveInstanceId}
-      settingsActive={
-        settingsTab !== null ||
-        creatingFamily ||
-        accessorySettingsEntityId !== null
-      }
-      onNavigate={navigateTo}
-      onCreateInstance={openCreateFamily}
-      onOpenSettings={() => openSettings({ tab: "family" })}
-      onContextMenuInstance={(id, e) => {
-        e.preventDefault();
-        if (id !== instanceId) {
-          navigateTo(`/instance/${id}/home`);
-        }
-        openSettings({ tab: "family", instanceId: id });
-      }}
       t={t}
+      reloadInstances={reloadInstances}
     >
-      {parsed.page === "home" && activeInstance && (
-        <>
-          <HomePage
-            instance={activeInstance}
-            entities={entities}
-            rooms={rooms}
-            ctx={ctx}
-            getPending={getPending}
-            onCall={onCall}
-            onOpenRoom={() => {
-              /* HomePage uses pushRoom() internally via useRoomNav */
-            }}
-            onOpenSettings={() => openSettings({ tab: "family" })}
-            t={t}
-          />
-          <RoomPageHost
-            instance={activeInstance}
-            entities={entities}
-            rooms={rooms}
-            ctx={ctx}
-            getPending={getPending}
-            onCall={onCall}
-            t={t}
-          />
-          <DetailOverlay
-            getEntity={(id) => entities.get(id)}
-            onCall={onCall}
-            getPending={getPending}
-            onOpenSettings={(eid) => {
-              setAccessorySettingsEntityId(eid);
-              closeDetail();
-            }}
-            t={t}
-          />
-        </>
-      )}
+      <AppShell
+        instances={instances}
+        activeInstanceId={effectiveInstanceId}
+        settingsActive={
+          settingsTab !== null ||
+          creatingFamily ||
+          accessorySettingsEntityId !== null
+        }
+        onNavigate={navigateTo}
+        onCreateInstance={openCreateFamily}
+        onOpenSettings={() => openSettings({ tab: "family" })}
+        onContextMenuInstance={(id, e) => {
+          e.preventDefault();
+          if (id !== instanceId) {
+            navigateTo(`/instance/${id}/home`);
+          }
+          openSettings({ tab: "family", instanceId: id });
+        }}
+        t={t}
+      >
+        {parsed.page === "home" && activeInstance && (
+          <>
+            <HomePage
+              instance={activeInstance}
+              entities={entities}
+              rooms={rooms}
+              ctx={ctx}
+              getPending={getPending}
+              onCall={onCall}
+              onOpenRoom={() => {
+                /* HomePage uses pushRoom() internally via useRoomNav */
+              }}
+              onOpenSettings={() => openSettings({ tab: "family" })}
+              t={t}
+            />
+            <RoomPageHost
+              instance={activeInstance}
+              entities={entities}
+              rooms={rooms}
+              ctx={ctx}
+              getPending={getPending}
+              onCall={onCall}
+              t={t}
+            />
+            <DetailOverlay
+              getEntity={(id) => entities.get(id)}
+              onCall={onCall}
+              getPending={getPending}
+              onOpenSettings={(eid) => {
+                setAccessorySettingsEntityId(eid);
+                closeDetail();
+              }}
+              t={t}
+            />
+          </>
+        )}
 
-      <AnimatedSettingsPane open={settingsTab !== null}>
-        {settingsTab !== null && (
-          <SettingsPane
-            instance={
-              settingsTargetId
-                ? (instances.find((i) => i.id === settingsTargetId) ?? null)
-                : null
-            }
-            onClose={closeSettings}
-            onInstanceUpdated={() => void reloadInstances()}
-            onInstanceDeleted={() => {
-              const deletedId = settingsTargetId;
-              closeSettings();
-              void reloadInstances();
-              const remaining = instances.filter((i) => i.id !== deletedId);
-              if (remaining.length > 0) {
-                navigateTo(`/instance/${remaining[0].id}/home`);
-              } else {
-                nav.replace("/setup", "Home Assistant");
+        <AnimatedSettingsPane open={settingsTab !== null}>
+          {settingsTab !== null && (
+            <SettingsPane
+              instance={
+                settingsTargetId
+                  ? (instances.find((i) => i.id === settingsTargetId) ?? null)
+                  : null
               }
-            }}
-            t={t}
-          />
-        )}
-      </AnimatedSettingsPane>
+              onClose={closeSettings}
+              onInstanceUpdated={() => void reloadInstances()}
+              onInstanceDeleted={() => {
+                const deletedId = settingsTargetId;
+                closeSettings();
+                void reloadInstances();
+                const remaining = instances.filter((i) => i.id !== deletedId);
+                if (remaining.length > 0) {
+                  navigateTo(`/instance/${remaining[0].id}/home`);
+                } else {
+                  nav.replace("/setup", "Home Assistant");
+                }
+              }}
+              t={t}
+            />
+          )}
+        </AnimatedSettingsPane>
 
-      <AnimatedSettingsPane open={creatingFamily}>
-        {creatingFamily && (
-          <SetupPage
-            t={t}
-            onCreated={handleFamilyCreated}
-            onCancel={closeCreateFamily}
-          />
-        )}
-      </AnimatedSettingsPane>
+        <AnimatedSettingsPane open={creatingFamily}>
+          {creatingFamily && (
+            <SetupPage
+              t={t}
+              onCreated={handleFamilyCreated}
+              onCancel={closeCreateFamily}
+            />
+          )}
+        </AnimatedSettingsPane>
 
-      <AnimatedSettingsPane open={accessorySettingsEntityId !== null}>
-        {accessorySettingsEntityId !== null && activeInstance && (
-          <AccessorySettingsPage
-            instanceId={activeInstance.id}
-            entityId={accessorySettingsEntityId}
-            onClose={() => setAccessorySettingsEntityId(null)}
-            t={t}
-          />
-        )}
-      </AnimatedSettingsPane>
-    </AppShell>
+        <AnimatedSettingsPane open={accessorySettingsEntityId !== null}>
+          {accessorySettingsEntityId !== null && activeInstance && (
+            <AccessorySettingsPage
+              instanceId={activeInstance.id}
+              entityId={accessorySettingsEntityId}
+              onClose={() => setAccessorySettingsEntityId(null)}
+              t={t}
+            />
+          )}
+        </AnimatedSettingsPane>
+      </AppShell>
+    </HomeAssistantMenuBar>
   );
 }
 
