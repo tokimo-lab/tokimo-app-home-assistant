@@ -266,8 +266,8 @@ export function TileBaseStyle({
         <p
           data-tile-name
           className={cn(
-            "truncate text-sm font-semibold leading-tight",
-            active ? "text-white" : "text-gray-700 dark:text-gray-200",
+            "truncate text-[15px] font-semibold leading-tight",
+            active ? "text-white" : "text-gray-700 dark:text-gray-100",
           )}
         >
           {name}
@@ -276,8 +276,8 @@ export function TileBaseStyle({
           <p
             data-tile-state
             className={cn(
-              "mt-0.5 truncate text-xs leading-tight",
-              active ? "text-white/85" : "text-gray-500 dark:text-gray-400",
+              "mt-0.5 truncate text-[13px] leading-tight",
+              active ? "text-white/90" : "text-gray-500 dark:text-gray-400",
             )}
           >
             {stateText}

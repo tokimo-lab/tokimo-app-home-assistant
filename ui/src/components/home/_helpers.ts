@@ -149,17 +149,122 @@ const CRITICAL_BINARY_SENSOR_CLASSES = new Set([
   "co",
 ]);
 
+/**
+ * Friendly-name keyword heuristics for switch / binary_sensor demotion.
+ *
+ * HA exposes many "configuration" switches (AI detection toggle, swing
+ * direction, child lock, indicator-light, watermark, …) under the bare
+ * `switch` domain. These technically pass the Tier-1 filter but pollute
+ * the default home page. We demote them to Tier 3 by name match so
+ * real lights / outlets stay on the front page.
+ *
+ * Symmetrically, binary_sensor entities matching a critical keyword
+ * (door / window / motion / leak …) are promoted to Tier 2 even when
+ * device_class isn't set — and obvious diagnostic ones (filter / fault
+ * / 报警) are pushed to Tier 3.
+ *
+ * Keyword match is case-insensitive substring on the resolved
+ * friendly_name. Keep this list tightly focused on "obviously not
+ * day-to-day operation" — when in doubt, leave at Tier 1.
+ */
+const SWITCH_NOISE_KEYWORDS = [
+  // detection / diagnostic
+  "检测",
+  "report",
+  "诊断",
+  "diagnostic",
+  "ai ",
+  "ai检测",
+  "灵敏度",
+  "sensitivity",
+  // motion vanes / swing
+  "上下摆风",
+  "左右摆风",
+  "swing",
+  // safety / lock
+  "童锁",
+  "锁定",
+  "calibrate",
+  "校准",
+  "镜头校准",
+  // notifications / alarms / indicators
+  "通知",
+  "提醒",
+  "alarm",
+  "buzzer",
+  "蜂鸣",
+  "指示灯",
+  "indicator",
+  "夜灯",
+  "警告音",
+  // OSD / watermark / display
+  "状态显示",
+  "osd",
+  "时间戳",
+  "水印",
+  "watermark",
+  // codec / quality
+  "音频编码",
+  "码率",
+  "bitrate",
+  "帧率",
+  "fps",
+];
+
+const BINARY_SENSOR_NOISE_KEYWORDS = ["滤网", "滤芯", "故障", "报警", "fault"];
+
+const BINARY_SENSOR_CRITICAL_KEYWORDS = [
+  "门",
+  "窗",
+  "人体",
+  "移动",
+  "占用",
+  "motion",
+  "occupancy",
+  "door",
+  "window",
+  "leak",
+  "smoke",
+  "gas",
+  "co2",
+  "co_alarm",
+];
+
+function resolveName(entity: EntityState): string {
+  const raw =
+    entity.display_name ??
+    (entity.attributes?.friendly_name as string | undefined) ??
+    entity.entity_id;
+  return raw.toLowerCase();
+}
+
+function matchesAny(haystack: string, needles: readonly string[]): boolean {
+  for (const n of needles) {
+    if (haystack.includes(n)) return true;
+  }
+  return false;
+}
+
 export type DomainTier = 1 | 2 | 3;
 
 export function domainTier(entity: EntityState): DomainTier {
   const d = getDomain(entity.entity_id);
-  if (TIER1_DOMAINS.has(d)) return 1;
+  if (TIER1_DOMAINS.has(d)) {
+    if (d === "switch") {
+      const name = resolveName(entity);
+      if (matchesAny(name, SWITCH_NOISE_KEYWORDS)) return 3;
+    }
+    return 1;
+  }
   if (TIER2_DOMAINS.has(d)) return 2;
   if (d === "binary_sensor") {
+    const name = resolveName(entity);
+    if (matchesAny(name, BINARY_SENSOR_NOISE_KEYWORDS)) return 3;
     const dc = entity.attributes?.device_class;
     if (typeof dc === "string" && CRITICAL_BINARY_SENSOR_CLASSES.has(dc)) {
       return 2;
     }
+    if (matchesAny(name, BINARY_SENSOR_CRITICAL_KEYWORDS)) return 2;
   }
   return 3;
 }
