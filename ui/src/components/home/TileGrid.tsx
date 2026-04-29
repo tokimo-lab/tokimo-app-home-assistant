@@ -112,25 +112,53 @@ export function TileGrid({
       >
         <LayoutGroup>
           {entities.map((entity) => {
-          const Tile = resolveTile(entity);
-          const size = forceSize ?? effectiveSizeForEntity(entity);
+            const Tile = resolveTile(entity);
+            const size = forceSize ?? effectiveSizeForEntity(entity);
 
-          const tile = (
-            <Tile
-              entity={entity}
-              instanceId={instanceId}
-              pending={getPending(entity.entity_id)}
-              onCall={onCall}
-              t={t}
-              size={size}
-            />
-          );
+            const tile = (
+              <Tile
+                entity={entity}
+                instanceId={instanceId}
+                pending={getPending(entity.entity_id)}
+                onCall={onCall}
+                t={t}
+                size={size}
+              />
+            );
 
-          if (editMode) {
-            const jiggleStyle: CSSProperties = {
-              animationDelay: `${jiggleDelayMs(entity.entity_id)}ms`,
-            };
+            if (editMode) {
+              const jiggleStyle: CSSProperties = {
+                animationDelay: `${jiggleDelayMs(entity.entity_id)}ms`,
+              };
+              return (
+                <motion.div
+                  key={entity.entity_id}
+                  layout="position"
+                  layoutId={entity.entity_id}
+                  transition={LAYOUT_SPRING}
+                  data-size={size}
+                  data-entity-id={entity.entity_id}
+                  className={cn(SIZE_SPAN[size], "relative")}
+                >
+                  <div
+                    className="tile-jiggle h-full w-full"
+                    style={jiggleStyle}
+                  >
+                    <EditableTileWrapper
+                      entity={entity}
+                      sortableContainerId={sortableContainerId}
+                      onRemove={onRemoveTile}
+                      removeLabel={removeLabel}
+                    >
+                      {tile}
+                    </EditableTileWrapper>
+                  </div>
+                </motion.div>
+              );
+            }
+
             return (
+              // biome-ignore lint/a11y/noStaticElementInteractions: contextmenu is a passive enhancement
               <motion.div
                 key={entity.entity_id}
                 layout="position"
@@ -138,45 +166,20 @@ export function TileGrid({
                 transition={LAYOUT_SPRING}
                 data-size={size}
                 data-entity-id={entity.entity_id}
-                className={cn(SIZE_SPAN[size], "relative")}
+                className={SIZE_SPAN[size]}
+                onContextMenu={
+                  onContextMenu
+                    ? (e) => {
+                        e.preventDefault();
+                        onContextMenu(entity, e);
+                      }
+                    : undefined
+                }
               >
-                <div className="tile-jiggle h-full w-full" style={jiggleStyle}>
-                  <EditableTileWrapper
-                    entity={entity}
-                    sortableContainerId={sortableContainerId}
-                    onRemove={onRemoveTile}
-                    removeLabel={removeLabel}
-                  >
-                    {tile}
-                  </EditableTileWrapper>
-                </div>
+                {tile}
               </motion.div>
             );
-          }
-
-          return (
-            // biome-ignore lint/a11y/noStaticElementInteractions: contextmenu is a passive enhancement
-            <motion.div
-              key={entity.entity_id}
-              layout="position"
-              layoutId={entity.entity_id}
-              transition={LAYOUT_SPRING}
-              data-size={size}
-              data-entity-id={entity.entity_id}
-              className={SIZE_SPAN[size]}
-              onContextMenu={
-                onContextMenu
-                  ? (e) => {
-                      e.preventDefault();
-                      onContextMenu(entity, e);
-                    }
-                  : undefined
-              }
-            >
-              {tile}
-            </motion.div>
-          );
-        })}
+          })}
         </LayoutGroup>
       </div>
     </div>

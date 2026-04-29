@@ -53,13 +53,7 @@ export function WelcomePage({ t, onGetStarted }: WelcomePageProps) {
   );
 }
 
-function FeatureRow({
-  icon,
-  text,
-}: {
-  icon: React.ReactNode;
-  text: string;
-}) {
+function FeatureRow({ icon, text }: { icon: React.ReactNode; text: string }) {
   return (
     <div className="flex items-center gap-3 rounded-2xl bg-white/[0.04] px-4 py-3 text-left">
       <div className="flex h-10 w-10 flex-none items-center justify-center rounded-xl bg-white/[0.06]">

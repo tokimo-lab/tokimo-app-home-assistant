@@ -277,8 +277,7 @@ export function TileShell({
             "flex h-9 w-9 items-center justify-center rounded-full",
             "transition-[box-shadow,background-color,color] duration-150",
             iconBgFor(state, domain),
-            !isUnavailable &&
-              "cursor-pointer hover:ring-4 hover:ring-white/15",
+            !isUnavailable && "cursor-pointer hover:ring-4 hover:ring-white/15",
           )}
         >
           {icon}

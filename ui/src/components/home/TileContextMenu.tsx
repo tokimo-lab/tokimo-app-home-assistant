@@ -5,7 +5,14 @@ import {
   useInteractions,
   useRole,
 } from "@floating-ui/react";
-import { Check, EyeOff, LayoutGrid, Sliders, Star, StarOff } from "lucide-react";
+import {
+  Check,
+  EyeOff,
+  LayoutGrid,
+  Sliders,
+  Star,
+  StarOff,
+} from "lucide-react";
 import { useLayoutEffect } from "react";
 import type { EntitySize, EntityState } from "../../types";
 import { effectiveSizeForEntity } from "./_helpers";

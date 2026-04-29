@@ -148,9 +148,7 @@ function Row({
   t: (k: string) => string;
 }) {
   const name =
-    entity.display_name ??
-    entity.attributes.friendly_name ??
-    entity.entity_id;
+    entity.display_name ?? entity.attributes.friendly_name ?? entity.entity_id;
   const icon = entity.custom_icon ?? entity.attributes.icon ?? "💡";
   const isPrimary = entity.group_primary === true;
 

@@ -118,9 +118,7 @@ export function AddMenu({
               icon={Clock}
               label={t("addAutomation")}
               disabled={!baseUrl}
-              onClick={handle(() =>
-                openHaPath("/config/automation/dashboard"),
-              )}
+              onClick={handle(() => openHaPath("/config/automation/dashboard"))}
             />
             <AddMenuItem
               icon={LayoutGrid}

@@ -88,9 +88,7 @@ function passesBase(entity: EntityState): boolean {
 
 function isVisible(entity: EntityState): boolean {
   return (
-    passesBase(entity) &&
-    !entity.collapsed &&
-    entity.group_primary !== false
+    passesBase(entity) && !entity.collapsed && entity.group_primary !== false
   );
 }
 

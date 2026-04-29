@@ -105,9 +105,7 @@ export function effectiveSizeForEntity(entity: EntityState): EntitySize {
  * `undefined` / `null` as visible and only suppress when explicitly false.
  */
 export function isHomeVisible(entity: EntityState): boolean {
-  return (
-    !entity.hidden && !entity.collapsed && entity.group_primary !== false
-  );
+  return !entity.hidden && !entity.collapsed && entity.group_primary !== false;
 }
 
 export const CHIP_LABEL_KEY: Record<ChipId, string> = {

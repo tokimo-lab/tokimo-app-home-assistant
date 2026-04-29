@@ -89,9 +89,7 @@ export function RoomDomainSection({
         >
           <ChevronDown
             size={16}
-            className={
-              localExpanded ? "rotate-180 transition" : "transition"
-            }
+            className={localExpanded ? "rotate-180 transition" : "transition"}
           />
           <span>
             {localExpanded

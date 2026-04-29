@@ -149,10 +149,7 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
       const inst = instances.find((i) => i.id === id);
       if (!inst) return;
       writePreferredInstanceId(id);
-      nav.navigate(
-        `/instance/${id}/home`,
-        `${inst.name} · ${t("navHome")}`,
-      );
+      nav.navigate(`/instance/${id}/home`, `${inst.name} · ${t("navHome")}`);
     },
     [instances, nav, t],
   );
@@ -307,11 +304,7 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
               onCall={onCall}
               t={t}
             />
-            <EntityManagementHost
-              instance={activeInstance}
-              ctx={ctx}
-              t={t}
-            />
+            <EntityManagementHost instance={activeInstance} ctx={ctx} t={t} />
             <DetailOverlay
               getEntity={(id) => entities.get(id)}
               onCall={onCall}
