@@ -149,6 +149,7 @@ export const enUS: Record<string, string> = {
   menuRoomSettings: "Room Settings",
   menuAutomation: "Automation",
   homeSwitch: "Switch home",
+  homeSwitchTitle: "Switch Home",
   favoritesEmpty: "Long-press a tile and choose “Add to Favorites”",
 
   // Filter chips (top-row category tabs)

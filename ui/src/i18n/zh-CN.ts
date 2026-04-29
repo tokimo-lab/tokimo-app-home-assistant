@@ -149,6 +149,7 @@ export const zhCN: Record<string, string> = {
   menuRoomSettings: "房间设置",
   menuAutomation: "自动化",
   homeSwitch: "切换家庭",
+  homeSwitchTitle: "切换家庭",
   favoritesEmpty: "长按某个配件，选择「加入收藏」",
 
   // Filter chips

@@ -30,6 +30,8 @@ interface HomePageProps {
   instance: HaInstance;
   entities: ReadonlyMap<string, EntityState>;
   rooms: HaRoom[];
+  instances: HaInstance[];
+  onSwitchInstance: (id: string) => void;
   ctx: AppRuntimeCtx;
   getPending: (entityId: string) => PendingOp | undefined;
   onCall: (params: CallParams) => void;
@@ -48,6 +50,8 @@ export function HomePage({
   instance,
   entities,
   rooms,
+  instances,
+  onSwitchInstance,
   ctx,
   getPending,
   onCall,
@@ -154,6 +158,9 @@ export function HomePage({
       instanceId={instance.id}
       instanceBaseUrl={instance.base_url}
       rooms={rooms}
+      instances={instances}
+      currentInstanceId={instance.id}
+      onSwitchInstance={onSwitchInstance}
       t={t}
       onOpenSettings={onOpenSettings}
       onEnterEditMode={enterEditMode}

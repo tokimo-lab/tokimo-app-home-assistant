@@ -11,7 +11,7 @@ import {
   enUS as uiEnUS,
   zhCN as uiZhCN,
 } from "@tokimo/ui";
-import { StrictMode, useEffect, useMemo, useState } from "react";
+import { StrictMode, useCallback, useEffect, useMemo, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { DetailOverlay } from "./components/detail/DetailOverlay";
 import { HomePage } from "./components/home/HomePage";
@@ -38,6 +38,24 @@ import { useInstances } from "./state/useInstances";
 import { clearRoomStack, pushRoom } from "./state/useRoomNav";
 import { useRooms } from "./state/useRooms";
 import type { ParsedRoute } from "./types";
+
+const ACTIVE_INSTANCE_LS_KEY = "ha:active_instance_id";
+
+function readPreferredInstanceId(): string | null {
+  try {
+    return localStorage.getItem(ACTIVE_INSTANCE_LS_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function writePreferredInstanceId(id: string): void {
+  try {
+    localStorage.setItem(ACTIVE_INSTANCE_LS_KEY, id);
+  } catch {
+    // ignore — localStorage may be disabled
+  }
+}
 
 function parseRoute(route: string): ParsedRoute {
   if (route === "/setup") return { page: "setup" };
@@ -117,10 +135,25 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
   useEffect(() => {
     const inst = instances.find((i) => i.id === instanceId);
     setActiveInstance(instanceId, inst?.name ?? null);
+    if (instanceId) writePreferredInstanceId(instanceId);
     // Switching home/family invalidates any pushed rooms or open detail card.
     clearRoomStack();
     closeDetail();
   }, [instanceId, instances, closeDetail]);
+
+  // ── Switch home (used by HomePageHeader dropdown) ────────────────────────
+  const handleSwitchInstance = useCallback(
+    (id: string) => {
+      const inst = instances.find((i) => i.id === id);
+      if (!inst) return;
+      writePreferredInstanceId(id);
+      nav.navigate(
+        `/instance/${id}/home`,
+        `${inst.name} · ${t("navHome")}`,
+      );
+    },
+    [instances, nav, t],
+  );
 
   // ── Wire DetailOverlay's "open in new window" to ShellApi.openModalWindow ─
   // The desktop shell's openModalWindow is now a typed first-class API on
@@ -151,10 +184,14 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
     if (instances.length === 0) {
       nav.replace("/setup", "Home Assistant");
     } else {
-      const first = instances[0];
+      // Prefer last-used instance from localStorage when available.
+      const preferredId = readPreferredInstanceId();
+      const target =
+        (preferredId && instances.find((i) => i.id === preferredId)) ||
+        instances[0];
       nav.replace(
-        `/instance/${first.id}/home`,
-        `${first.name} · ${t("navHome")}`,
+        `/instance/${target.id}/home`,
+        `${target.name} · ${t("navHome")}`,
       );
     }
   }, [parsed.page, instances, instancesLoading, nav, t]);
@@ -237,6 +274,8 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
               instance={activeInstance}
               entities={entities}
               rooms={rooms}
+              instances={instances}
+              onSwitchInstance={handleSwitchInstance}
               ctx={ctx}
               getPending={getPending}
               onCall={onCall}
