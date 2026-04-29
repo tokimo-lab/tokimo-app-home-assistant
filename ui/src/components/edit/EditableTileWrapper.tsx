@@ -1,7 +1,7 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@tokimo/ui";
-import { ArrowDownRight, Minus } from "lucide-react";
+import { Maximize2, Minus } from "lucide-react";
 import {
   type CSSProperties,
   type MouseEvent as ReactMouseEvent,
@@ -160,12 +160,12 @@ export function EditableTileWrapper({
           onPointerDown={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
           className={cn(
-            "absolute -bottom-1.5 -right-1.5 z-10 flex h-7 w-7 items-center justify-center",
+            "absolute -top-1.5 -right-1.5 z-10 flex h-7 w-7 items-center justify-center",
             "cursor-pointer rounded-full bg-gray-900 text-white shadow-lg",
             "ring-1 ring-white/60 transition-transform hover:scale-110",
           )}
         >
-          <ArrowDownRight size={14} />
+          <Maximize2 size={14} />
         </button>
       )}
     </div>
