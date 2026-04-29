@@ -432,7 +432,7 @@ pub struct SyncStats {
 /// Implements three-layer fallback for group_id:
 /// 1. Same device_id (no domain suffix) → cross-domain aggregation
 /// 2. Same via_device + area → hub-based aggregation
-/// 3. Same area + LCP clustering → name-based aggregation
+/// 3. Same area + LCP clustering (cross-group merge) → name-based aggregation
 /// 4. None of above → singleton
 fn compute_decisions(entries: &[HaEntityRegistryEntry]) -> Vec<Decision> {
     let mut decisions: Vec<Decision> = entries
@@ -468,42 +468,98 @@ fn compute_decisions(entries: &[HaEntityRegistryEntry]) -> Vec<Decision> {
         }
     }
 
-    // Layer 3: LCP clustering per area
-    let mut area_entities: HashMap<String, Vec<usize>> = HashMap::new();
-    for (idx, e) in entries.iter().enumerate() {
-        if decisions[idx].group_id.is_some() {
-            continue; // Already grouped
+    // Collect all Layer-1 and Layer-2 groups for interim primary selection
+    let mut all_groups = device_groups.clone();
+    all_groups.extend(via_groups.clone());
+
+    // Interim primary selection: within each Layer-1/2 group, pick the best entity
+    for member_idxs in all_groups.values() {
+        if member_idxs.len() <= 1 {
+            continue;
         }
-        if let Some(area) = &e.area_id {
-            area_entities.entry(area.clone()).or_default().push(idx);
+        let mut ranked = member_idxs.clone();
+        ranked.sort_by_key(|&idx| entries[idx].primary_sort_key());
+        // First = primary, rest = secondary
+        for &idx in ranked.iter().skip(1) {
+            decisions[idx].group_primary = false;
         }
     }
 
-    for (area, indices) in area_entities.iter() {
-        if indices.len() < 2 {
-            continue; // No clustering needed for single entity
+    // Layer 3: LCP clustering across groups per area
+    // Build candidates: each Layer-1/2 group represented by its primary, plus ungrouped entities
+    #[derive(Clone)]
+    struct Candidate {
+        #[allow(dead_code)]
+        representative_idx: usize,
+        #[allow(dead_code)]
+        area_id: String,
+        friendly_name: String,
+        member_idxs: Vec<usize>,
+        #[allow(dead_code)]
+        current_group_id: Option<String>,
+    }
+
+    let mut area_candidates: HashMap<String, Vec<Candidate>> = HashMap::new();
+
+    // Add Layer-1/2 groups as candidates (represented by their primary)
+    for (group_id, member_idxs) in &all_groups {
+        if member_idxs.is_empty() {
+            continue;
+        }
+        let primary_idx = *member_idxs
+            .iter()
+            .find(|&&idx| decisions[idx].group_primary)
+            .unwrap_or(&member_idxs[0]);
+        let e = &entries[primary_idx];
+        if let (Some(area), Some(name)) = (&e.area_id, &e.friendly_name)
+            && !name.is_empty()
+        {
+            area_candidates.entry(area.clone()).or_default().push(Candidate {
+                representative_idx: primary_idx,
+                area_id: area.clone(),
+                friendly_name: name.clone(),
+                member_idxs: member_idxs.clone(),
+                current_group_id: Some(group_id.clone()),
+            });
+        }
+    }
+
+    // Add ungrouped entities as candidates
+    for (idx, e) in entries.iter().enumerate() {
+        if decisions[idx].group_id.is_some() {
+            continue; // Already in a group
+        }
+        if let (Some(area), Some(name)) = (&e.area_id, &e.friendly_name)
+            && !name.is_empty()
+        {
+            area_candidates.entry(area.clone()).or_default().push(Candidate {
+                representative_idx: idx,
+                area_id: area.clone(),
+                friendly_name: name.clone(),
+                member_idxs: vec![idx],
+                current_group_id: None,
+            });
+        }
+    }
+
+    // Run Union-Find LCP on candidates per area
+    for (area, candidates) in &area_candidates {
+        if candidates.len() < 2 {
+            continue;
         }
 
-        // Build Union-Find for this area
-        let mut uf = UnionFind::new(indices.len());
+        let mut uf = UnionFind::new(candidates.len());
 
         // Compare all pairs for LCP
-        for i in 0..indices.len() {
-            for j in (i + 1)..indices.len() {
-                let idx_a = indices[i];
-                let idx_b = indices[j];
-                let name_a = entries[idx_a].friendly_name.as_deref().unwrap_or("");
-                let name_b = entries[idx_b].friendly_name.as_deref().unwrap_or("");
-
-                if name_a.is_empty() || name_b.is_empty() {
-                    continue;
-                }
+        for i in 0..candidates.len() {
+            for j in (i + 1)..candidates.len() {
+                let name_a = &candidates[i].friendly_name;
+                let name_b = &candidates[j].friendly_name;
 
                 let lcp = longest_common_prefix(name_a, name_b);
                 let lcp_len = char_count(&lcp);
                 let shorter_len = char_count(name_a).min(char_count(name_b));
 
-                // Check threshold: LCP ≥ 50% of shorter name
                 if shorter_len == 0 {
                     continue;
                 }
@@ -525,15 +581,10 @@ fn compute_decisions(entries: &[HaEntityRegistryEntry]) -> Vec<Decision> {
                 continue;
             }
 
-            // Compute base name: LCP of all members in cluster
-            let mut base_name = entries[indices[cluster[0]]]
-                .friendly_name
-                .as_deref()
-                .unwrap_or("")
-                .to_string();
+            // Compute base name: LCP of all candidate friendly names in cluster
+            let mut base_name = candidates[cluster[0]].friendly_name.clone();
             for &local_idx in cluster.iter().skip(1) {
-                let global_idx = indices[local_idx];
-                let name = entries[global_idx].friendly_name.as_deref().unwrap_or("");
+                let name = &candidates[local_idx].friendly_name;
                 base_name = longest_common_prefix(&base_name, name);
             }
             base_name = trim_suffix(&base_name);
@@ -542,29 +593,36 @@ fn compute_decisions(entries: &[HaEntityRegistryEntry]) -> Vec<Decision> {
                 continue;
             }
 
-            // Generate group_id: sha1(base_name::area_id).truncate(16)
+            // Generate new group_id: sha1(base_name::area_id).truncate(16)
             let input = format!("{}::{}", base_name, area);
             let hash = Sha1::digest(input.as_bytes());
             let hash_hex = format!("{:x}", hash);
-            let group_id = format!("name::{}", &hash_hex[..16.min(hash_hex.len())]);
+            let new_group_id = format!("name::{}", &hash_hex[..16.min(hash_hex.len())]);
 
-            // Assign group_id to all cluster members
+            // Assign new group_id to all members of all candidates in this cluster
             for &local_idx in &cluster {
-                let global_idx = indices[local_idx];
-                decisions[global_idx].group_id = Some(group_id.clone());
+                for &global_idx in &candidates[local_idx].member_idxs {
+                    decisions[global_idx].group_id = Some(new_group_id.clone());
+                }
             }
-
-            // Add to groups for primary selection
-            via_groups.insert(group_id, cluster.iter().map(|&i| indices[i]).collect());
         }
     }
 
-    // Collect all groups for primary selection
-    let mut all_groups = device_groups;
-    all_groups.extend(via_groups);
+    // Final primary selection: rebuild groups from current decisions and re-elect primaries
+    let mut final_groups: HashMap<String, Vec<usize>> = HashMap::new();
+    for (idx, decision) in decisions.iter().enumerate() {
+        if let Some(group_id) = &decision.group_id {
+            final_groups.entry(group_id.clone()).or_default().push(idx);
+        }
+    }
 
-    // Primary selection: within each group, pick the best entity
-    for member_idxs in all_groups.values() {
+    // Reset all group_primary to true (for singletons)
+    for decision in &mut decisions {
+        decision.group_primary = true;
+    }
+
+    // Re-elect primary for each final group
+    for member_idxs in final_groups.values() {
         if member_idxs.len() <= 1 {
             continue;
         }
@@ -992,5 +1050,188 @@ mod tests {
         let visible = decisions.iter().filter(|d| !d.collapsed && d.group_primary).count();
         // All unique names, no clustering, all should be independent primaries
         assert_eq!(visible, 30, "all 30 lights stay visible without K-cap");
+    }
+
+    #[test]
+    fn test_cross_device_same_name_merges() {
+        // User's real case: 3 different integrations for the same physical light
+        // Each integration creates a separate device_id, but all have same area + friendly_name
+        let entries = vec![
+            // Yeelight local integration (device + light entity)
+            {
+                let mut e = entry("light.yeelight_ceiling");
+                e.device_id = Some("yeelight_dev1".into());
+                e.area_id = Some("bedroom2".into());
+                e.friendly_name = Some("次卧吸顶灯 灯".into());
+                e
+            },
+            {
+                let mut e = entry("sensor.yeelight_power");
+                e.device_id = Some("yeelight_dev1".into());
+                e.area_id = Some("bedroom2".into());
+                e.friendly_name = Some("次卧吸顶灯 功率".into());
+                e
+            },
+            // MiHome local integration (device + light entity)
+            {
+                let mut e = entry("light.mihome_ceiling");
+                e.device_id = Some("mihome_dev2".into());
+                e.area_id = Some("bedroom2".into());
+                e.friendly_name = Some("次卧吸顶灯 灯".into());
+                e
+            },
+            {
+                let mut e = entry("button.mihome_identify");
+                e.device_id = Some("mihome_dev2".into());
+                e.area_id = Some("bedroom2".into());
+                e.friendly_name = Some("次卧吸顶灯 识别".into());
+                e
+            },
+            // MiHome cloud integration (device + light entity)
+            {
+                let mut e = entry("light.micloud_ceiling");
+                e.device_id = Some("micloud_dev3".into());
+                e.area_id = Some("bedroom2".into());
+                e.friendly_name = Some("次卧吸顶灯 灯".into());
+                e
+            },
+            {
+                let mut e = entry("sensor.micloud_brightness");
+                e.device_id = Some("micloud_dev3".into());
+                e.area_id = Some("bedroom2".into());
+                e.friendly_name = Some("次卧吸顶灯 亮度".into());
+                e
+            },
+        ];
+
+        let decisions = compute_decisions(&entries);
+
+        // All 6 entities should be merged into one group via Layer-3 LCP
+        let group_ids: Vec<_> = decisions.iter().filter_map(|d| d.group_id.as_ref()).collect();
+        assert_eq!(group_ids.len(), 6, "all entities should have a group");
+        assert!(
+            group_ids.windows(2).all(|w| w[0] == w[1]),
+            "all should be in the same group"
+        );
+        assert!(
+            group_ids[0].starts_with("name::"),
+            "should be name-based merge, got: {}",
+            group_ids[0]
+        );
+
+        // Only one primary (should be a light entity based on domain priority)
+        let primaries: Vec<usize> = decisions
+            .iter()
+            .enumerate()
+            .filter(|(_, d)| d.group_primary)
+            .map(|(i, _)| i)
+            .collect();
+        assert_eq!(primaries.len(), 1, "only one primary");
+        assert!(
+            entries[primaries[0]].domain == "light",
+            "primary should be a light entity"
+        );
+    }
+
+    #[test]
+    fn test_singletons_still_cluster() {
+        // Entities without device_id but with same area + LCP should still cluster
+        let entries = vec![
+            {
+                let mut e = entry("light.living_main");
+                e.area_id = Some("living".into());
+                e.friendly_name = Some("客厅主灯".into());
+                e
+            },
+            {
+                let mut e = entry("light.living_spot1");
+                e.area_id = Some("living".into());
+                e.friendly_name = Some("客厅射灯1".into());
+                e
+            },
+            {
+                let mut e = entry("light.living_spot2");
+                e.area_id = Some("living".into());
+                e.friendly_name = Some("客厅射灯2".into());
+                e
+            },
+        ];
+
+        let decisions = compute_decisions(&entries);
+
+        // All three should cluster (LCP = "客厅", 2 chars ≥ 50% and ≥2 Chinese chars)
+        assert!(decisions[0].group_id.is_some());
+        assert_eq!(decisions[0].group_id, decisions[1].group_id);
+        assert_eq!(decisions[0].group_id, decisions[2].group_id);
+        assert!(decisions[0].group_id.as_ref().unwrap().starts_with("name::"));
+    }
+
+    #[test]
+    fn test_partial_match_merges_groups_partially() {
+        // Mix of device groups and singletons with overlapping names
+        let entries = vec![
+            // Device group 1: "次卧灯" cluster
+            {
+                let mut e = entry("light.dev1_main");
+                e.device_id = Some("dev1".into());
+                e.area_id = Some("bedroom".into());
+                e.friendly_name = Some("次卧灯 主灯".into());
+                e
+            },
+            {
+                let mut e = entry("switch.dev1_switch");
+                e.device_id = Some("dev1".into());
+                e.area_id = Some("bedroom".into());
+                e.friendly_name = Some("次卧灯 开关".into());
+                e
+            },
+            // Device group 2: "次卧灯" cluster
+            {
+                let mut e = entry("light.dev2_spot");
+                e.device_id = Some("dev2".into());
+                e.area_id = Some("bedroom".into());
+                e.friendly_name = Some("次卧灯 射灯".into());
+                e
+            },
+            // Singleton: "次卧灯" cluster
+            {
+                let mut e = entry("light.singleton");
+                e.area_id = Some("bedroom".into());
+                e.friendly_name = Some("次卧灯 台灯".into());
+                e
+            },
+            // Unrelated singleton in same area (different prefix to avoid clustering)
+            {
+                let mut e = entry("cover.curtain");
+                e.area_id = Some("bedroom".into());
+                e.friendly_name = Some("主卧窗帘".into());
+                e
+            },
+        ];
+
+        let decisions = compute_decisions(&entries);
+
+        // First 4 entities should merge (3 device-grouped + 1 singleton, all "次卧灯")
+        assert!(decisions[0].group_id.is_some());
+        assert_eq!(decisions[0].group_id, decisions[1].group_id);
+        assert_eq!(decisions[0].group_id, decisions[2].group_id);
+        assert_eq!(decisions[0].group_id, decisions[3].group_id);
+        assert!(
+            decisions[0].group_id.as_ref().unwrap().starts_with("name::"),
+            "should be name-based merge"
+        );
+
+        // Last entity ("主卧窗帘") should not merge with "次卧灯" cluster
+        assert_ne!(decisions[0].group_id, decisions[4].group_id);
+
+        // Only one primary across all merged entities
+        let primaries: Vec<usize> = decisions
+            .iter()
+            .enumerate()
+            .take(4) // First 4 entities
+            .filter(|(_, d)| d.group_primary)
+            .map(|(i, _)| i)
+            .collect();
+        assert_eq!(primaries.len(), 1, "only one primary in merged group");
     }
 }
