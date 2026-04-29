@@ -1,4 +1,5 @@
 import type { AppRuntimeCtx } from "@tokimo/sdk";
+import { cn } from "@tokimo/ui";
 import { useCallback, useEffect, useState } from "react";
 import { rescanInstance } from "../../api/client";
 import { clearEntities } from "../../state/entityStore";
@@ -234,7 +235,13 @@ export function HomePage({
       <div className="relative h-full overflow-y-auto">
         <div className="px-6 pt-10 pb-3">{headerEl}</div>
         {!reorderSections && (
-          <div className="sticky top-0 z-10 bg-white/70 px-6 py-3 backdrop-blur-xl dark:bg-zinc-950/70">
+          <div
+            className={cn(
+              "px-6 py-3",
+              selectedChip !== null &&
+                "sticky top-0 z-10 bg-white/70 backdrop-blur-xl dark:bg-zinc-950/70",
+            )}
+          >
             <FilterChipBar
               availableChips={availableChips}
               selectedChip={selectedChip}
