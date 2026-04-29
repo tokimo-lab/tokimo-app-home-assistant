@@ -50,7 +50,6 @@ CREATE TABLE IF NOT EXISTS entity_overrides (
     group_id        TEXT,
     group_primary   BOOLEAN NOT NULL DEFAULT TRUE,
     decimal_places  INTEGER,
-    seal_version    INTEGER NOT NULL DEFAULT 0,
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     PRIMARY KEY (instance_id, entity_id)
 );
@@ -84,12 +83,3 @@ ALTER TABLE entity_overrides
   ADD COLUMN IF NOT EXISTS group_id TEXT;
 ALTER TABLE entity_overrides
   ADD COLUMN IF NOT EXISTS group_primary BOOLEAN NOT NULL DEFAULT TRUE;
-
--- Idempotent migration: track which version of the default-seal heuristic
--- last touched this row. Bumping CURRENT_SEAL_VERSION in the Rust source
--- causes the next sync to re-fire DO UPDATE on rows whose stored version
--- is lower, propagating heuristic changes (e.g. per-(room, domain) K-cap)
--- to already-sealed deployments. Pre-existing rows default to 0 so the
--- next sync re-evaluates them.
-ALTER TABLE entity_overrides
-  ADD COLUMN IF NOT EXISTS seal_version INTEGER NOT NULL DEFAULT 0;

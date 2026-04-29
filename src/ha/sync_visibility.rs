@@ -1,27 +1,22 @@
-//! First-import固化 of (hidden, collapsed, group_id, group_primary) onto
-//! `entity_overrides`.
+//! Default-presentation seal of (hidden, collapsed, group_id, group_primary)
+//! onto `entity_overrides`.
 //!
 //! Strategy: for every HA entity we know about, compute the four "default
-//! presentation" fields, on first import, and `INSERT ... ON CONFLICT DO
-//! UPDATE`. The UPDATE branch is gated on `seal_version`: rows store the
-//! version of the heuristic that produced their current values, and DO
-//! UPDATE only fires when the running code's `CURRENT_SEAL_VERSION` is
-//! strictly greater. This propagates heuristic improvements (new pass,
-//! tightened K-cap) to already-sealed deployments without needing a
-//! manual reset, while leaving rows untouched between releases.
+//! presentation" fields and `INSERT ... ON CONFLICT DO UPDATE`. The
+//! UPDATE branch unconditionally rewrites `collapsed` / `group_id` /
+//! `group_primary` from the latest domain rule on every sync. There is
+//! no version gate — re-syncing intentionally resets user manual
+//! `collapsed` toggles back to the domain default. This is acceptable
+//! for the test environment; if persistent user overrides become a
+//! requirement later, gate the UPDATE explicitly.
 //!
-//! The `seal_version` mechanism replaces the earlier "pristine triple"
-//! guard which couldn't re-fire once a row was sealed once. Bumping the
-//! version *will* overwrite a user's manually toggled `collapsed` flag
-//! for that release, so only bump when the new heuristic is strictly an
-//! improvement worth re-applying.
-//!
-//! Why固化 in DB instead of recomputing per-render in the frontend:
+//! Why seal in DB instead of recomputing per-render in the frontend:
 //!   * The frontend used to run a chain of dynamic filters (noise keyword
 //!     match, domain-tier demotion, dedup-by-device) on every render which
 //!     made debugging "where did 次卧灯 go?" extremely hard.
 //!   * Persisting the decision means user can override any one cell by
-//!     hand and the override sticks across reconnects / refreshes.
+//!     hand and the override sticks across reconnects / refreshes
+//!     (until the next full sync).
 //!
 //! The default rules:
 //!   * `hidden` — `entity_category` ∈ {`diagnostic`, `config`}.
@@ -44,21 +39,6 @@ use crate::error::AppError;
 
 /// HA entity categories that should default to hidden in the dashboard.
 const HIDDEN_BY_DEFAULT_CATEGORIES: &[&str] = &["diagnostic", "config"];
-
-/// Bumped whenever the default-seal heuristic changes meaningfully (e.g.
-/// a new pass like per-(room, domain) K-cap is added). Rows with a stored
-/// `seal_version` strictly less than this re-fire DO UPDATE on the next
-/// sync, propagating the new defaults to deployments that were already
-/// sealed by a previous version. User manual toggles via PATCH /entities
-/// land on a different write path, so bumping this *will* overwrite a
-/// user's collapsed override — only bump when the new heuristic is
-/// strictly an improvement worth re-applying.
-///
-/// History:
-///   v1 — initial seal (hidden / collapsed-by-tier / group_id / group_primary).
-///   v2 — added per-(area_id, domain) K-cap pass.
-///   v3 — dropped K-cap; collapsed seeded from explicit domain table only.
-const CURRENT_SEAL_VERSION: i32 = 3;
 
 /// Domains that default to `collapsed = false` (visible inline on home).
 /// Direct user-actuation surfaces — the home page exists primarily to
@@ -368,10 +348,13 @@ fn compute_decisions(entries: &[HaEntityRegistryEntry]) -> Vec<Decision> {
     decisions
 }
 
-/// First-import固化: insert default (hidden, collapsed, group_id,
-/// group_primary) for every HA entity that does not already have an
-/// `entity_overrides` row. Existing rows are re-sealed only when the stored
-/// `seal_version` is below `CURRENT_SEAL_VERSION`.
+/// Sync default visibility / grouping: insert (hidden, collapsed, group_id,
+/// group_primary) for every HA entity. Existing rows have their
+/// `collapsed` / `group_id` / `group_primary` unconditionally rewritten
+/// from the latest domain rule on every sync — there is no version gate.
+/// User manual toggles via `PATCH /entities/:eid/display` are made AFTER
+/// import; subsequent re-imports will reset them. This is intentional for
+/// the test environment.
 pub async fn sync_default_visibility_and_grouping(
     pool: &PgPool,
     instance_id: Uuid,
@@ -392,15 +375,12 @@ pub async fn sync_default_visibility_and_grouping(
         let res = sqlx::query(
             "INSERT INTO entity_overrides ( \
                 instance_id, entity_id, hidden, entity_category, \
-                collapsed, group_id, group_primary, seal_version \
-             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) \
+                collapsed, group_id, group_primary \
+             ) VALUES ($1, $2, $3, $4, $5, $6, $7) \
              ON CONFLICT (instance_id, entity_id) DO UPDATE SET \
                 collapsed = EXCLUDED.collapsed, \
                 group_id = EXCLUDED.group_id, \
-                group_primary = EXCLUDED.group_primary, \
-                seal_version = EXCLUDED.seal_version \
-             WHERE \
-                entity_overrides.seal_version < EXCLUDED.seal_version",
+                group_primary = EXCLUDED.group_primary",
         )
         .bind(instance_id)
         .bind(&e.entity_id)
@@ -409,7 +389,6 @@ pub async fn sync_default_visibility_and_grouping(
         .bind(d.collapsed)
         .bind(d.group_id.as_deref())
         .bind(d.group_primary)
-        .bind(CURRENT_SEAL_VERSION)
         .execute(&mut *tx)
         .await?;
 
