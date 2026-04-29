@@ -35,7 +35,7 @@ import {
 } from "./state/useDetailOverlay";
 import { useEntities } from "./state/useEntities";
 import { useInstances } from "./state/useInstances";
-import { clearRoomStack } from "./state/useRoomNav";
+import { clearRoomStack, pushRoom } from "./state/useRoomNav";
 import { useRooms } from "./state/useRooms";
 import type { ParsedRoute } from "./types";
 
@@ -240,8 +240,8 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
               ctx={ctx}
               getPending={getPending}
               onCall={onCall}
-              onOpenRoom={() => {
-                /* HomePage uses pushRoom() internally via useRoomNav */
+              onOpenRoom={(roomId) => {
+                pushRoom(roomId);
               }}
               onOpenSettings={() => openSettings({ tab: "family" })}
               t={t}
