@@ -12,6 +12,8 @@ interface FavoritesSectionProps {
   getPending: (entityId: string) => PendingOp | undefined;
   onCall: (params: CallParams) => void;
   onContextMenu?: (entity: EntityState, e: ReactMouseEvent) => void;
+  onRemoveTile?: (entityId: string) => void;
+  removeLabel?: string;
   t: (k: string) => string;
 }
 
@@ -23,6 +25,8 @@ export function FavoritesSection({
   getPending,
   onCall,
   onContextMenu,
+  onRemoveTile,
+  removeLabel,
   t,
 }: FavoritesSectionProps) {
   const { editMode } = useEditHomeView();
@@ -54,6 +58,8 @@ export function FavoritesSection({
       onContextMenu={onContextMenu}
       editMode={editMode}
       sortableContainerId={editMode ? FAVORITES_CONTAINER_ID : undefined}
+      onRemoveTile={onRemoveTile}
+      removeLabel={removeLabel}
       t={t}
     />
   );

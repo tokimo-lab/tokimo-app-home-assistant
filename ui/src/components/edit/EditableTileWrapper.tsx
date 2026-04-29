@@ -1,7 +1,7 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@tokimo/ui";
-import { ArrowDownRight } from "lucide-react";
+import { ArrowDownRight, Minus } from "lucide-react";
 import {
   type CSSProperties,
   type MouseEvent as ReactMouseEvent,
@@ -20,6 +20,14 @@ interface EditableTileWrapperProps {
    * overlay button becomes the drag handle.
    */
   sortableContainerId?: string;
+  /**
+   * Click handler for the top-left red `−` badge. Removes the entity
+   * from the default home view (host typically dispatches `hidden: true`
+   * + `is_favorite: false` via useDisplayPatch).
+   */
+  onRemove?: (entityId: string) => void;
+  /** Localised aria-label for the remove badge (e.g. "Remove from Home"). */
+  removeLabel?: string;
   children: ReactNode;
 }
 
@@ -41,6 +49,8 @@ interface EditableTileWrapperProps {
 export function EditableTileWrapper({
   entity,
   sortableContainerId,
+  onRemove,
+  removeLabel,
   children,
 }: EditableTileWrapperProps) {
   const { selectedTileId, selectTile, toggleSize } = useEditHomeView();
@@ -82,6 +92,15 @@ export function EditableTileWrapper({
     [entity.entity_id, toggleSize],
   );
 
+  const handleRemove = useCallback(
+    (e: ReactMouseEvent<HTMLButtonElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+      onRemove?.(entity.entity_id);
+    },
+    [entity.entity_id, onRemove],
+  );
+
   return (
     <div
       ref={sortableContainerId ? sortable.setNodeRef : undefined}
@@ -113,6 +132,24 @@ export function EditableTileWrapper({
           "bg-transparent",
         )}
       />
+
+      {onRemove && (
+        <button
+          type="button"
+          data-testid="tile-remove-badge"
+          aria-label={removeLabel ?? `Remove ${entity.entity_id}`}
+          onClick={handleRemove}
+          onPointerDown={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          className={cn(
+            "absolute -top-1.5 -left-1.5 z-10 flex h-6 w-6 items-center justify-center",
+            "cursor-pointer rounded-full bg-red-500 text-white shadow-lg",
+            "ring-2 ring-white/90 transition-transform hover:scale-110",
+          )}
+        >
+          <Minus size={14} strokeWidth={3} />
+        </button>
+      )}
 
       {selected && (
         <button

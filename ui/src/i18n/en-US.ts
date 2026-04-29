@@ -333,6 +333,7 @@ export const enUS: Record<string, string> = {
   // Edit mode (R6)
   editHomeView: "Edit Home View",
   done: "Done",
+  removeFromHome: "Remove from Home",
   addToFavorites: "Add to Favorites",
   removeFromFavorites: "Remove from Favorites",
   tileSize: "Tile Size",

@@ -1,5 +1,5 @@
 import type { AppRuntimeCtx } from "@tokimo/sdk";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { rescanInstance } from "../../api/client";
 import { clearEntities } from "../../state/entityStore";
 import { useDetailOverlay } from "../../state/useDetailOverlay";
@@ -89,6 +89,29 @@ export function HomePage({
   } = useTileContextMenu(patch, openDetail, instance.id);
 
   useToggleSizeRegistry(entities, patch);
+
+  const handleRemoveTile = useCallback(
+    (entityId: string) => {
+      // Remove from default home: hide entity (filter excludes it) and
+      // clear the favorite flag so it doesn't reappear in Favorites.
+      void patch(entityId, { hidden: true, is_favorite: false });
+    },
+    [patch],
+  );
+
+  // ESC exits edit mode (Apple Home parity). Skipped while reorderSections
+  // sub-mode is active so the picker doesn't double-handle the key.
+  useEffect(() => {
+    if (!editMode) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        exitEditMode();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [editMode, exitEditMode]);
 
   const [rescanOpen, setRescanOpen] = useState(false);
   const [rescanLoading, setRescanLoading] = useState(false);
@@ -194,6 +217,8 @@ export function HomePage({
             onCall={onCall}
             onContextMenu={openMenu}
             onOpenRoom={onOpenRoom}
+            onRemoveTile={handleRemoveTile}
+            removeLabel={t("removeFromHome")}
             disableRoomCap={!!selectedChip || showAll}
             t={t}
           />

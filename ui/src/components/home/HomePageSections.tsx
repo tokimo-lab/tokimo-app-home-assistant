@@ -34,6 +34,8 @@ interface HomePageSectionsProps {
   onCall: (params: CallParams) => void;
   onContextMenu: (entity: EntityState, e: ReactMouseEvent) => void;
   onOpenRoom: (roomId: string) => void;
+  onRemoveTile?: (entityId: string) => void;
+  removeLabel?: string;
   disableRoomCap: boolean;
   t: (k: string) => string;
 }
@@ -62,6 +64,8 @@ export function HomePageSections(props: HomePageSectionsProps) {
     onCall,
     onContextMenu,
     onOpenRoom,
+    onRemoveTile,
+    removeLabel,
     disableRoomCap,
     t,
   } = props;
@@ -72,6 +76,8 @@ export function HomePageSections(props: HomePageSectionsProps) {
     onCall,
     onContextMenu,
     onOpenRoom,
+    onRemoveTile,
+    removeLabel,
     t,
     editMode,
   };

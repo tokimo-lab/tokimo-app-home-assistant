@@ -21,6 +21,8 @@ export interface HomePageDefaultProps {
   onCall: (params: CallParams) => void;
   onContextMenu: (entity: EntityState, e: ReactMouseEvent) => void;
   onOpenRoom: (roomId: string) => void;
+  onRemoveTile?: (entityId: string) => void;
+  removeLabel?: string;
   t: (k: string) => string;
   editMode: boolean;
   /** Skip the per-room cap (chip view, edit mode, or "show all"). */
@@ -45,6 +47,8 @@ export function HomePageDefault({
   onCall,
   onContextMenu,
   onOpenRoom,
+  onRemoveTile,
+  removeLabel,
   t,
   editMode,
   disableRoomCap,
@@ -67,6 +71,8 @@ export function HomePageDefault({
         getPending={getPending}
         onCall={onCall}
         onContextMenu={onContextMenu}
+        onRemoveTile={onRemoveTile}
+        removeLabel={removeLabel}
         t={t}
       />
       {rooms.map((room) => {
@@ -82,6 +88,8 @@ export function HomePageDefault({
             onCall={onCall}
             onContextMenu={onContextMenu}
             onOpenRoom={onOpenRoom}
+            onRemoveTile={onRemoveTile}
+            removeLabel={removeLabel}
             disableCap={disableRoomCap || editMode}
             t={t}
           />

@@ -330,6 +330,7 @@ export const zhCN: Record<string, string> = {
   // Edit mode (R6)
   editHomeView: "编辑主页",
   done: "完成",
+  removeFromHome: "从主页移除",
   addToFavorites: "添加到收藏",
   removeFromFavorites: "从收藏移除",
   tileSize: "磁贴大小",

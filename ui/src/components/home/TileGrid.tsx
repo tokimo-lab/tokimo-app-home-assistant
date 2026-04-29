@@ -27,6 +27,13 @@ interface TileGridProps {
    * jiggle but cannot be dragged.
    */
   sortableContainerId?: string;
+  /**
+   * Called when the red `−` badge in edit mode is clicked. Wired by the
+   * host to dispatch a `hidden: true` patch (and optionally clear
+   * `is_favorite`).
+   */
+  onRemoveTile?: (entityId: string) => void;
+  removeLabel?: string;
   t: (k: string) => string;
 }
 
@@ -73,6 +80,8 @@ export function TileGrid({
   forceSize,
   editMode,
   sortableContainerId,
+  onRemoveTile,
+  removeLabel,
   t,
 }: TileGridProps) {
   // Subscribing to selection changes so the grid re-renders when the
@@ -114,12 +123,16 @@ export function TileGrid({
             return (
               <div
                 key={entity.entity_id}
+                data-size={size}
+                data-entity-id={entity.entity_id}
                 className={cn(SIZE_SPAN[size], "relative")}
               >
                 <div className="tile-jiggle h-full w-full" style={jiggleStyle}>
                   <EditableTileWrapper
                     entity={entity}
                     sortableContainerId={sortableContainerId}
+                    onRemove={onRemoveTile}
+                    removeLabel={removeLabel}
                   >
                     {tile}
                   </EditableTileWrapper>
@@ -132,6 +145,8 @@ export function TileGrid({
             // biome-ignore lint/a11y/noStaticElementInteractions: contextmenu is a passive enhancement
             <div
               key={entity.entity_id}
+              data-size={size}
+              data-entity-id={entity.entity_id}
               className={SIZE_SPAN[size]}
               onContextMenu={
                 onContextMenu

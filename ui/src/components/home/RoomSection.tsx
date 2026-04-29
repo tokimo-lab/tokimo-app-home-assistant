@@ -17,6 +17,8 @@ interface RoomSectionProps {
   onCall: (params: CallParams) => void;
   onContextMenu?: (entity: EntityState, e: ReactMouseEvent) => void;
   onOpenRoom: (roomId: string) => void;
+  onRemoveTile?: (entityId: string) => void;
+  removeLabel?: string;
   /** When true, render every entity (chip view, edit mode, "show all"). */
   disableCap?: boolean;
   t: (k: string) => string;
@@ -34,6 +36,8 @@ export function RoomSection({
   onCall,
   onContextMenu,
   onOpenRoom,
+  onRemoveTile,
+  removeLabel,
   disableCap,
   t: _t,
 }: RoomSectionProps) {
@@ -76,6 +80,8 @@ export function RoomSection({
       onContextMenu={onContextMenu}
       editMode={editMode}
       sortableContainerId={editMode ? containerId : undefined}
+      onRemoveTile={onRemoveTile}
+      removeLabel={removeLabel}
       t={_t}
     />
   );

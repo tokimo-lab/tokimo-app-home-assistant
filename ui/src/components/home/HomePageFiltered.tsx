@@ -24,6 +24,8 @@ export interface HomePageFilteredProps {
   onCall: (params: CallParams) => void;
   onContextMenu: (entity: EntityState, e: ReactMouseEvent) => void;
   onOpenRoom: (roomId: string) => void;
+  onRemoveTile?: (entityId: string) => void;
+  removeLabel?: string;
   t: (k: string) => string;
   editMode: boolean;
   selectedChip: ChipId;
@@ -46,6 +48,8 @@ export function HomePageFiltered({
   onCall,
   onContextMenu,
   onOpenRoom,
+  onRemoveTile,
+  removeLabel,
   t,
   selectedChip,
 }: HomePageFilteredProps) {
@@ -79,6 +83,8 @@ export function HomePageFiltered({
             onCall={onCall}
             onContextMenu={onContextMenu}
             onOpenRoom={onOpenRoom}
+            onRemoveTile={onRemoveTile}
+            removeLabel={removeLabel}
             t={t}
           />
         );
