@@ -1,65 +1,112 @@
 import { cn } from "@tokimo/ui";
-import type { ReactNode } from "react";
+import type {
+  CSSProperties,
+  MouseEvent as ReactMouseEvent,
+  ReactNode,
+} from "react";
 
-export type EntitySize = "small" | "medium" | "large";
+export type TileSize = "small" | "medium" | "large";
+
+/**
+ * AppleHome accent palette per IMG_2654.
+ * Map domain -> active fill color. Domains absent from this map render as
+ * "always-off" (sensor / binary_sensor stay gray regardless of state).
+ */
+export const TILE_ACCENT: Record<string, string> = {
+  light: "#FFB800",
+  climate: "#FF6B35",
+  switch: "#34C759",
+  outlet: "#34C759",
+  input_boolean: "#34C759",
+  lock: "#34C759",
+  cover: "#0A84FF",
+  fan: "#5AC8FA",
+  media_player: "#FF2D55",
+  scene: "#AF52DE",
+  script: "#AF52DE",
+  vacuum: "#34C759",
+  camera: "#000000",
+  automation: "#AF52DE",
+};
+
+const NEUTRAL_DOMAINS = new Set(["sensor", "binary_sensor"]);
 
 export interface TileBaseStyleProps {
-  size?: EntitySize;
+  /** Domain controls accent color via TILE_ACCENT map. */
   domain: string;
+  /** Whether this tile is in its "active" state (lit / playing / locked / etc). */
   isOn: boolean;
+  /** Optional explicit accent override (rarely needed; e.g. light-color sync). */
+  accentColor?: string;
+  /** Tile size: small/medium = icon top-left, large = icon centered. */
+  size?: TileSize;
+
   icon: ReactNode;
   name: string;
-  stateText: string;
+  stateText?: string;
+
+  /** Body click (whole tile). */
   onClick?: () => void;
-  onIconClick?: (e: React.MouseEvent) => void;
-  onContextMenu?: (e: React.MouseEvent) => void;
+  /** Icon-region click (used by tiles whose icon doubles as toggle). */
+  onIconClick?: (e: ReactMouseEvent) => void;
+  onContextMenu?: (e: ReactMouseEvent) => void;
+
+  /** Extra background content (rendered behind labels), e.g. camera frame. */
+  children?: ReactNode;
   className?: string;
 }
 
-function domainOnBg(domain: string): string {
-  const map: Record<string, string> = {
-    light: "bg-amber-400 dark:bg-amber-400",
-    switch: "bg-blue-500 dark:bg-blue-500",
-    input_boolean: "bg-blue-500 dark:bg-blue-500",
-    fan: "bg-sky-400 dark:bg-sky-400",
-    cover: "bg-sky-400 dark:bg-sky-400",
-    climate: "bg-orange-400 dark:bg-orange-400",
-    lock: "bg-emerald-500 dark:bg-emerald-500",
-    media_player: "bg-violet-500 dark:bg-violet-500",
-    scene: "bg-purple-500 dark:bg-purple-500",
-    script: "bg-indigo-500 dark:bg-indigo-500",
-    sensor: "bg-gray-500 dark:bg-gray-500",
-    binary_sensor: "bg-orange-500 dark:bg-orange-500",
-    camera: "bg-black/80 dark:bg-black/80",
-    vacuum: "bg-emerald-500 dark:bg-emerald-500",
-    automation: "bg-amber-500 dark:bg-amber-500",
-  };
-  return map[domain] ?? "bg-gray-500 dark:bg-gray-500";
+function resolveAccent(domain: string, override?: string): string | undefined {
+  if (override) return override;
+  if (NEUTRAL_DOMAINS.has(domain)) return undefined;
+  return TILE_ACCENT[domain];
 }
 
+/**
+ * Visual layer of every HA tile (matches IMG_2654).
+ *
+ * Off state: white card (deep gray in dark mode), gray icon + gray labels.
+ * On state : solid accent fill + white icon + white labels.
+ *
+ * Layout:
+ * - small / medium → icon top-left, name+stateText bottom-left
+ * - large          → icon centered, name+stateText centered below
+ *
+ * Accent is exposed as `--ha-tile-accent` so callers can read it for
+ * inner highlights if desired.
+ */
 export function TileBaseStyle({
-  size,
   domain,
   isOn,
+  accentColor,
+  size = "small",
   icon,
   name,
   stateText,
   onClick,
   onIconClick,
   onContextMenu,
+  children,
   className,
 }: TileBaseStyleProps) {
-  const isLarge = (size ?? "small") === "large";
+  const accent = resolveAccent(domain, accentColor);
+  const active = isOn && accent !== undefined;
+  const isLarge = size === "large";
+
+  const style: CSSProperties | undefined = accent
+    ? ({ "--ha-tile-accent": accent } as CSSProperties)
+    : undefined;
 
   return (
-    // biome-ignore lint/a11y/noStaticElementInteractions: has conditional role=button + onKeyDown
+    // biome-ignore lint/a11y/noStaticElementInteractions: conditional role=button + onKeyDown applied below.
     <div
       data-tile
       data-size={size}
-      data-on={isOn ? "true" : undefined}
+      data-on={active ? "true" : undefined}
       data-domain={domain}
-      onContextMenu={onContextMenu}
+      style={style}
       onClick={onClick}
+      onContextMenu={onContextMenu}
       onKeyDown={
         onClick
           ? (e) => {
@@ -73,24 +120,19 @@ export function TileBaseStyle({
       tabIndex={onClick ? 0 : undefined}
       role={onClick ? "button" : undefined}
       className={cn(
-        "relative flex h-full w-full overflow-hidden rounded-2xl transition-colors",
-        // Off state
-        !isOn && "bg-white dark:bg-zinc-800",
-        !isOn && "border border-black/[0.04] dark:border-white/[0.06]",
-        !isOn && "text-zinc-500 dark:text-zinc-400",
-        // On state
-        isOn && domainOnBg(domain),
-        isOn && "text-white",
-        // Layout
-        isLarge
-          ? "flex-col items-center justify-center gap-3 p-4"
-          : "flex-col justify-between p-3",
-        onClick && "cursor-pointer active:scale-[0.97] transition-transform",
+        "relative flex h-full w-full flex-col overflow-hidden rounded-2xl p-3 transition-colors",
+        active
+          ? "bg-[var(--ha-tile-accent)] text-white"
+          : "bg-white text-gray-500 dark:bg-white/[0.06] dark:text-gray-400",
+        isLarge ? "items-center justify-center gap-2" : "justify-between",
+        onClick &&
+          "cursor-pointer select-none active:scale-[0.97] transition-transform",
         className,
       )}
     >
-      {/* Icon slot */}
-      {/* biome-ignore lint/a11y/noStaticElementInteractions: has conditional role=button + onKeyDown */}
+      {children}
+
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: conditional role=button + onKeyDown applied below. */}
       <div
         data-tile-icon
         onClick={
@@ -107,7 +149,7 @@ export function TileBaseStyle({
                 if (e.key === "Enter" || e.key === " ") {
                   e.preventDefault();
                   e.stopPropagation();
-                  e.currentTarget.click();
+                  onIconClick(e as unknown as ReactMouseEvent);
                 }
               }
             : undefined
@@ -115,30 +157,42 @@ export function TileBaseStyle({
         tabIndex={onIconClick ? 0 : undefined}
         role={onIconClick ? "button" : undefined}
         className={cn(
+          "relative z-10 flex items-center justify-center",
+          isLarge ? "h-12 w-12" : "h-8 w-8 self-start",
           onIconClick && "cursor-pointer",
-          isLarge && "flex items-center justify-center",
+          active ? "text-white" : "text-gray-400 dark:text-gray-400",
         )}
       >
         {icon}
       </div>
 
-      {/* Name + stateText slot */}
       <div
         data-tile-labels
-        className={cn("truncate", isLarge && "text-center")}
+        className={cn(
+          "relative z-10 min-w-0",
+          isLarge ? "text-center" : "self-stretch",
+        )}
       >
         <p
           data-tile-name
-          className="truncate text-sm font-medium leading-tight"
+          className={cn(
+            "truncate text-sm font-semibold leading-tight",
+            active ? "text-white" : "text-gray-700 dark:text-gray-200",
+          )}
         >
           {name}
         </p>
-        <p
-          data-tile-state
-          className="truncate text-xs leading-tight opacity-70"
-        >
-          {stateText}
-        </p>
+        {stateText && (
+          <p
+            data-tile-state
+            className={cn(
+              "mt-0.5 truncate text-xs leading-tight",
+              active ? "text-white/85" : "text-gray-500 dark:text-gray-400",
+            )}
+          >
+            {stateText}
+          </p>
+        )}
       </div>
     </div>
   );

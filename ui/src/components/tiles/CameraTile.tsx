@@ -3,6 +3,7 @@ import { memo, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { getFriendlyName } from "../../lib/format";
 import { type TileProps, tilePropsEqual } from "./_types";
+import { TileBaseStyle } from "./TileBaseStyle";
 
 const REFRESH_INTERVAL = 10_000;
 
@@ -18,10 +19,10 @@ function CameraTileImpl({ entity, instanceId, t }: TileProps) {
   );
   const [fullscreen, setFullscreen] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
-  const tileRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const el = tileRef.current;
+    const el = containerRef.current;
     if (!el) return;
     const obs = new IntersectionObserver(
       ([entry]) => setIsVisible(entry.isIntersecting),
@@ -41,25 +42,28 @@ function CameraTileImpl({ entity, instanceId, t }: TileProps) {
 
   return (
     <>
-      <div
-        ref={tileRef}
-        className="relative h-full w-full overflow-hidden rounded-2xl"
-      >
-        <img
-          src={imgSrc}
-          alt={name}
-          className="absolute inset-0 h-full w-full object-cover opacity-40"
-          onError={() => {}}
-        />
-        <div className="relative z-10 flex h-full w-full flex-col justify-between p-3">
-          <div className="flex items-start justify-between">
-            <Camera size={16} className="text-white/80" />
-            <Maximize2 size={14} className="text-white/60" />
-          </div>
-          <p className="truncate text-xs font-semibold text-white drop-shadow">
-            {name}
-          </p>
-        </div>
+      <div ref={containerRef} className="relative h-full w-full">
+        <TileBaseStyle
+          domain="camera"
+          isOn
+          size="large"
+          icon={<Camera size={28} />}
+          name={name}
+          stateText={t("stateOn")}
+          onClick={() => setFullscreen(true)}
+        >
+          <img
+            src={imgSrc}
+            alt={name}
+            className="absolute inset-0 h-full w-full object-cover opacity-50"
+            onError={() => {}}
+          />
+          <div className="absolute inset-0 bg-black/40" />
+          <Maximize2
+            size={14}
+            className="absolute right-2 top-2 z-10 text-white/70"
+          />
+        </TileBaseStyle>
       </div>
 
       {fullscreen &&

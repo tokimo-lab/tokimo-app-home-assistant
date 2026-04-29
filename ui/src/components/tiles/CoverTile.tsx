@@ -30,7 +30,7 @@ function CoverTileImpl({ entity, t, onCall }: TileProps) {
   return (
     <TileBaseStyle
       domain="cover"
-      isOn={!isOpen}
+      isOn={isOpen}
       icon={<Blinds size={20} />}
       name={name}
       stateText={stateText}
