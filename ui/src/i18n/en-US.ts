@@ -445,6 +445,12 @@ export const enUS: Record<string, string> = {
   tileSizeLarge: "Large",
   hideEntity: "Hide entity",
 
+  // Similar accessories modal
+  similarAccessories: "Similar Accessories",
+  markAsPrimary: "Show on Home",
+  currentlyShown: "Currently Shown",
+  noSimilarAccessories: "No similar accessories",
+
   // Family sidebar tooltips
   sidebarNewFamily: "New Family",
   sidebarSettings: "Family Settings",

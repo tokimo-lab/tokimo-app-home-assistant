@@ -441,6 +441,12 @@ export const zhCN: Record<string, string> = {
   tileSizeLarge: "大",
   hideEntity: "隐藏设备",
 
+  // Similar accessories modal
+  similarAccessories: "相似配件",
+  markAsPrimary: "设为展示",
+  currentlyShown: "当前展示",
+  noSimilarAccessories: "无相似配件",
+
   // Family sidebar tooltips
   sidebarNewFamily: "新建家庭",
   sidebarSettings: "家庭设置",

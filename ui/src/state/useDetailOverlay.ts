@@ -93,6 +93,20 @@ export function useDetailOverlay(): UseDetailOverlayResult {
   };
 }
 
+/**
+ * Module-level escape hatch for code paths that don't have access to the
+ * React hook (e.g. modal-window components rendered in a separate React
+ * tree by the host shell). Pushes a detail entry directly onto the stack
+ * and notifies subscribers, so the inline DetailOverlay opens.
+ */
+export function openDetailFromExternal(
+  entityId: string,
+  instanceId: string,
+): void {
+  state = { stack: [...state.stack, { entityId, instanceId }] };
+  emit();
+}
+
 // Test-only reset.
 export function __resetDetailOverlayForTests(): void {
   state = { stack: [] };

@@ -5,7 +5,7 @@ import {
   useInteractions,
   useRole,
 } from "@floating-ui/react";
-import { Check, EyeOff, Sliders, Star, StarOff } from "lucide-react";
+import { Check, EyeOff, LayoutGrid, Sliders, Star, StarOff } from "lucide-react";
 import { useLayoutEffect } from "react";
 import type { EntitySize, EntityState } from "../../types";
 import { effectiveSizeForEntity } from "./_helpers";
@@ -20,6 +20,12 @@ interface TileContextMenuProps {
   onSetSize: (size: EntitySize) => void;
   onToggleFavorite: (next: boolean) => void;
   onHide: () => void;
+  /**
+   * When provided, the "Similar Accessories" menu item is rendered. Caller
+   * is responsible for only supplying this when the entity belongs to a
+   * group with ≥2 members (gated by `entity.group_id` + sibling count).
+   */
+  onShowSimilar?: () => void;
   t: (k: string) => string;
 }
 
@@ -43,6 +49,7 @@ export function TileContextMenu({
   onSetSize,
   onToggleFavorite,
   onHide,
+  onShowSimilar,
   t,
 }: TileContextMenuProps) {
   const currentSize: EntitySize = effectiveSizeForEntity(entity);
@@ -126,6 +133,17 @@ export function TileContextMenu({
           label={isFav ? t("removeFromFavorites") : t("addToFavorites")}
           onClick={handle(() => onToggleFavorite(!isFav))}
         />
+
+        {onShowSimilar && (
+          <>
+            <div className="my-1 h-px bg-white/[0.08]" />
+            <MenuItem
+              icon={<LayoutGrid size={16} />}
+              label={t("similarAccessories")}
+              onClick={handle(onShowSimilar)}
+            />
+          </>
+        )}
 
         <div className="my-1 h-px bg-white/[0.08]" />
 

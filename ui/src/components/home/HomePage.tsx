@@ -94,6 +94,36 @@ export function HomePage({
 
   useToggleSizeRegistry(entities, patch);
 
+  // Sibling count for the long-press menu's "Similar Accessories" item.
+  // Only render the menu item when the right-clicked entity belongs to a
+  // group with ≥2 members; derived from the in-memory entity map (no
+  // extra fetch).
+  const menuGroupSiblingCount = (() => {
+    const gid = menu?.entity.group_id;
+    if (!gid) return 0;
+    let n = 0;
+    for (const e of entities.values()) {
+      if (e.group_id === gid) n++;
+    }
+    return n;
+  })();
+
+  const onShowSimilar = useCallback(() => {
+    if (!menu?.entity.group_id) return;
+    ctx.shell.openModalWindow({
+      component: () => import("./SimilarEntitiesModal"),
+      title: t("similarAccessories"),
+      width: 480,
+      height: 560,
+      metadata: {
+        instanceId: instance.id,
+        groupId: menu.entity.group_id,
+        currentEntityId: menu.entity.entity_id,
+        locale: ctx.locale,
+      },
+    });
+  }, [ctx, instance.id, menu, t]);
+
   const handleRemoveTile = useCallback(
     (entityId: string) => {
       // Remove from default home: hide entity (filter excludes it) and
@@ -241,6 +271,9 @@ export function HomePage({
             onSetSize={onSetSize}
             onToggleFavorite={onToggleFavorite}
             onHide={onHide}
+            onShowSimilar={
+              menuGroupSiblingCount >= 2 ? onShowSimilar : undefined
+            }
             t={t}
           />
         )}
