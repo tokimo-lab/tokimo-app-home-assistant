@@ -193,6 +193,7 @@ export function HomePage({
   const filteredProps = {
     ...sharedSectionProps,
     entities,
+    cameras,
     rooms,
     entitiesByRoom,
   };

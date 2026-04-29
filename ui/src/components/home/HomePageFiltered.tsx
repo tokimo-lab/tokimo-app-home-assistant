@@ -8,6 +8,7 @@ import type {
   PendingOp,
 } from "../../types";
 import { bySortOrder } from "./_helpers";
+import { CamerasSection } from "./CamerasSection";
 import { DomainSummaryBadge } from "./DomainSummaryBadge";
 import { RoomSection } from "./RoomSection";
 
@@ -15,6 +16,8 @@ export interface HomePageFilteredProps {
   instance: HaInstance;
   /** All renderable entities (unfiltered); DomainSummaryBadge uses the full map. */
   entities: ReadonlyMap<string, EntityState>;
+  /** All renderable cameras (unfiltered); rendered as a top section under Security chip. */
+  cameras: EntityState[];
   rooms: HaRoom[];
   entitiesByRoom: ReadonlyMap<string, EntityState[]>;
   getPending: (entityId: string) => PendingOp | undefined;
@@ -36,6 +39,7 @@ export interface HomePageFilteredProps {
 export function HomePageFiltered({
   instance,
   entities,
+  cameras,
   rooms,
   entitiesByRoom,
   getPending,
@@ -48,6 +52,17 @@ export function HomePageFiltered({
   return (
     <>
       <DomainSummaryBadge chipId={selectedChip} entities={entities} t={t} />
+
+      {selectedChip === "security" && cameras.length > 0 && (
+        <CamerasSection
+          cameras={cameras}
+          instanceId={instance.id}
+          getPending={getPending}
+          onCall={onCall}
+          onContextMenu={onContextMenu}
+          t={t}
+        />
+      )}
 
       {rooms.map((room) => {
         const list = (entitiesByRoom.get(room.id) ?? [])
