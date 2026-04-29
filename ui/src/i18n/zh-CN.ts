@@ -449,6 +449,15 @@ export const zhCN: Record<string, string> = {
 
   // Family sidebar tooltips (removed — sidebar deleted)
 
+  // Add menu (header [+])
+  addAccessory: "添加配件",
+  addScene: "添加场景",
+  addAutomation: "添加自动化",
+  addRoom: "添加房间",
+  addPeople: "添加成员",
+  addNewHome: "添加家庭",
+  comingSoon: "即将推出",
+
   // Rooms tab (settings)
   roomsSyncDescription: "从 Home Assistant 同步区域为房间，并管理排序与图标",
   roomsIconPlaceholder: "🏠 或 mdi:sofa",

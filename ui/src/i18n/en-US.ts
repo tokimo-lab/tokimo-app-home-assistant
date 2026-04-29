@@ -453,6 +453,15 @@ export const enUS: Record<string, string> = {
 
   // Family sidebar tooltips (removed — sidebar deleted)
 
+  // Add menu (header [+])
+  addAccessory: "Add Accessory",
+  addScene: "Add Scene",
+  addAutomation: "Add Automation",
+  addRoom: "Add Room",
+  addPeople: "Add People",
+  addNewHome: "Add New Home",
+  comingSoon: "Coming Soon",
+
   // Rooms tab (settings)
   roomsSyncDescription:
     "Sync areas from Home Assistant as rooms, and manage order and icons.",

@@ -20,6 +20,7 @@ import {
   SettingsPane,
   type SettingsTab,
 } from "./components/settings/SettingsPane";
+import { HomeSettingsPage } from "./components/settings/HomeSettingsPage";
 import { AnimatedSettingsPane } from "./components/shell/AnimatedSettingsPane";
 import { HomeAssistantMenuBar } from "./components/shell/HomeAssistantMenuBar";
 import { enUS, zhCN } from "./i18n";
@@ -112,6 +113,9 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
   // ── Settings pane (Family settings) ──────────────────────────────────────
   const [settingsTab, setSettingsTab] = useState<SettingsTab | null>(null);
   const [settingsTargetId, setSettingsTargetId] = useState<string | null>(null);
+  const [homeSettingsInstanceId, setHomeSettingsInstanceId] = useState<
+    string | null
+  >(null);
   const openSettings = (opts: { tab: SettingsTab; instanceId?: string }) => {
     const targetId = opts.instanceId ?? effectiveInstanceId;
     setSettingsTargetId(targetId);
@@ -121,6 +125,8 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
     setSettingsTab(null);
     setSettingsTargetId(null);
   };
+  const openHomeSettings = (id: string) => setHomeSettingsInstanceId(id);
+  const closeHomeSettings = () => setHomeSettingsInstanceId(null);
 
   // ── Sync activeInstanceStore + reset transient stacks on instance change ─
   useEffect(() => {
@@ -258,6 +264,8 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
                 pushRoom(roomId);
               }}
               onOpenSettings={() => openSettings({ tab: "family" })}
+              onAddRoom={() => openHomeSettings(activeInstance.id)}
+              onAddNewHome={() => navigateTo("/setup")}
               t={t}
             />
             <RoomPageHost
@@ -304,6 +312,17 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
                   nav.replace("/setup", "Home Assistant");
                 }
               }}
+              t={t}
+            />
+          )}
+        </AnimatedSettingsPane>
+
+        <AnimatedSettingsPane open={homeSettingsInstanceId !== null}>
+          {homeSettingsInstanceId !== null && (
+            <HomeSettingsPage
+              instanceId={homeSettingsInstanceId}
+              onClose={closeHomeSettings}
+              onBack={closeHomeSettings}
               t={t}
             />
           )}

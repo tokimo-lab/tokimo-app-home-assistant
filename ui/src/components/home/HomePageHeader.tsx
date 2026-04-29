@@ -10,9 +10,10 @@ import {
   useRole,
 } from "@floating-ui/react";
 import { cn } from "@tokimo/ui";
-import { Check, ChevronDown, Plus } from "lucide-react";
+import { Check, ChevronDown } from "lucide-react";
 import { useState } from "react";
 import type { HaInstance, HaRoom } from "../../types";
+import { AddMenu } from "./AddMenu";
 import { HomeMenu } from "./HomeMenu";
 
 export interface HomePageHeaderProps {
@@ -25,6 +26,8 @@ export interface HomePageHeaderProps {
   onSwitchInstance: (id: string) => void;
   t: (k: string) => string;
   onOpenSettings: () => void;
+  onAddRoom: () => void;
+  onAddNewHome: () => void;
   onEnterEditMode: () => void;
   onEnterReorderSections: () => void;
   onOpenRoom: (id: string) => void;
@@ -37,7 +40,7 @@ export interface HomePageHeaderProps {
  * Apple-Home-style top bar:
  *   left  – home name (bold, large) + ChevronDown for switching homes
  *           (chevron + dropdown only render when ≥ 2 instances exist)
- *   right – round [+] add accessory + round [⋯] menu button
+ *   right – round [+] add menu + round [⋯] menu button
  */
 export function HomePageHeader({
   title,
@@ -49,6 +52,8 @@ export function HomePageHeader({
   onSwitchInstance,
   t,
   onOpenSettings,
+  onAddRoom,
+  onAddNewHome,
   onEnterEditMode,
   onEnterReorderSections,
   onOpenRoom,
@@ -56,9 +61,6 @@ export function HomePageHeader({
   showAll,
   onToggleShowAll,
 }: HomePageHeaderProps) {
-  const integrationsUrl = instanceBaseUrl
-    ? `${instanceBaseUrl.replace(/\/$/, "")}/config/integrations/dashboard`
-    : "";
   return (
     <div className="flex items-center justify-between">
       <HomeSwitcher
@@ -69,19 +71,12 @@ export function HomePageHeader({
         t={t}
       />
       <div className="flex items-center gap-2">
-        <button
-          type="button"
-          aria-label={t("homeAdd")}
-          title={t("homeAdd")}
-          disabled={!integrationsUrl}
-          onClick={() => {
-            if (!integrationsUrl) return;
-            window.open(integrationsUrl, "_blank", "noopener,noreferrer");
-          }}
-          className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-white/[0.06] text-[var(--text-primary)] transition hover:bg-white/[0.1] disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          <Plus size={20} />
-        </button>
+        <AddMenu
+          instanceBaseUrl={instanceBaseUrl}
+          t={t}
+          onAddRoom={onAddRoom}
+          onAddNewHome={onAddNewHome}
+        />
         <HomeMenu
           instanceId={instanceId}
           rooms={rooms}

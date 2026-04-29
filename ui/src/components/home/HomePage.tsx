@@ -37,6 +37,8 @@ interface HomePageProps {
   onCall: (params: CallParams) => void;
   onOpenRoom: (roomId: string) => void;
   onOpenSettings: () => void;
+  onAddRoom: () => void;
+  onAddNewHome: () => void;
   t: (k: string) => string;
 }
 
@@ -57,6 +59,8 @@ export function HomePage({
   onCall,
   onOpenRoom,
   onOpenSettings,
+  onAddRoom,
+  onAddNewHome,
   t,
 }: HomePageProps) {
   const { selectedChip, selectChip, availableChips } = useFilterChip();
@@ -193,6 +197,8 @@ export function HomePage({
       onSwitchInstance={onSwitchInstance}
       t={t}
       onOpenSettings={onOpenSettings}
+      onAddRoom={onAddRoom}
+      onAddNewHome={onAddNewHome}
       onEnterEditMode={enterEditMode}
       onEnterReorderSections={enterReorderSections}
       onOpenRoom={onOpenRoom}
