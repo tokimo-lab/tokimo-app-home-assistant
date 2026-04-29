@@ -39,26 +39,6 @@ export function domainsForChip(chip: ChipId): readonly string[] {
   return CHIP_TO_DOMAINS[chip];
 }
 
-const URL_KEY = "ha_chip";
-
-function readChipFromUrl(): ChipId | null {
-  if (typeof window === "undefined") return null;
-  const params = new URLSearchParams(window.location.search);
-  const raw = params.get(URL_KEY);
-  if (!raw) return null;
-  return (CHIP_ORDER as readonly string[]).includes(raw)
-    ? (raw as ChipId)
-    : null;
-}
-
-function writeChipToUrl(chip: ChipId | null): void {
-  if (typeof window === "undefined") return;
-  const url = new URL(window.location.href);
-  if (chip) url.searchParams.set(URL_KEY, chip);
-  else url.searchParams.delete(URL_KEY);
-  window.history.replaceState({}, "", url.toString());
-}
-
 function entityIdDomain(entityId: string): string {
   const i = entityId.indexOf(".");
   return i < 0 ? "" : entityId.slice(0, i);
@@ -104,14 +84,12 @@ export interface UseFilterChipResult {
 
 /**
  * Top-of-home chip row state: mutually-exclusive single selection
- * (re-clicking the active chip clears it). Persists to URL search param so
- * a refresh keeps the user where they were. Available-chip list is derived
- * from the live entity store snapshot.
+ * (re-clicking the active chip clears it). State is in-memory only;
+ * a refresh resets the selection. Available-chip list is derived from
+ * the live entity store snapshot.
  */
 export function useFilterChip(): UseFilterChipResult {
-  const [selectedChip, setSelectedChip] = useState<ChipId | null>(() =>
-    readChipFromUrl(),
-  );
+  const [selectedChip, setSelectedChip] = useState<ChipId | null>(null);
 
   const entities = useSyncExternalStore(
     subscribeRender,
@@ -123,21 +101,15 @@ export function useFilterChip(): UseFilterChipResult {
     chipHasEntities(c, entities),
   );
 
-  // If the persisted chip is no longer available (e.g. instance switched),
-  // drop it.
+  // If the active chip is no longer available (e.g. instance switched), drop it.
   useEffect(() => {
     if (selectedChip && !availableChips.includes(selectedChip)) {
       setSelectedChip(null);
-      writeChipToUrl(null);
     }
   }, [availableChips, selectedChip]);
 
   const selectChip = useCallback((chip: ChipId) => {
-    setSelectedChip((prev) => {
-      const next = prev === chip ? null : chip;
-      writeChipToUrl(next);
-      return next;
-    });
+    setSelectedChip((prev) => (prev === chip ? null : chip));
   }, []);
 
   return {
