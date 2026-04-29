@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use axum::{
     Json,
-    extract::{Path, State},
+    extract::{Path, Query, State},
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -176,6 +176,19 @@ pub(crate) async fn populate_override_cache(
 
 // ─── List entities ────────────────────────────────────────────────────────────
 
+/// Query params for `GET /instances/:id/entities`.
+///
+/// `include_hidden` defaults to `false`: hidden entities (entries with
+/// `entity_overrides.hidden = true`) are stripped from the response. UI
+/// surfaces that need the full set (e.g. an entity-management page) must
+/// pass `?include_hidden=true` explicitly.
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct ListParams {
+    #[serde(default)]
+    pub include_hidden: bool,
+}
+
 /// Build a fresh snapshot of all entities for an instance with overrides
 /// merged in. Shared by GET `/entities` and the SSE handler so both paths
 /// emit identical `EntityDto` shapes.
@@ -227,7 +240,11 @@ pub(crate) async fn fetch_override(
     Ok(row.as_ref().map(row_to_override))
 }
 
-pub async fn list(State(ctx): State<Arc<AppCtx>>, Path(id): Path<Uuid>) -> Result<Json<Vec<EntityDto>>, AppError> {
+pub async fn list(
+    State(ctx): State<Arc<AppCtx>>,
+    Path(id): Path<Uuid>,
+    Query(params): Query<ListParams>,
+) -> Result<Json<Vec<EntityDto>>, AppError> {
     let instance = ctx
         .conn_pool
         .instances
@@ -236,7 +253,10 @@ pub async fn list(State(ctx): State<Arc<AppCtx>>, Path(id): Path<Uuid>) -> Resul
         .value()
         .clone();
 
-    let entities = snapshot_entities(&ctx.pool, &instance, id).await?;
+    let mut entities = snapshot_entities(&ctx.pool, &instance, id).await?;
+    if !params.include_hidden {
+        entities.retain(|e| !e.hidden);
+    }
     Ok(Json(entities))
 }
 
@@ -384,4 +404,27 @@ pub async fn capabilities(
     }
 
     Ok(Json(CapabilitiesResp { domains }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn list_params_default_excludes_hidden() {
+        let q = ListParams::default();
+        assert!(!q.include_hidden);
+    }
+
+    #[test]
+    fn list_params_parse_include_hidden_true() {
+        let q: ListParams = serde_json::from_str(r#"{"include_hidden":true}"#).unwrap();
+        assert!(q.include_hidden);
+    }
+
+    #[test]
+    fn list_params_parse_omitted_defaults_false() {
+        let q: ListParams = serde_json::from_str("{}").unwrap();
+        assert!(!q.include_hidden);
+    }
 }
