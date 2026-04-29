@@ -20,3 +20,5 @@ image        = "icon.png"
 color        = "#fb923c"
 width        = 1080
 height       = 720
+title_bar_style = "overlay"
+full_bleed   = true

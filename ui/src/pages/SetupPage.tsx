@@ -48,7 +48,7 @@ export function SetupPage({ t, onCreated, onBack }: SetupPageProps) {
           type="button"
           onClick={onBack}
           aria-label={t("back")}
-          className="absolute left-4 top-4 z-10 flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-white/[0.08] text-white/80 transition-colors hover:bg-white/[0.14] hover:text-white"
+          className="absolute left-20 top-10 z-10 flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-white/[0.08] text-white/80 transition-colors hover:bg-white/[0.14] hover:text-white"
         >
           <ChevronLeft size={22} />
         </button>

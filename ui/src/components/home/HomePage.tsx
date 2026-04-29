@@ -212,7 +212,7 @@ export function HomePage({
   if (allEntities.length === 0) {
     return (
       <>
-        <div className="flex h-full flex-col px-6 py-6">
+        <div className="flex h-full flex-col pt-10 pr-20 pb-6 pl-20">
           {headerEl}
           <div className="flex flex-1 items-center justify-center">
             <EmptyState title={t("homeEmpty")} />
@@ -232,7 +232,7 @@ export function HomePage({
   return (
     <>
       <div className="relative flex h-full flex-col">
-        <div className="shrink-0 px-6 pt-6 pb-3">{headerEl}</div>
+        <div className="shrink-0 pt-10 pr-20 pb-3 pl-20">{headerEl}</div>
         {!reorderSections && (
           <div className="shrink-0 px-6 pb-3">
             <FilterChipBar

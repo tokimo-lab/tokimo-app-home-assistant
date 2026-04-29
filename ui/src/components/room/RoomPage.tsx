@@ -218,7 +218,7 @@ export function RoomPage({
 
   return (
     <div className="flex h-full flex-col overflow-auto">
-      <header className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-black/[0.05] bg-white/80 px-6 py-3 backdrop-blur-md dark:border-white/[0.06] dark:bg-zinc-950/80">
+      <header className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-black/[0.05] bg-white/80 pt-10 pr-20 pb-3 pl-20 backdrop-blur-md dark:border-white/[0.06] dark:bg-zinc-950/80">
         <button
           type="button"
           onClick={onBack}
