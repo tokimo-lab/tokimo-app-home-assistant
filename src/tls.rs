@@ -5,12 +5,25 @@
 //! HA installs on a LAN). For both reqwest and tokio-tungstenite we then
 //! provide a connector / client that accepts any server certificate.
 
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier};
 use rustls::pki_types::{CertificateDer, ServerName, UnixTime};
 use rustls::{ClientConfig, DigitallySignedStruct, SignatureScheme};
 use tokio_tungstenite::Connector;
+
+/// Install a process-level rustls `CryptoProvider` exactly once.
+///
+/// rustls 0.23 requires a global provider before `ClientConfig::builder()` can
+/// run; without it the builder panics. Both the `verify_tls=true` (default
+/// connector built by tokio-tungstenite) and `verify_tls=false` (our custom
+/// connector) paths need this, so we centralize it here.
+fn ensure_crypto_provider() {
+    static PROVIDER_INIT: OnceLock<()> = OnceLock::new();
+    PROVIDER_INIT.get_or_init(|| {
+        let _ = rustls::crypto::ring::default_provider().install_default();
+    });
+}
 
 /// A `ServerCertVerifier` that accepts every server certificate.
 ///
@@ -67,13 +80,10 @@ impl ServerCertVerifier for NoVerify {
 ///
 /// Returns `None` (default verifier) when verification is on.
 pub fn ws_connector(verify_tls: bool) -> Option<Connector> {
+    ensure_crypto_provider();
     if verify_tls {
         return None;
     }
-    // Ensure a default crypto provider is installed before building config.
-    // `install_default` errors if one is already installed — we ignore that.
-    let _ = rustls::crypto::ring::default_provider().install_default();
-
     let config = ClientConfig::builder()
         .dangerous()
         .with_custom_certificate_verifier(Arc::new(NoVerify))
