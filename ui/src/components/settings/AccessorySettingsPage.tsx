@@ -6,6 +6,10 @@ import { updateEntityDisplay } from "../../api/display";
 import { getEntity } from "../../api/entities";
 import { listRooms } from "../../api/rooms";
 import { enUS, zhCN } from "../../i18n";
+import {
+  applyOptimistic,
+  getEntity as getStoreEntity,
+} from "../../state/entityStore";
 import type {
   EntitySize,
   EntityState,
@@ -118,6 +122,15 @@ export function AccessorySettingsPage({
           ? { status: "ready", entity: { ...prev.entity, ...next } }
           : prev,
       );
+      // Propagate the patch into the shared entity store so tiles /
+      // details re-render with the new override (decimal_places, size,
+      // hidden, …). Without this, the settings modal's local state is
+      // updated but the home page keeps rendering the stale value until
+      // a real HA state push or full reload.
+      const inStore = getStoreEntity(entityId);
+      if (inStore) {
+        applyOptimistic({ ...inStore, ...next });
+      }
     },
     [instanceId, entityId],
   );
