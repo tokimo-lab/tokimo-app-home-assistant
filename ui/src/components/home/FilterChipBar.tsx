@@ -49,6 +49,7 @@ function entitiesForChip(
   const domains = new Set(domainsForChip(chip));
   const out: EntityState[] = [];
   for (const e of entities.values()) {
+    if (e.hidden) continue;
     const d = getDomain(e.entity_id);
     if (!domains.has(d)) continue;
     if (chip === "climate" && d === "sensor") {
