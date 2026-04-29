@@ -538,6 +538,23 @@ pub async fn refresh_registries(instance: &Arc<InstanceCtx>, pool: &sqlx::PgPool
         entities_with_device = entity_count,
         "HA WS: registry caches refreshed"
     );
+
+    // Sync HA area registry → local rooms + room_entities (best-effort).
+    match crate::handlers::rooms::sync_areas_for_instance(pool, instance.id, &base_url, &access_token, verify_tls).await
+    {
+        Ok(stats) => debug!(
+            instance_id = %instance.id,
+            rooms_upserted = stats.upserted,
+            entities_with_area = stats.upserted_entities,
+            "HA WS: areas auto-synced"
+        ),
+        Err(e) => warn!(
+            instance_id = %instance.id,
+            error = %e.message,
+            "HA WS: areas auto-sync failed"
+        ),
+    }
+
     Ok(())
 }
 

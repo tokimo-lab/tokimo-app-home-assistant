@@ -265,22 +265,23 @@ pub async fn remove_entity(
 
 #[derive(Serialize)]
 pub struct SyncAreasResp {
-    upserted: usize,
-    upserted_entities: usize,
+    pub upserted: usize,
+    pub upserted_entities: usize,
 }
 
-pub async fn sync_areas(State(ctx): State<Arc<AppCtx>>, Path(id): Path<Uuid>) -> Result<Json<SyncAreasResp>, AppError> {
-    let r = sqlx::query("SELECT base_url, access_token, verify_tls FROM instances WHERE id = $1")
-        .bind(id)
-        .fetch_one(&ctx.pool)
-        .await?;
-    let base_url: String = r.get("base_url");
-    let access_token: String = r.get("access_token");
-    let verify_tls: bool = r.get("verify_tls");
-
-    let areas = crate::ha::ws::fetch_area_registry(&base_url, &access_token, verify_tls).await?;
-    let entities = crate::ha::ws::fetch_entity_registry(&base_url, &access_token, verify_tls).await?;
-    let devices = crate::ha::ws::fetch_device_registry(&base_url, &access_token, verify_tls).await?;
+/// Core IO logic for syncing HA area registry into local rooms,
+/// entity_overrides, and room_entities. Shared between the manual `sync_areas`
+/// handler and the WS bootstrap path (`refresh_registries`).
+pub async fn sync_areas_for_instance(
+    pool: &sqlx::PgPool,
+    instance_id: Uuid,
+    base_url: &str,
+    access_token: &str,
+    verify_tls: bool,
+) -> Result<SyncAreasResp, AppError> {
+    let areas = crate::ha::ws::fetch_area_registry(base_url, access_token, verify_tls).await?;
+    let entities = crate::ha::ws::fetch_entity_registry(base_url, access_token, verify_tls).await?;
+    let devices = crate::ha::ws::fetch_device_registry(base_url, access_token, verify_tls).await?;
 
     let arr = areas
         .as_array()
@@ -299,18 +300,18 @@ pub async fn sync_areas(State(ctx): State<Arc<AppCtx>>, Path(id): Path<Uuid>) ->
                ON CONFLICT (instance_id, ha_area_id)
                DO UPDATE SET name = EXCLUDED.name, updated_at = NOW()"#,
         )
-        .bind(id)
+        .bind(instance_id)
         .bind(name)
         .bind(ha_area_id)
-        .execute(&ctx.pool)
+        .execute(pool)
         .await?;
         upserted += 1;
     }
 
     // Build ha_area_id -> room.id (uuid) map for this instance.
     let room_rows = sqlx::query("SELECT id, ha_area_id FROM rooms WHERE instance_id = $1 AND ha_area_id IS NOT NULL")
-        .bind(id)
-        .fetch_all(&ctx.pool)
+        .bind(instance_id)
+        .fetch_all(pool)
         .await?;
     let mut area_to_room: std::collections::HashMap<String, Uuid> = std::collections::HashMap::new();
     for row in room_rows {
@@ -364,23 +365,94 @@ pub async fn sync_areas(State(ctx): State<Arc<AppCtx>>, Path(id): Path<Uuid>) ->
                ON CONFLICT (instance_id, entity_id)
                DO UPDATE SET area_id = EXCLUDED.area_id, updated_at = NOW()"#,
         )
-        .bind(id)
+        .bind(instance_id)
         .bind(entity_id)
         .bind(room_uuid)
-        .execute(&ctx.pool)
+        .execute(pool)
         .await?;
         upserted_entities += 1;
     }
+
+    // Drop stale room_entities rows where the entity has moved to a different
+    // area in HA (entity_overrides.area_id no longer matches re.room_id).
+    // Done before the INSERT below so freshly inserted rows aren't deleted.
+    sqlx::query(
+        r#"DELETE FROM room_entities re
+           USING entity_overrides eo, rooms r
+           WHERE re.room_id = r.id
+             AND r.instance_id = $1
+             AND eo.instance_id = $1
+             AND eo.entity_id = re.entity_id
+             AND eo.area_id IS NOT NULL
+             AND eo.area_id != re.room_id"#,
+    )
+    .bind(instance_id)
+    .execute(pool)
+    .await?;
+
+    // Mirror entity_overrides.area_id into room_entities so GET /rooms returns
+    // non-empty entities[]. ON CONFLICT DO NOTHING preserves user-customized
+    // sort_order while only adding missing membership rows.
+    for e in entity_arr {
+        let Some(entity_id) = e.get("entity_id").and_then(|v| v.as_str()) else {
+            continue;
+        };
+        if entity_id.is_empty() {
+            continue;
+        }
+        let effective_area_ha: Option<String> = e
+            .get("area_id")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
+            .or_else(|| {
+                e.get("device_id")
+                    .and_then(|v| v.as_str())
+                    .and_then(|did| device_area.get(did).cloned())
+            });
+        let Some(ha_aid) = effective_area_ha else {
+            continue;
+        };
+        let Some(room_uuid) = area_to_room.get(&ha_aid).copied() else {
+            continue;
+        };
+
+        sqlx::query(
+            r#"INSERT INTO room_entities(room_id, entity_id, sort_order)
+               SELECT $1, $2, COALESCE(
+                   (SELECT MAX(sort_order) + 1 FROM room_entities WHERE room_id = $1),
+                   0
+               )
+               ON CONFLICT (room_id, entity_id) DO NOTHING"#,
+        )
+        .bind(room_uuid)
+        .bind(entity_id)
+        .execute(pool)
+        .await?;
+    }
+
+    Ok(SyncAreasResp {
+        upserted,
+        upserted_entities,
+    })
+}
+
+pub async fn sync_areas(State(ctx): State<Arc<AppCtx>>, Path(id): Path<Uuid>) -> Result<Json<SyncAreasResp>, AppError> {
+    let r = sqlx::query("SELECT base_url, access_token, verify_tls FROM instances WHERE id = $1")
+        .bind(id)
+        .fetch_one(&ctx.pool)
+        .await?;
+    let base_url: String = r.get("base_url");
+    let access_token: String = r.get("access_token");
+    let verify_tls: bool = r.get("verify_tls");
+
+    let resp = sync_areas_for_instance(&ctx.pool, id, &base_url, &access_token, verify_tls).await?;
 
     // Refresh cache after bulk area updates.
     if let Some(instance) = ctx.conn_pool.instances.get(&id) {
         let _ = crate::handlers::entities::populate_override_cache(&ctx.pool, &instance, id).await;
     }
 
-    Ok(Json(SyncAreasResp {
-        upserted,
-        upserted_entities,
-    }))
+    Ok(Json(resp))
 }
 
 // ─── Areas passthrough ────────────────────────────────────────────────────────
