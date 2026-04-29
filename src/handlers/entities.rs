@@ -70,10 +70,7 @@ pub(crate) fn apply_override(state: EntityState, ov: Option<&OverrideRow>) -> En
 }
 
 /// Apply overrides from cached snapshot (avoids per-event DB query).
-pub(crate) fn apply_override_snapshot(
-    state: EntityState,
-    ov: Option<&crate::state::OverrideSnapshot>,
-) -> EntityDto {
+pub(crate) fn apply_override_snapshot(state: EntityState, ov: Option<&crate::state::OverrideSnapshot>) -> EntityDto {
     EntityDto {
         entity_id: state.entity_id,
         state: state.state,
@@ -128,8 +125,7 @@ pub(crate) struct OverrideRow {
     pub group_primary: bool,
 }
 
-pub(crate) const OVERRIDE_COLS: &str =
-    "entity_id, display_name, custom_icon, area_id, hidden, is_favorite, favorite_order, size, sort_order, collapsed, group_id, group_primary";
+pub(crate) const OVERRIDE_COLS: &str = "entity_id, display_name, custom_icon, area_id, hidden, is_favorite, favorite_order, size, sort_order, collapsed, group_id, group_primary";
 
 pub(crate) fn row_to_override(r: &sqlx::postgres::PgRow) -> OverrideRow {
     OverrideRow {
@@ -210,9 +206,7 @@ pub(crate) async fn snapshot_entities(
 }
 
 /// Build a snapshot using the cached overrides (SSE hot path optimization).
-pub(crate) fn snapshot_entities_cached(
-    instance: &Arc<crate::state::InstanceCtx>,
-) -> Vec<EntityDto> {
+pub(crate) fn snapshot_entities_cached(instance: &Arc<crate::state::InstanceCtx>) -> Vec<EntityDto> {
     instance
         .store
         .states

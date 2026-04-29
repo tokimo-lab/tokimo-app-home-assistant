@@ -19,9 +19,7 @@ use uuid::Uuid;
 
 use super::AppCtx;
 use crate::error::AppError;
-use crate::handlers::entities::{
-    EntityDto, OVERRIDE_COLS, apply_override, row_to_override,
-};
+use crate::handlers::entities::{EntityDto, OVERRIDE_COLS, apply_override, row_to_override};
 
 pub async fn list_by_group(
     State(ctx): State<Arc<AppCtx>>,

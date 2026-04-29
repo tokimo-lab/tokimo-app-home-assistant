@@ -224,9 +224,7 @@ pub async fn delete(State(ctx): State<Arc<AppCtx>>, Path(id): Path<Uuid>) -> Res
     if res.rows_affected() == 0 {
         return Err(AppError::not_found(format!("instance not found: {id}")));
     }
-    Ok(Json(DeleteResp {
-        deleted: true,
-    }))
+    Ok(Json(DeleteResp { deleted: true }))
 }
 
 // ─── Test connection ──────────────────────────────────────────────────────────
@@ -480,12 +478,11 @@ pub async fn rescan(
             .bind(id)
             .execute(&mut *tx)
             .await?;
-        let r2 = sqlx::query(
-            "DELETE FROM room_entities WHERE room_id IN (SELECT id FROM rooms WHERE instance_id = $1)",
-        )
-        .bind(id)
-        .execute(&mut *tx)
-        .await?;
+        let r2 =
+            sqlx::query("DELETE FROM room_entities WHERE room_id IN (SELECT id FROM rooms WHERE instance_id = $1)")
+                .bind(id)
+                .execute(&mut *tx)
+                .await?;
         tx.commit().await?;
         cleared = r1.rows_affected() + r2.rows_affected();
     }

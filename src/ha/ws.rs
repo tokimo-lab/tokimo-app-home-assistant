@@ -379,9 +379,7 @@ async fn ws_command(
         // command
         let cmd_id: u64 = 1;
         stream
-            .send(Message::Text(
-                json!({"id": cmd_id, "type": command_type}).to_string(),
-            ))
+            .send(Message::Text(json!({"id": cmd_id, "type": command_type}).to_string()))
             .await
             .map_err(|e| AppError::bad_gateway(format!("HA WS send {command_type}: {e}")))?;
 
@@ -518,13 +516,7 @@ pub async fn refresh_registries(instance: &Arc<InstanceCtx>, pool: &sqlx::PgPool
                 entry.merge_attributes(&state.attributes);
             }
         }
-        match sync_visibility::sync_default_visibility_and_grouping(
-            pool,
-            instance.id,
-            registry_entries,
-        )
-        .await
-        {
+        match sync_visibility::sync_default_visibility_and_grouping(pool, instance.id, registry_entries).await {
             Ok(stats) => debug!(
                 instance_id = %instance.id,
                 inserted = stats.inserted,

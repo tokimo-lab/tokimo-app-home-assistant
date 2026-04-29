@@ -167,10 +167,7 @@ impl HaEntityRegistryEntry {
     pub fn from_json(v: &serde_json::Value) -> Option<Self> {
         let entity_id = v.get("entity_id")?.as_str()?.to_string();
         let domain = entity_id.split('.').next().unwrap_or("").to_string();
-        let entity_category = v
-            .get("entity_category")
-            .and_then(|c| c.as_str())
-            .map(str::to_string);
+        let entity_category = v.get("entity_category").and_then(|c| c.as_str()).map(str::to_string);
         let device_id = v
             .get("device_id")
             .and_then(|c| c.as_str())
@@ -233,9 +230,7 @@ impl HaEntityRegistryEntry {
             // everything else stays expanded. Critical-class promotion
             // doesn't matter for the collapsed flag — a normal binary
             // sensor is already Tier-2-equivalent for visibility.
-            return BINARY_SENSOR_NOISE_KEYWORDS
-                .iter()
-                .any(|k| name_lower.contains(k));
+            return BINARY_SENSOR_NOISE_KEYWORDS.iter().any(|k| name_lower.contains(k));
         }
         // Anything else (sensor without env class, button, update,
         // weather, …) is Tier 3 → collapsed.
@@ -262,10 +257,7 @@ impl HaEntityRegistryEntry {
     /// Order: most supported_features bits, then most attributes, then
     /// shortest friendly_name, then shortest entity_id, then lex entity_id.
     fn primary_sort_key(&self) -> (i32, i32, i32, i32, &str) {
-        let bits = self
-            .supported_features
-            .map(|v| -(v.count_ones() as i32))
-            .unwrap_or(0);
+        let bits = self.supported_features.map(|v| -(v.count_ones() as i32)).unwrap_or(0);
         let attrs = -self.attribute_count.unwrap_or(0);
         let name_len = self.friendly_name.as_ref().map(|s| s.len() as i32).unwrap_or(i32::MAX);
         let eid_len = self.entity_id.len() as i32;
@@ -322,11 +314,7 @@ pub async fn sync_default_visibility_and_grouping(
             continue;
         }
         let mut ranked: Vec<usize> = member_idxs.clone();
-        ranked.sort_by(|&a, &b| {
-            entries[a]
-                .primary_sort_key()
-                .cmp(&entries[b].primary_sort_key())
-        });
+        ranked.sort_by(|&a, &b| entries[a].primary_sort_key().cmp(&entries[b].primary_sort_key()));
         // First entry in ranked = primary; rest = demoted.
         for &idx in ranked.iter().skip(1) {
             decisions[idx].group_primary = false;
@@ -433,10 +421,7 @@ mod tests {
     fn group_id_falls_back_to_name() {
         let mut e = entry("light.foo");
         e.friendly_name = Some("  Bedroom Light  ".into());
-        assert_eq!(
-            e.compute_group_id().as_deref(),
-            Some("name::bedroom light::light")
-        );
+        assert_eq!(e.compute_group_id().as_deref(), Some("name::bedroom light::light"));
     }
 
     #[test]

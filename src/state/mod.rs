@@ -285,12 +285,12 @@ impl ConnectionPool {
                 verify_tls,
             };
             let ctx = InstanceCtx::new(id, config);
-            
+
             // Populate override cache before inserting (errors logged, don't fail boot).
             if let Err(e) = crate::handlers::entities::populate_override_cache(&pool, &ctx, id).await {
                 warn!(instance_id = %id, error = %e.message, "failed to populate override cache on boot");
             }
-            
+
             cp.instances.insert(id, Arc::clone(&ctx));
             spawn_supervisor(Arc::clone(&ctx), pool.clone());
         }
@@ -309,14 +309,16 @@ impl ConnectionPool {
         let ctx_clone = Arc::clone(&ctx);
         let ctx_for_cache = Arc::clone(&ctx);
         let id = ctx.id;
-        
+
         // Populate override cache (errors logged, don't fail add).
         tokio::spawn(async move {
-            if let Err(e) = crate::handlers::entities::populate_override_cache(&pool_for_cache, &ctx_for_cache, id).await {
+            if let Err(e) =
+                crate::handlers::entities::populate_override_cache(&pool_for_cache, &ctx_for_cache, id).await
+            {
                 warn!(instance_id = %id, error = %e.message, "failed to populate override cache on add_instance");
             }
         });
-        
+
         self.instances.insert(ctx.id, ctx);
         spawn_supervisor(ctx_clone, pool);
     }
@@ -337,12 +339,12 @@ impl ConnectionPool {
 
         // Create fresh InstanceCtx (new CancelToken + empty store).
         let new_ctx = InstanceCtx::new(id, new_config);
-        
+
         // Populate override cache (errors logged, don't fail restart).
         if let Err(e) = crate::handlers::entities::populate_override_cache(&self.pool, &new_ctx, id).await {
             warn!(instance_id = %id, error = %e.message, "failed to populate override cache on restart_instance");
         }
-        
+
         self.instances.insert(id, Arc::clone(&new_ctx));
         spawn_supervisor(new_ctx, self.pool.clone());
     }

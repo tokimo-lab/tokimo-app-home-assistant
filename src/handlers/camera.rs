@@ -31,11 +31,7 @@ pub async fn camera_proxy(
 
     let http = super::instance_http_client(&ctx, instance_id, verify_tls);
 
-    let url = format!(
-        "{}/api/camera_proxy/{}",
-        base_url.trim_end_matches('/'),
-        entity_id
-    );
+    let url = format!("{}/api/camera_proxy/{}", base_url.trim_end_matches('/'), entity_id);
 
     let upstream = http
         .get(&url)
