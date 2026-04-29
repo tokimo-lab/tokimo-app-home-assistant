@@ -470,21 +470,32 @@ pub async fn refresh_registries(instance: &Arc<InstanceCtx>, pool: &sqlx::PgPool
     *instance.device_registry.write().await = Arc::new(device_map);
     *instance.entity_to_device.write().await = Arc::new(e2d_map);
 
-    // Mark diagnostic/config-category entities as hidden-by-default.
-    // Uses ON CONFLICT DO NOTHING so existing user overrides are preserved.
+    // Persist HA entity_category onto entity_overrides so we can default-hide
+    // diagnostic/config entities while preserving any existing user choices.
     {
         let registry_entries: Vec<sync_visibility::HaEntityRegistryEntry> = entity_arr
             .iter()
             .filter_map(sync_visibility::HaEntityRegistryEntry::from_json)
             .collect();
-        if let Err(e) = sync_visibility::mark_default_hidden_for_diagnostic_entities(
+        match sync_visibility::mark_default_hidden_for_entities(
             pool,
             instance.id,
             &registry_entries,
         )
         .await
         {
-            warn!(instance_id = %instance.id, error = %e.message, "HA WS: failed to mark diagnostic entities as hidden");
+            Ok(stats) => debug!(
+                instance_id = %instance.id,
+                inserted = stats.inserted,
+                backfilled_hidden = stats.backfilled_hidden,
+                touched = stats.touched,
+                "HA WS: entity_category sync complete",
+            ),
+            Err(e) => warn!(
+                instance_id = %instance.id,
+                error = %e.message,
+                "HA WS: failed to sync entity_category / default-hide",
+            ),
         }
     }
 
