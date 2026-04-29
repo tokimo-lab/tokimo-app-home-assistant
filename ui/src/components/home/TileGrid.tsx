@@ -1,6 +1,5 @@
 import { cn } from "@tokimo/ui";
 import type { CSSProperties, MouseEvent as ReactMouseEvent } from "react";
-import { getDomain } from "../../lib/domain";
 import { useEditHomeView } from "../../state/useEditHomeView";
 import type {
   CallParams,
@@ -10,6 +9,7 @@ import type {
 } from "../../types";
 import { EditableTileWrapper } from "../edit/EditableTileWrapper";
 import { resolveTile } from "../tiles";
+import { effectiveSizeForEntity } from "./_helpers";
 
 interface TileGridProps {
   entities: EntityState[];
@@ -35,25 +35,6 @@ const SIZE_SPAN: Record<EntitySize, string> = {
   medium: "col-span-2 row-span-1 aspect-[2/1]",
   large: "col-span-2 row-span-2 aspect-square",
 };
-
-const MEDIUM_DEFAULT = new Set(["climate", "media_player"]);
-
-function defaultSizeFor(entity: EntityState): EntitySize {
-  const d = getDomain(entity.entity_id);
-  if (d === "camera") return "large";
-  if (MEDIUM_DEFAULT.has(d)) return "medium";
-  if (d === "sensor") {
-    const dc = entity.attributes?.device_class;
-    if (dc === "temperature" || dc === "humidity") return "medium";
-    return "small";
-  }
-  if (d === "cover") {
-    return typeof entity.attributes?.current_position === "number"
-      ? "medium"
-      : "small";
-  }
-  return "small";
-}
 
 /**
  * Deterministic per-entity jiggle delay so tiles don't all rotate in
@@ -114,7 +95,7 @@ export function TileGrid({
       >
         {entities.map((entity) => {
           const Tile = resolveTile(entity);
-          const size = forceSize ?? entity.size ?? defaultSizeFor(entity);
+          const size = forceSize ?? effectiveSizeForEntity(entity);
 
           const tile = (
             <Tile

@@ -28,7 +28,25 @@ export const RENDERABLE_DOMAINS = new Set([
 
 export const ENV_SENSOR_CLASSES = new Set(["temperature", "humidity"]);
 
-const MEDIUM_DEFAULT = new Set(["climate", "media_player"]);
+/**
+ * Apple-Home style default sizing (§1.x):
+ *  - 主控类 (light / switch / fan / lock / climate / cover / input_boolean
+ *    / automation / media_player) → medium (2×1 横长矩形)
+ *  - 摄像头 (camera) → large (2×2，含封面)
+ *  - 传感器 (sensor / binary_sensor) → small，温湿度专门走 medium 以容纳数值
+ *  - 其他 (scene / script / vacuum / ...) → small
+ */
+const MEDIUM_DEFAULT_DOMAINS = new Set([
+  "light",
+  "switch",
+  "input_boolean",
+  "automation",
+  "fan",
+  "lock",
+  "climate",
+  "cover",
+  "media_player",
+]);
 
 export function isRenderable(entity: EntityState): boolean {
   return (
@@ -56,24 +74,34 @@ export function bySortOrder(a: EntityState, b: EntityState): number {
 }
 
 /**
- * Mirror of TileGrid.defaultSizeFor; kept in sync so size-cycle starts
- * from the same baseline that the grid renders.
+ * Single source of truth for per-entity default tile size, used both by
+ * TileGrid (render path) and useToggleSizeRegistry (size-cycle baseline).
  */
 export function defaultSizeForEntity(entity: EntityState): EntitySize {
   const d = getDomain(entity.entity_id);
   if (d === "camera") return "large";
-  if (MEDIUM_DEFAULT.has(d)) return "medium";
+  if (MEDIUM_DEFAULT_DOMAINS.has(d)) return "medium";
   if (d === "sensor") {
     const dc = entity.attributes?.device_class;
     if (dc === "temperature" || dc === "humidity") return "medium";
-    return "small";
-  }
-  if (d === "cover") {
-    return typeof entity.attributes?.current_position === "number"
-      ? "medium"
-      : "small";
   }
   return "small";
+}
+
+/**
+ * Resolve the actual size to render for an entity.
+ *
+ * Backend currently always returns `size: "small"` for entities without a
+ * user-issued override (DB column default), which would shadow the domain
+ * defaults above. We therefore treat `"small"` from the backend as
+ * "unspecified" — only `medium`/`large` are honored as explicit user
+ * choices. The size-cycle UI lets users opt into a smaller size by
+ * persisting `medium`/`large` and never round-trips through `"small"`
+ * unintentionally (see useToggleSizeRegistry).
+ */
+export function effectiveSizeForEntity(entity: EntityState): EntitySize {
+  if (entity.size === "medium" || entity.size === "large") return entity.size;
+  return defaultSizeForEntity(entity);
 }
 
 export const CHIP_LABEL_KEY: Record<ChipId, string> = {
