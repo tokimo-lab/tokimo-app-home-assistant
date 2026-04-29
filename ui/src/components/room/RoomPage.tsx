@@ -1,6 +1,18 @@
+import {
+  autoUpdate,
+  FloatingPortal,
+  offset,
+  shift,
+  useClick,
+  useDismiss,
+  useFloating,
+  useInteractions,
+  useRole,
+} from "@floating-ui/react";
 import type { AppRuntimeCtx } from "@tokimo/sdk";
-import { ChevronLeft, MoreHorizontal } from "lucide-react";
-import { useMemo } from "react";
+import { cn } from "@tokimo/ui";
+import { ChevronLeft, Eye, MoreHorizontal } from "lucide-react";
+import { useMemo, useState } from "react";
 import { getDomain } from "../../lib/domain";
 import type {
   CallParams,
@@ -66,11 +78,26 @@ const DOMAIN_TITLE_KEY: Record<string, string> = {
 
 const RENDERABLE_DOMAINS = new Set(DOMAIN_ORDER);
 
-function isRenderable(entity: EntityState): boolean {
+function passesBase(entity: EntityState): boolean {
   return (
     RENDERABLE_DOMAINS.has(getDomain(entity.entity_id)) &&
     entity.state !== "unavailable" &&
     !(entity.hidden ?? entity.override?.hidden ?? false)
+  );
+}
+
+function isVisible(entity: EntityState): boolean {
+  return (
+    passesBase(entity) &&
+    !entity.collapsed &&
+    entity.group_primary !== false
+  );
+}
+
+function isSecondary(entity: EntityState): boolean {
+  return (
+    passesBase(entity) &&
+    (entity.collapsed === true || entity.group_primary === false)
   );
 }
 
@@ -88,7 +115,7 @@ function resolveRoomEntities(
   const out: EntityState[] = [];
   for (const id of ids) {
     const e = entities.get(id);
-    if (e && isRenderable(e)) out.push(e);
+    if (e && passesBase(e)) out.push(e);
   }
   out.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
   return out;
@@ -97,40 +124,54 @@ function resolveRoomEntities(
 interface DomainGroup {
   domain: string;
   titleKey: string;
-  entities: EntityState[];
+  visible: EntityState[];
+  collapsed: EntityState[];
 }
 
 function groupByDomain(roomEntities: EntityState[]): DomainGroup[] {
-  const byDomain = new Map<string, EntityState[]>();
+  const byDomain = new Map<
+    string,
+    { visible: EntityState[]; collapsed: EntityState[] }
+  >();
   for (const e of roomEntities) {
     const d = getDomain(e.entity_id);
-    const arr = byDomain.get(d) ?? [];
-    arr.push(e);
-    byDomain.set(d, arr);
+    let bucket = byDomain.get(d);
+    if (!bucket) {
+      bucket = { visible: [], collapsed: [] };
+      byDomain.set(d, bucket);
+    }
+    if (isVisible(e)) bucket.visible.push(e);
+    else if (isSecondary(e)) bucket.collapsed.push(e);
   }
 
   const groups: DomainGroup[] = [];
   const seen = new Set<string>();
   for (const domain of DOMAIN_ORDER) {
-    const list = byDomain.get(domain);
-    if (!list || list.length === 0) continue;
+    const bucket = byDomain.get(domain);
+    if (!bucket) continue;
+    if (bucket.visible.length === 0 && bucket.collapsed.length === 0) continue;
     seen.add(domain);
     groups.push({
       domain,
       titleKey: DOMAIN_TITLE_KEY[domain] ?? "room.domain.other",
-      entities: list,
+      visible: bucket.visible,
+      collapsed: bucket.collapsed,
     });
   }
   // Anything unexpected → "other" bucket (defensive).
-  const leftover: EntityState[] = [];
-  for (const [d, list] of byDomain) {
-    if (!seen.has(d)) leftover.push(...list);
+  const otherVisible: EntityState[] = [];
+  const otherCollapsed: EntityState[] = [];
+  for (const [d, bucket] of byDomain) {
+    if (seen.has(d)) continue;
+    otherVisible.push(...bucket.visible);
+    otherCollapsed.push(...bucket.collapsed);
   }
-  if (leftover.length > 0) {
+  if (otherVisible.length > 0 || otherCollapsed.length > 0) {
     groups.push({
       domain: "other",
       titleKey: "room.domain.other",
-      entities: leftover,
+      visible: otherVisible,
+      collapsed: otherCollapsed,
     });
   }
   return groups;
@@ -148,12 +189,17 @@ export function RoomPage({
   t,
 }: RoomPageProps) {
   const room = rooms.find((r) => r.id === roomId);
+  const [forceExpandAll, setForceExpandAll] = useState(false);
 
   const roomEntities = useMemo(
     () => (room ? resolveRoomEntities(room, entities) : []),
     [room, entities],
   );
   const groups = useMemo(() => groupByDomain(roomEntities), [roomEntities]);
+  const totalCollapsed = useMemo(
+    () => groups.reduce((acc, g) => acc + g.collapsed.length, 0),
+    [groups],
+  );
 
   if (!room) {
     return (
@@ -187,14 +233,11 @@ export function RoomPage({
         <h1 className="flex-1 truncate text-center text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
           {room.name}
         </h1>
-        <button
-          type="button"
-          disabled
-          className="flex h-9 w-9 items-center justify-center rounded-full text-zinc-400 dark:text-zinc-500"
-          aria-label="more"
-        >
-          <MoreHorizontal size={20} />
-        </button>
+        <RoomMenu
+          enabled={totalCollapsed > 0 && !forceExpandAll}
+          onShowAll={() => setForceExpandAll(true)}
+          t={t}
+        />
       </header>
 
       <div className="flex flex-col gap-4 px-6 pt-4 pb-8">
@@ -207,7 +250,9 @@ export function RoomPage({
             </h3>
             <RoomDomainSection
               titleKey={g.titleKey}
-              entities={g.entities}
+              entities={g.visible}
+              collapsed={g.collapsed}
+              forceExpand={forceExpandAll}
               instanceId={instance.id}
               getPending={getPending}
               onCall={onCall}
@@ -224,5 +269,86 @@ export function RoomPage({
         )}
       </div>
     </div>
+  );
+}
+
+interface RoomMenuProps {
+  enabled: boolean;
+  onShowAll: () => void;
+  t: (k: string) => string;
+}
+
+function RoomMenu({ enabled, onShowAll, t }: RoomMenuProps) {
+  const [open, setOpen] = useState(false);
+  const { refs, floatingStyles, context } = useFloating({
+    open,
+    onOpenChange: setOpen,
+    placement: "bottom-end",
+    middleware: [offset(6), shift({ padding: 8 })],
+    whileElementsMounted: autoUpdate,
+  });
+  const click = useClick(context);
+  const dismiss = useDismiss(context);
+  const role = useRole(context, { role: "menu" });
+  const { getReferenceProps, getFloatingProps } = useInteractions([
+    click,
+    dismiss,
+    role,
+  ]);
+
+  if (!enabled) {
+    return (
+      <button
+        type="button"
+        disabled
+        className="flex h-9 w-9 items-center justify-center rounded-full text-zinc-400 dark:text-zinc-500"
+        aria-label="more"
+      >
+        <MoreHorizontal size={20} />
+      </button>
+    );
+  }
+
+  return (
+    <>
+      <button
+        ref={refs.setReference}
+        type="button"
+        aria-label={t("menuOpen")}
+        className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-zinc-700 transition hover:bg-black/[0.05] dark:text-zinc-200 dark:hover:bg-white/[0.08]"
+        {...getReferenceProps()}
+      >
+        <MoreHorizontal size={20} />
+      </button>
+      {open && (
+        <FloatingPortal>
+          <div
+            ref={refs.setFloating}
+            style={floatingStyles}
+            className={cn(
+              "z-[9999] min-w-[200px] overflow-hidden rounded-xl",
+              "border border-black/[0.08] bg-white py-1 text-zinc-900 shadow-2xl",
+              "dark:border-white/[0.08] dark:bg-[var(--surface-elevated,#1a1a1a)] dark:text-[var(--text-primary)]",
+            )}
+            {...getFloatingProps()}
+          >
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setOpen(false);
+                onShowAll();
+              }}
+              className="flex w-full cursor-pointer items-center gap-3 px-3 py-2 text-left text-sm hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
+            >
+              <span className="flex h-4 w-4 items-center justify-center text-zinc-500 dark:text-[var(--text-secondary)]">
+                <Eye size={16} />
+              </span>
+              <span className="flex-1 truncate">{t("showAllDevices")}</span>
+            </button>
+          </div>
+        </FloatingPortal>
+      )}
+    </>
   );
 }

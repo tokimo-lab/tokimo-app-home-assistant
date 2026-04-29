@@ -7,11 +7,16 @@ import type { CallParams, EntityState, HaRoom, PendingOp } from "../../types";
 import { DroppableSection } from "../edit/DroppableSection";
 import { TileGrid } from "./TileGrid";
 
-const ROOM_TILE_CAP = 12;
-
 interface RoomSectionProps {
   room: HaRoom;
+  /** Default-visible entities (passes isHomeVisible). */
   entities: EntityState[];
+  /**
+   * Backend-collapsed entities for this room (collapsed=true or
+   * group_primary=false). Rendered inline below the visible grid when
+   * the user expands the section. Edit mode ignores this list.
+   */
+  collapsed?: EntityState[];
   instanceId: string;
   getPending: (entityId: string) => PendingOp | undefined;
   onCall: (params: CallParams) => void;
@@ -19,8 +24,6 @@ interface RoomSectionProps {
   onOpenRoom: (roomId: string) => void;
   onRemoveTile?: (entityId: string) => void;
   removeLabel?: string;
-  /** When true, render every entity (chip view, edit mode, "show all"). */
-  disableCap?: boolean;
   t: (k: string) => string;
 }
 
@@ -31,6 +34,7 @@ export function roomContainerId(roomId: string): string {
 export function RoomSection({
   room,
   entities,
+  collapsed = [],
   instanceId,
   getPending,
   onCall,
@@ -38,25 +42,18 @@ export function RoomSection({
   onOpenRoom,
   onRemoveTile,
   removeLabel,
-  disableCap,
-  t: _t,
+  t,
 }: RoomSectionProps) {
   const { editMode } = useEditHomeView();
   const [expanded, setExpanded] = useState(false);
+
+  // Boundary: with no visible entities outside edit mode the entire
+  // section disappears, even when collapsed entities exist (P5.6 spec).
   if (entities.length === 0 && !editMode) return null;
 
   const containerId = roomContainerId(room.id);
 
-  const capActive =
-    !disableCap && !editMode && !expanded && entities.length > ROOM_TILE_CAP;
-  const visibleEntities = capActive
-    ? entities.slice(0, ROOM_TILE_CAP)
-    : entities;
-  const hiddenCount = capActive ? entities.length - ROOM_TILE_CAP : 0;
-
   const header = editMode ? (
-    // In edit mode the section title is plain (no chevron, no nav); the
-    // section itself is the drop target.
     <h2 className="mb-3 text-base font-semibold text-[var(--text-primary)]">
       {room.name}
     </h2>
@@ -73,7 +70,7 @@ export function RoomSection({
 
   const grid = (
     <TileGrid
-      entities={visibleEntities}
+      entities={entities}
       instanceId={instanceId}
       getPending={getPending}
       onCall={onCall}
@@ -82,28 +79,9 @@ export function RoomSection({
       sortableContainerId={editMode ? containerId : undefined}
       onRemoveTile={onRemoveTile}
       removeLabel={removeLabel}
-      t={_t}
+      t={t}
     />
   );
-
-  const showMoreButton =
-    hiddenCount > 0 || (expanded && !disableCap && !editMode) ? (
-      <button
-        type="button"
-        onClick={() => setExpanded((v) => !v)}
-        className="mt-3 flex cursor-pointer items-center gap-1 text-sm text-[var(--text-secondary)] transition hover:text-[var(--text-primary)]"
-      >
-        <ChevronDown
-          size={16}
-          className={expanded ? "rotate-180 transition" : "transition"}
-        />
-        <span>
-          {expanded
-            ? _t("roomShowLess")
-            : _t("roomShowMore").replace("{n}", String(hiddenCount))}
-        </span>
-      </button>
-    ) : null;
 
   if (editMode) {
     return (
@@ -119,11 +97,45 @@ export function RoomSection({
     );
   }
 
+  const collapsedCount = collapsed.length;
+  const showToggle = collapsedCount > 0;
+
   return (
     <section>
       {header}
       {grid}
-      {showMoreButton}
+      {expanded && collapsedCount > 0 && (
+        <div className="mt-2 opacity-80">
+          <TileGrid
+            entities={collapsed}
+            instanceId={instanceId}
+            getPending={getPending}
+            onCall={onCall}
+            onContextMenu={onContextMenu}
+            t={t}
+          />
+        </div>
+      )}
+      {showToggle && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="mt-3 flex cursor-pointer items-center gap-1 text-sm text-[var(--text-secondary)] transition hover:text-[var(--text-primary)]"
+        >
+          <ChevronDown
+            size={16}
+            className={expanded ? "rotate-180 transition" : "transition"}
+          />
+          <span>
+            {expanded
+              ? t("hideSecondaryDevices")
+              : t("showSecondaryDevices").replace(
+                  "{n}",
+                  String(collapsedCount),
+                )}
+          </span>
+        </button>
+      )}
     </section>
   );
 }

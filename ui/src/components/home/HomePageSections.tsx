@@ -24,6 +24,8 @@ interface HomePageSectionsProps {
   cameras: EntityState[];
   favorites: EntityState[];
   entitiesByRoom: ReadonlyMap<string, EntityState[]>;
+  /** Default-home secondary entities per room. Empty when chip active. */
+  collapsedByRoom: ReadonlyMap<string, EntityState[]>;
   selectedChip: ChipId | null;
   editMode: boolean;
   reorderSections: boolean;
@@ -36,7 +38,6 @@ interface HomePageSectionsProps {
   onOpenRoom: (roomId: string) => void;
   onRemoveTile?: (entityId: string) => void;
   removeLabel?: string;
-  disableRoomCap: boolean;
   t: (k: string) => string;
 }
 
@@ -54,6 +55,7 @@ export function HomePageSections(props: HomePageSectionsProps) {
     cameras,
     favorites,
     entitiesByRoom,
+    collapsedByRoom,
     selectedChip,
     editMode,
     reorderSections,
@@ -66,7 +68,6 @@ export function HomePageSections(props: HomePageSectionsProps) {
     onOpenRoom,
     onRemoveTile,
     removeLabel,
-    disableRoomCap,
     t,
   } = props;
 
@@ -94,7 +95,7 @@ export function HomePageSections(props: HomePageSectionsProps) {
     favorites,
     rooms,
     entitiesByRoom,
-    disableRoomCap,
+    collapsedByRoom,
   };
 
   if (reorderSections) {

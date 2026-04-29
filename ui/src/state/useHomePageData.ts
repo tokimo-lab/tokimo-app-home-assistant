@@ -15,12 +15,6 @@ export interface UseHomePageDataParams {
   entities: ReadonlyMap<string, EntityState>;
   rooms: HaRoom[];
   selectedChip: ChipId | null;
-  /**
-   * When true, the default-home Tier 3 filter is bypassed — every
-   * renderable entity is shown and the per-room cap is also lifted by
-   * the consumer. No effect when a chip is selected.
-   */
-  showAll: boolean;
   t: (k: string) => string;
 }
 
@@ -31,6 +25,12 @@ export interface HomePageData {
   visibleEntities: EntityState[];
   /** visibleEntities grouped by room id. */
   entitiesByRoom: ReadonlyMap<string, EntityState[]>;
+  /**
+   * Default-home secondary entities grouped by room id: entities the
+   * backend marked `collapsed=true` or `group_primary=false`. Empty when
+   * a chip is active.
+   */
+  collapsedByRoom: ReadonlyMap<string, EntityState[]>;
   /** All renderable cameras, sorted by sort_order. */
   cameras: EntityState[];
   /** All favorited renderable entities, sorted by favorite_order. */
@@ -49,7 +49,6 @@ export function useHomePageData({
   entities,
   rooms,
   selectedChip,
-  showAll,
   t,
 }: UseHomePageDataParams): HomePageData {
   const allEntities = useMemo(
@@ -68,9 +67,17 @@ export function useHomePageData({
         passesChip(e, selectedChip, chipDomains),
       );
     }
-    if (showAll) return allEntities;
     return allEntities.filter(isHomeVisible);
-  }, [allEntities, selectedChip, chipDomains, showAll]);
+  }, [allEntities, selectedChip, chipDomains]);
+
+  const collapsedEntities = useMemo(() => {
+    // Only meaningful in the default (no-chip) view; chip view shows
+    // everything matching the chip and ignores the collapsed concept.
+    if (selectedChip) return [] as EntityState[];
+    return allEntities.filter(
+      (e) => !e.hidden && (e.collapsed === true || e.group_primary === false),
+    );
+  }, [allEntities, selectedChip]);
 
   const entityRoomId = useMemo(() => {
     const map = new Map<string, string>();
@@ -100,6 +107,19 @@ export function useHomePageData({
     return map;
   }, [visibleEntities, entityRoomId]);
 
+  const collapsedByRoom = useMemo(() => {
+    const map = new Map<string, EntityState[]>();
+    for (const e of collapsedEntities) {
+      const rid = entityRoomId.get(e.entity_id);
+      if (!rid) continue;
+      const arr = map.get(rid) ?? [];
+      arr.push(e);
+      map.set(rid, arr);
+    }
+    for (const arr of map.values()) arr.sort(bySortOrder);
+    return map;
+  }, [collapsedEntities, entityRoomId]);
+
   const cameras = useMemo(
     () =>
       allEntities
@@ -125,6 +145,7 @@ export function useHomePageData({
     allEntities,
     visibleEntities,
     entitiesByRoom,
+    collapsedByRoom,
     cameras,
     favorites,
     headerTitle,

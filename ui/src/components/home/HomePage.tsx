@@ -8,7 +8,6 @@ import { useDragHandlers } from "../../state/useDragHandlers";
 import { useEditHomeView } from "../../state/useEditHomeView";
 import { useFilterChip } from "../../state/useFilterChip";
 import { useHomePageData } from "../../state/useHomePageData";
-import { useShowAll } from "../../state/useShowAll";
 import { useTileContextMenu } from "../../state/useTileContextMenu";
 import { useToggleSizeRegistry } from "../../state/useToggleSizeRegistry";
 import type {
@@ -64,7 +63,6 @@ export function HomePage({
   t,
 }: HomePageProps) {
   const { selectedChip, selectChip, availableChips } = useFilterChip();
-  const { showAll, toggleShowAll } = useShowAll();
   const { patch, reorderFavoritesOptimistic, reorderRoomEntitiesOptimistic } =
     useDisplayPatch(instance.id, ctx, t);
   const {
@@ -75,15 +73,20 @@ export function HomePage({
     enterReorderSections,
   } = useEditHomeView();
 
-  const { allEntities, entitiesByRoom, cameras, favorites, headerTitle } =
-    useHomePageData({
-      instance,
-      entities,
-      rooms,
-      selectedChip,
-      showAll,
-      t,
-    });
+  const {
+    allEntities,
+    entitiesByRoom,
+    collapsedByRoom,
+    cameras,
+    favorites,
+    headerTitle,
+  } = useHomePageData({
+    instance,
+    entities,
+    rooms,
+    selectedChip,
+    t,
+  });
 
   const { openDetail } = useDetailOverlay();
   const {
@@ -203,8 +206,6 @@ export function HomePage({
       onEnterReorderSections={enterReorderSections}
       onOpenRoom={onOpenRoom}
       onRescan={() => setRescanOpen(true)}
-      showAll={showAll}
-      onToggleShowAll={toggleShowAll}
     />
   );
 
@@ -251,6 +252,7 @@ export function HomePage({
             cameras={cameras}
             favorites={favorites}
             entitiesByRoom={entitiesByRoom}
+            collapsedByRoom={collapsedByRoom}
             selectedChip={selectedChip}
             editMode={editMode}
             reorderSections={reorderSections}
@@ -263,7 +265,6 @@ export function HomePage({
             onOpenRoom={onOpenRoom}
             onRemoveTile={handleRemoveTile}
             removeLabel={t("removeFromHome")}
-            disableRoomCap={!!selectedChip || showAll}
             t={t}
           />
         </div>

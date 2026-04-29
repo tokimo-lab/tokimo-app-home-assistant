@@ -17,6 +17,8 @@ export interface HomePageDefaultProps {
   rooms: HaRoom[];
   /** Pre-sorted, pre-filtered entities per room. */
   entitiesByRoom: ReadonlyMap<string, EntityState[]>;
+  /** Default-hidden (collapsed) entities per room. */
+  collapsedByRoom: ReadonlyMap<string, EntityState[]>;
   getPending: (entityId: string) => PendingOp | undefined;
   onCall: (params: CallParams) => void;
   onContextMenu: (entity: EntityState, e: ReactMouseEvent) => void;
@@ -25,8 +27,6 @@ export interface HomePageDefaultProps {
   removeLabel?: string;
   t: (k: string) => string;
   editMode: boolean;
-  /** Skip the per-room cap (chip view, edit mode, or "show all"). */
-  disableRoomCap?: boolean;
   /** Passed through to TileGrid so tiles participate in the parent DndContext. */
   sortableContainerId?: string;
 }
@@ -43,6 +43,7 @@ export function HomePageDefault({
   favorites,
   rooms,
   entitiesByRoom,
+  collapsedByRoom,
   getPending,
   onCall,
   onContextMenu,
@@ -51,7 +52,6 @@ export function HomePageDefault({
   removeLabel,
   t,
   editMode,
-  disableRoomCap,
 }: HomePageDefaultProps) {
   return (
     <>
@@ -77,12 +77,16 @@ export function HomePageDefault({
       />
       {rooms.map((room) => {
         const list = entitiesByRoom.get(room.id) ?? [];
+        const collapsed = collapsedByRoom.get(room.id) ?? [];
+        // Boundary: visible=0 (regardless of collapsed count) hides the
+        // section entirely outside edit mode. Spec §P5.6.
         if (list.length === 0 && !editMode) return null;
         return (
           <RoomSection
             key={room.id}
             room={room}
             entities={list}
+            collapsed={collapsed}
             instanceId={instance.id}
             getPending={getPending}
             onCall={onCall}
@@ -90,7 +94,6 @@ export function HomePageDefault({
             onOpenRoom={onOpenRoom}
             onRemoveTile={onRemoveTile}
             removeLabel={removeLabel}
-            disableCap={disableRoomCap || editMode}
             t={t}
           />
         );
