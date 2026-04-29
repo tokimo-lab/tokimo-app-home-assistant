@@ -275,9 +275,10 @@ export function TileShell({
           onPointerDown={(e) => e.stopPropagation()}
           className={cn(
             "flex h-9 w-9 items-center justify-center rounded-full",
-            "transition-colors",
+            "transition-[box-shadow,background-color,color] duration-150",
             iconBgFor(state, domain),
-            !isUnavailable && "cursor-pointer",
+            !isUnavailable &&
+              "cursor-pointer hover:ring-4 hover:ring-white/15",
           )}
         >
           {icon}

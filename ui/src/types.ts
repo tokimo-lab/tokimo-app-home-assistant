@@ -153,7 +153,7 @@ export interface EntityState {
   is_favorite?: boolean;
   favorite_order?: number;
   sort_order?: number;
-  size?: EntitySize;
+  size?: EntitySize | null;
   /** Forward-compat: device grouping id from HA's entity_registry. May be
    * undefined on list endpoints; when present, dedupByDevice uses it as
    * the authoritative device identifier. */

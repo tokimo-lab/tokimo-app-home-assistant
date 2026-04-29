@@ -86,26 +86,11 @@ export function defaultSizeForEntity(entity: EntityState): EntitySize {
 }
 
 /**
- * Resolve the actual size to render for an entity.
- *
- * Backend currently always returns `size: "small"` for entities without a
- * user-issued override (DB column default in `entity_overrides.size`), so
- * `"small"` from the backend is indistinguishable from "user explicitly
- * picked small". To avoid shadowing the medium/large domain defaults
- * (light / climate / cover / media_player + temperature/humidity sensors)
- * we treat `"small"` as unspecified and fall back to `defaultSizeForEntity`.
- *
- * After tightening MEDIUM_DEFAULT_DOMAINS (switch / input_boolean /
- * automation / fan / lock now default to small), the small-as-unspecified
- * conflation is harmless for those domains: backend "small" → default
- * "small" → renders small ✓. The user can still escalate to medium/large
- * via the right-click menu. Truly distinguishing "no override" from
- * "explicit small" for the remaining medium-default domains would require
- * the backend to expose a nullable size column.
+ * Resolve the actual size to render for an entity. Returns the explicit
+ * user override when present, otherwise falls back to the domain default.
  */
 export function effectiveSizeForEntity(entity: EntityState): EntitySize {
-  if (entity.size === "medium" || entity.size === "large") return entity.size;
-  return defaultSizeForEntity(entity);
+  return entity.size ?? defaultSizeForEntity(entity);
 }
 
 /**
