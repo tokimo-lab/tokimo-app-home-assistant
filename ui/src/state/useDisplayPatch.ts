@@ -32,6 +32,13 @@ function mergeDisplay(
     }),
     ...(patch.size !== undefined && { size: patch.size }),
     ...(patch.sort_order !== undefined && { sort_order: patch.sort_order }),
+    ...(patch.decimal_places !== undefined && {
+      decimal_places: patch.decimal_places,
+    }),
+    ...(patch.collapsed !== undefined && { collapsed: patch.collapsed }),
+    ...(patch.group_primary !== undefined && {
+      group_primary: patch.group_primary,
+    }),
   };
 }
 
