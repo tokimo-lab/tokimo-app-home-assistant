@@ -96,6 +96,10 @@ export interface EntityDisplay {
   group_primary: boolean;
   /** Per-entity numeric precision. `null` means "use frontend default". */
   decimal_places?: number | null;
+  /** Sub-function role within accessory: null (default in detail card),
+   * 'hidden_in_aggregate' (excluded from detail card), or
+   * 'promoted_to_tile' (shown as tile badge in phase-2). */
+  sub_function_role?: "hidden_in_aggregate" | "promoted_to_tile" | null;
   updated_at?: string;
 }
 
@@ -123,6 +127,14 @@ export interface UpdateEntityDisplayDto {
    * - omitted: leave unchanged
    */
   decimal_places?: number | null;
+  /**
+   * Sub-function role within accessory.
+   * - 'hidden_in_aggregate': exclude from detail card
+   * - 'promoted_to_tile': show as badge (phase-2)
+   * - `null`: clear to default (show in detail card)
+   * - omitted: leave unchanged
+   */
+  sub_function_role?: "hidden_in_aggregate" | "promoted_to_tile" | null;
 }
 
 export interface RoomReorderItem {
@@ -190,6 +202,9 @@ export interface EntityState {
   group_primary?: boolean;
   /** Per-entity numeric precision override; `null`/undefined → frontend default. */
   decimal_places?: number | null;
+  /** Sub-function role within accessory (P7): null (default in detail),
+   * 'hidden_in_aggregate' (excluded), 'promoted_to_tile' (badge). */
+  sub_function_role?: "hidden_in_aggregate" | "promoted_to_tile" | null;
   /** Forward-compat: device grouping id from HA's entity_registry. */
   device_id?: string | null;
   /** Only populated by GET /entities/:eid single-fetch path. */

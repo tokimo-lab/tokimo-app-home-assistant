@@ -101,3 +101,20 @@ export function clearEntities() {
 export function getEntity(entityId: string): EntityState | undefined {
   return entities.get(entityId);
 }
+
+// ── P7 Accessory Derivation ───────────────────────────────────────────────
+
+/**
+ * Accessory view grouping entities by group_id (when non-null).
+ * @property groupId - The stable accessory identifier (device::..., name::..., via::...)
+ * @property primary - The elected primary entity (group_primary=true)
+ * @property members - All entities in this accessory (includes primary)
+ * @property subMembers - Non-primary members eligible for detail card display
+ *                        (group_primary=false && sub_function_role != 'hidden_in_aggregate')
+ */
+export interface AccessoryView {
+  groupId: string;
+  primary: EntityState;
+  members: EntityState[];
+  subMembers: EntityState[];
+}
