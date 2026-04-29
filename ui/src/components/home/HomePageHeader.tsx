@@ -11,6 +11,7 @@ export interface HomePageHeaderProps {
   onEnterEditMode: () => void;
   onEnterReorderSections: () => void;
   onOpenRoom: (id: string) => void;
+  onRescan?: () => void;
 }
 
 /**
@@ -27,6 +28,7 @@ export function HomePageHeader({
   onEnterEditMode,
   onEnterReorderSections,
   onOpenRoom,
+  onRescan,
 }: HomePageHeaderProps) {
   return (
     <div className="flex items-center justify-between">
@@ -61,6 +63,7 @@ export function HomePageHeader({
           onEditHomeView={onEnterEditMode}
           onReorderSections={onEnterReorderSections}
           onOpenRoom={onOpenRoom}
+          onRescan={onRescan}
         />
       </div>
     </div>

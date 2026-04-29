@@ -16,6 +16,7 @@ import {
   MoreHorizontal,
   Pencil,
   Plus,
+  RefreshCw,
   Rows,
   Settings,
   Workflow,
@@ -35,6 +36,7 @@ interface HomeMenuProps {
   onEditHomeView?: () => void;
   onReorderSections?: () => void;
   onOpenRoom: (roomId: string) => void;
+  onRescan?: () => void;
 }
 
 export function HomeMenu({
@@ -45,6 +47,7 @@ export function HomeMenu({
   onEditHomeView,
   onReorderSections,
   onOpenRoom,
+  onRescan,
 }: HomeMenuProps) {
   const [open, setOpen] = useState(false);
 
@@ -143,6 +146,13 @@ export function HomeMenu({
                 console.log("[HomeMenu] automation placeholder");
               })}
             />
+            {onRescan && (
+              <MenuItem
+                icon={<RefreshCw size={16} />}
+                label={t("menuRescan")}
+                onClick={handle(onRescan)}
+              />
+            )}
 
             {rooms.length > 0 && (
               <>

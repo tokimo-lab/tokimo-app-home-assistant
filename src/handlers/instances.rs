@@ -444,3 +444,57 @@ mod tests {
         assert!(validate_base_url("https://1.1.1.1").await.is_ok());
     }
 }
+
+// ─── Rescan ───────────────────────────────────────────────────────────────────
+
+#[derive(Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct RescanReq {
+    pub clear_data: bool,
+}
+
+#[derive(serde::Serialize)]
+pub struct RescanResp {
+    ok: bool,
+    cleared: u64,
+}
+
+pub async fn rescan(
+    State(ctx): State<Arc<AppCtx>>,
+    Path(id): Path<Uuid>,
+    Json(req): Json<RescanReq>,
+) -> Result<Json<RescanResp>, AppError> {
+    let instance = ctx
+        .conn_pool
+        .instances
+        .get(&id)
+        .ok_or_else(|| AppError::not_found(format!("instance not found: {id}")))?
+        .value()
+        .clone();
+
+    let mut cleared: u64 = 0;
+
+    if req.clear_data {
+        let mut tx = ctx.pool.begin().await?;
+        let r1 = sqlx::query("DELETE FROM entity_overrides WHERE instance_id = $1")
+            .bind(id)
+            .execute(&mut *tx)
+            .await?;
+        let r2 = sqlx::query(
+            "DELETE FROM room_entities WHERE room_id IN (SELECT id FROM rooms WHERE instance_id = $1)",
+        )
+        .bind(id)
+        .execute(&mut *tx)
+        .await?;
+        tx.commit().await?;
+        cleared = r1.rows_affected() + r2.rows_affected();
+    }
+
+    // Restart supervisor for a fresh entity_registry sync.
+    let config = (**instance.config.read().await).clone();
+    ctx.conn_pool.restart_instance(id, config).await;
+
+    info!(%id, cleared, clear_data = req.clear_data, "instance: rescan triggered");
+
+    Ok(Json(RescanResp { ok: true, cleared }))
+}

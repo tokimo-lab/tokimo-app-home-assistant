@@ -417,6 +417,15 @@ export const enUS: Record<string, string> = {
   // Home top-bar menu
   menuOpen: "Open menu",
   menuReload: "Reload",
+  menuRescan: "Rescan Entities",
+  rescanModalTitle: "Rescan Entities",
+  rescanClearLabel: "Clear and rescan",
+  rescanClearHint:
+    "Removes all per-entity display settings (hidden / favourite / size / custom name / icon) and room assignments. Rooms themselves are preserved. If unchecked, only triggers HA reconnect.",
+  rescanConfirm: "Start Rescan",
+  rescanInProgress: "Rescanning…",
+  rescanCancel: "Cancel",
+  rescanStartedToast: "Rescan started",
 
   // Camera tile fullscreen overlay
   cameraCloseFullscreen: "Close fullscreen",

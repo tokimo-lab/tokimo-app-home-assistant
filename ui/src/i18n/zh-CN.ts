@@ -413,6 +413,15 @@ export const zhCN: Record<string, string> = {
   // Home top-bar menu
   menuOpen: "打开菜单",
   menuReload: "重新加载",
+  menuRescan: "重新扫描设备",
+  rescanModalTitle: "重新扫描",
+  rescanClearLabel: "清空再扫描",
+  rescanClearHint:
+    "勾选后会删除所有实体显示设置（隐藏 / 收藏 / 尺寸 / 自定义名称 / 图标）和房间归属，房间本身保留。不勾选只触发 HA 重新连接。",
+  rescanConfirm: "开始扫描",
+  rescanInProgress: "扫描中…",
+  rescanCancel: "取消",
+  rescanStartedToast: "扫描已开始",
 
   // Camera tile fullscreen overlay
   cameraCloseFullscreen: "退出全屏",

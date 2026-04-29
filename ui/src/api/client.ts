@@ -36,3 +36,13 @@ export async function apiFetch<T>(
 export function sseUrl(path: string): string {
   return `${BASE}${path}`;
 }
+
+export async function rescanInstance(
+  instanceId: string,
+  clearData: boolean,
+): Promise<{ ok: boolean; cleared: number }> {
+  return apiFetch(`/instances/${instanceId}/rescan`, {
+    method: "POST",
+    body: JSON.stringify({ clear_data: clearData }),
+  });
+}

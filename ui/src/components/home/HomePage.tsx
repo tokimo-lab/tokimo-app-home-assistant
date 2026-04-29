@@ -1,4 +1,7 @@
 import type { AppRuntimeCtx } from "@tokimo/sdk";
+import { useState } from "react";
+import { rescanInstance } from "../../api/client";
+import { clearEntities } from "../../state/entityStore";
 import { useDisplayPatch } from "../../state/useDisplayPatch";
 import { useDragHandlers } from "../../state/useDragHandlers";
 import { useEditHomeView } from "../../state/useEditHomeView";
@@ -18,6 +21,7 @@ import { EditModeToolbar } from "../edit/EditModeToolbar";
 import { FilterChipBar } from "./FilterChipBar";
 import { HomePageHeader } from "./HomePageHeader";
 import { HomePageSections } from "./HomePageSections";
+import { RescanModal } from "./RescanModal";
 import { TileContextMenu } from "./TileContextMenu";
 
 interface HomePageProps {
@@ -68,6 +72,22 @@ export function HomePage({
 
   useToggleSizeRegistry(entities, patch);
 
+  const [rescanOpen, setRescanOpen] = useState(false);
+  const [rescanLoading, setRescanLoading] = useState(false);
+
+  const handleRescan = async (clearData: boolean) => {
+    setRescanLoading(true);
+    try {
+      await rescanInstance(instance.id, clearData);
+      clearEntities();
+      setRescanOpen(false);
+    } catch (err) {
+      console.error("[HomePage] rescan failed", err);
+    } finally {
+      setRescanLoading(false);
+    }
+  };
+
   const { sensors, handleDragEnd, handleSectionDragEnd } = useDragHandlers({
     instanceId: instance.id,
     entities,
@@ -97,67 +117,86 @@ export function HomePage({
       onEnterEditMode={enterEditMode}
       onEnterReorderSections={enterReorderSections}
       onOpenRoom={onOpenRoom}
+      onRescan={() => setRescanOpen(true)}
     />
   );
 
   if (allEntities.length === 0) {
     return (
-      <div className="flex h-full flex-col px-6 py-6">
-        {headerEl}
-        <div className="flex flex-1 items-center justify-center">
-          <EmptyState title={t("homeEmpty")} />
+      <>
+        <div className="flex h-full flex-col px-6 py-6">
+          {headerEl}
+          <div className="flex flex-1 items-center justify-center">
+            <EmptyState title={t("homeEmpty")} />
+          </div>
         </div>
-      </div>
+        <RescanModal
+          open={rescanOpen}
+          loading={rescanLoading}
+          t={t}
+          onConfirm={handleRescan}
+          onCancel={() => setRescanOpen(false)}
+        />
+      </>
     );
   }
 
   return (
-    <div className="relative flex h-full flex-col">
-      <div className="shrink-0 px-6 pt-6 pb-3">{headerEl}</div>
-      {!reorderSections && (
-        <div className="shrink-0 px-6 pb-3">
-          <FilterChipBar
-            availableChips={availableChips}
-            selectedChip={selectedChip}
-            onSelectChip={selectChip}
+    <>
+      <div className="relative flex h-full flex-col">
+        <div className="shrink-0 px-6 pt-6 pb-3">{headerEl}</div>
+        {!reorderSections && (
+          <div className="shrink-0 px-6 pb-3">
+            <FilterChipBar
+              availableChips={availableChips}
+              selectedChip={selectedChip}
+              onSelectChip={selectChip}
+              entities={entities}
+              t={t}
+            />
+          </div>
+        )}
+        <div className="flex flex-1 flex-col gap-5 overflow-auto px-6 pb-6">
+          <HomePageSections
+            instance={instance}
             entities={entities}
+            rooms={rooms}
+            cameras={cameras}
+            favorites={favorites}
+            entitiesByRoom={entitiesByRoom}
+            selectedChip={selectedChip}
+            editMode={editMode}
+            reorderSections={reorderSections}
+            sensors={sensors}
+            onDragEnd={handleDragEnd}
+            onSectionDragEnd={handleSectionDragEnd}
+            getPending={getPending}
+            onCall={onCall}
+            onContextMenu={openMenu}
+            onOpenRoom={onOpenRoom}
             t={t}
           />
         </div>
-      )}
-      <div className="flex flex-1 flex-col gap-5 overflow-auto px-6 pb-6">
-        <HomePageSections
-          instance={instance}
-          entities={entities}
-          rooms={rooms}
-          cameras={cameras}
-          favorites={favorites}
-          entitiesByRoom={entitiesByRoom}
-          selectedChip={selectedChip}
-          editMode={editMode}
-          reorderSections={reorderSections}
-          sensors={sensors}
-          onDragEnd={handleDragEnd}
-          onSectionDragEnd={handleSectionDragEnd}
-          getPending={getPending}
-          onCall={onCall}
-          onContextMenu={openMenu}
-          onOpenRoom={onOpenRoom}
-          t={t}
-        />
+        {menu && (
+          <TileContextMenu
+            entity={menu.entity}
+            x={menu.x}
+            y={menu.y}
+            onClose={closeMenu}
+            onSetSize={onSetSize}
+            onToggleFavorite={onToggleFavorite}
+            onHide={onHide}
+            t={t}
+          />
+        )}
       </div>
-      {menu && (
-        <TileContextMenu
-          entity={menu.entity}
-          x={menu.x}
-          y={menu.y}
-          onClose={closeMenu}
-          onSetSize={onSetSize}
-          onToggleFavorite={onToggleFavorite}
-          onHide={onHide}
-          t={t}
-        />
-      )}
-    </div>
+      <RescanModal
+        open={rescanOpen}
+        loading={rescanLoading}
+        t={t}
+        onConfirm={handleRescan}
+        onCancel={() => setRescanOpen(false)}
+      />
+    </>
   );
 }

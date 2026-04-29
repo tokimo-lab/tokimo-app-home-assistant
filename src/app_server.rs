@@ -10,6 +10,7 @@
 //!   PATCH  /instances/:id
 //!   DELETE /instances/:id
 //!   POST   /instances/:id/test
+//!   POST   /instances/:id/rescan
 //!   GET    /instances/:id/status
 //!   GET    /instances/:id/summary
 //!   GET    /instances/:id/entities
@@ -91,6 +92,7 @@ fn build_router(ctx: Arc<AppCtx>) -> Router {
                 .delete(instances::delete),
         )
         .route("/instances/{id}/test", post(instances::test))
+        .route("/instances/{id}/rescan", post(instances::rescan))
         .route("/instances/{id}/status", get(instances::status))
         .route("/instances/{id}/summary", get(summary::get_summary))
         // ── Entities ─────────────────────────────────────────────────────
