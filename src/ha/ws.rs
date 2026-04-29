@@ -460,6 +460,9 @@ pub async fn refresh_registries(instance: &Arc<InstanceCtx>, pool: &sqlx::PgPool
     let empty = Vec::new();
     let device_arr = devices.as_array().unwrap_or(&empty);
     let mut device_map: HashMap<String, DeviceMeta> = HashMap::with_capacity(device_arr.len());
+    // Side-table: device_id → area_id, used to inherit area onto entities
+    // whose registry row leaves area_id null (HA's standard pattern).
+    let mut device_area: HashMap<String, String> = HashMap::with_capacity(device_arr.len());
     for d in device_arr {
         let Some(device_id) = d.get("id").and_then(|v| v.as_str()) else {
             continue;
@@ -471,6 +474,9 @@ pub async fn refresh_registries(instance: &Arc<InstanceCtx>, pool: &sqlx::PgPool
                 .filter(|s| !s.is_empty())
         };
         let name = str_field("name_by_user").or_else(|| str_field("name"));
+        if let Some(area) = str_field("area_id") {
+            device_area.insert(device_id.to_string(), area);
+        }
         device_map.insert(
             device_id.to_string(),
             DeviceMeta {
@@ -511,9 +517,18 @@ pub async fn refresh_registries(instance: &Arc<InstanceCtx>, pool: &sqlx::PgPool
             .collect();
         // Merge friendly_name / supported_features / attribute_count from
         // the live HA state cache (already populated by get_states).
+        // Also inherit area_id from the entity's device when the entity
+        // itself doesn't override it (HA's standard "device area applies
+        // to all its entities" semantic).
         for entry in registry_entries.iter_mut() {
             if let Some(state) = instance.store.states.get(&entry.entity_id) {
                 entry.merge_attributes(&state.attributes);
+            }
+            if entry.area_id.is_none()
+                && let Some(dev_id) = &entry.device_id
+                && let Some(area) = device_area.get(dev_id)
+            {
+                entry.area_id = Some(area.clone());
             }
         }
         match sync_visibility::sync_default_visibility_and_grouping(pool, instance.id, registry_entries).await {

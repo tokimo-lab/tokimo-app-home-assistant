@@ -2,17 +2,19 @@
 //! `entity_overrides`.
 //!
 //! Strategy: for every HA entity we know about, compute the four "default
-//! presentation" fields *once*, on first import, and `INSERT ... ON CONFLICT
-//! DO UPDATE` — but the UPDATE branch is guarded so it only fires for rows
-//! still at post-migration defaults (`collapsed=FALSE` AND `group_id IS NULL`
-//! AND `group_primary=TRUE`). Any user manual toggle is sacred: once a row
-//! diverges from the pristine pattern, subsequent syncs leave it alone.
+//! presentation" fields, on first import, and `INSERT ... ON CONFLICT DO
+//! UPDATE`. The UPDATE branch is gated on `seal_version`: rows store the
+//! version of the heuristic that produced their current values, and DO
+//! UPDATE only fires when the running code's `CURRENT_SEAL_VERSION` is
+//! strictly greater. This propagates heuristic improvements (new pass,
+//! tightened K-cap) to already-sealed deployments without needing a
+//! manual reset, while leaving rows untouched between releases.
 //!
-//! This guarded-UPDATE form (rather than plain `DO NOTHING`) is what
-//! backfills pre-existing deployments after the `collapsed` / `group_id` /
-//! `group_primary` columns were added by an idempotent ALTER TABLE: their
-//! 2k+ existing rows match the pristine pattern and get sealed on the next
-//! sync without losing any user customisation made via the UI.
+//! The `seal_version` mechanism replaces the earlier "pristine triple"
+//! guard which couldn't re-fire once a row was sealed once. Bumping the
+//! version *will* overwrite a user's manually toggled `collapsed` flag
+//! for that release, so only bump when the new heuristic is strictly an
+//! improvement worth re-applying.
 //!
 //! Why固化 in DB instead of recomputing per-render in the frontend:
 //!   * The frontend used to run a chain of dynamic filters (noise keyword
@@ -25,8 +27,8 @@
 //! (`ui/src/components/home/_helpers.ts`):
 //!   * `hidden` — `entity_category` ∈ {`diagnostic`, `config`}.
 //!   * `collapsed` — Tier-3 demotion: noise-keyword switch / binary_sensor,
-//!     or any non-Tier-1/2/binary_sensor domain. Collapsed entities still
-//!     render but live under a "show all" reveal.
+//!     or any non-Tier-1/2/binary_sensor domain. Plus per-(area_id, domain)
+//!     K-cap so a room with > K entities of one domain shows K + reveal.
 //!   * `group_id` — `device::{device_id}::{domain}` when device_id is known,
 //!     else `name::{normalized_name}::{domain}`, else `None` (singleton).
 //!   * `group_primary` — within a group, the entity with the most features
@@ -41,6 +43,50 @@ use crate::error::AppError;
 
 /// HA entity categories that should default to hidden in the dashboard.
 const HIDDEN_BY_DEFAULT_CATEGORIES: &[&str] = &["diagnostic", "config"];
+
+/// Bumped whenever the default-seal heuristic changes meaningfully (e.g.
+/// a new pass like per-(room, domain) K-cap is added). Rows with a stored
+/// `seal_version` strictly less than this re-fire DO UPDATE on the next
+/// sync, propagating the new defaults to deployments that were already
+/// sealed by a previous version. User manual toggles via PATCH /entities
+/// land on a different write path, so bumping this *will* overwrite a
+/// user's collapsed override — only bump when the new heuristic is
+/// strictly an improvement worth re-applying.
+///
+/// History:
+///   v1 — initial seal (hidden / collapsed-by-tier / group_id / group_primary).
+///   v2 — added per-(area_id, domain) K-cap pass.
+const CURRENT_SEAL_VERSION: i32 = 2;
+
+/// Per-domain cap on how many entities stay visible (collapsed=false) within
+/// a single (area_id, domain) bucket. Excess entries get demoted to
+/// `collapsed=true` so the UI's "Show N more" reveal handles the long tail.
+/// Rooms with very few devices are unaffected (the cap only trims overflow).
+fn cap_for_domain(domain: &str) -> usize {
+    match domain {
+        // Tier-1 actuators: a room with > 4 lights or switches still shows
+        // 4 + reveal. 4 fits one row of toggle tiles on a typical layout.
+        "light"
+        | "switch"
+        | "input_boolean"
+        | "fan"
+        | "cover"
+        | "lock"
+        | "media_player"
+        | "climate"
+        | "vacuum"
+        | "water_heater"
+        | "humidifier"
+        | "alarm_control_panel" => 4,
+        // Trigger-style: scenes / scripts / automations.
+        "scene" | "script" | "automation" => 4,
+        // Read-only sensors: long tails are common (per-device temperature,
+        // humidity, illuminance, signal_strength, …) — cap tighter.
+        "sensor" | "binary_sensor" => 2,
+        // Unknown domain — match Tier-1 cap.
+        _ => 4,
+    }
+}
 
 /// Domains whose primary purpose is direct user actuation. Visible by
 /// default. Mirrors `TIER1_DOMAINS` in the frontend.
@@ -167,6 +213,11 @@ pub struct HaEntityRegistryEntry {
     pub domain: String,
     pub supported_features: Option<i64>,
     pub attribute_count: Option<i32>,
+    /// Effective area: entity-level `area_id` if set, else inherited from
+    /// the device's area. `None` for unassigned entities. Used purely for
+    /// per-(area, domain) K-cap; not persisted (the user-overridable area
+    /// lives on `entity_overrides.area_id` keyed by tokimo room UUID).
+    pub area_id: Option<String>,
 }
 
 impl HaEntityRegistryEntry {
@@ -181,6 +232,11 @@ impl HaEntityRegistryEntry {
             .and_then(|c| c.as_str())
             .filter(|s| !s.is_empty())
             .map(str::to_string);
+        let area_id = v
+            .get("area_id")
+            .and_then(|c| c.as_str())
+            .filter(|s| !s.is_empty())
+            .map(str::to_string);
         Some(Self {
             entity_id,
             entity_category,
@@ -189,6 +245,7 @@ impl HaEntityRegistryEntry {
             domain,
             supported_features: None,
             attribute_count: None,
+            area_id,
         })
     }
 
@@ -288,18 +345,10 @@ pub struct SyncStats {
     pub skipped_existing: usize,
 }
 
-/// First-import固化: insert default (hidden, collapsed, group_id,
-/// group_primary) for every HA entity that does not already have an
-/// `entity_overrides` row. Existing rows are completely untouched.
-pub async fn sync_default_visibility_and_grouping(
-    pool: &PgPool,
-    instance_id: Uuid,
-    entries: Vec<HaEntityRegistryEntry>,
-) -> Result<SyncStats, AppError> {
-    if entries.is_empty() {
-        return Ok(SyncStats::default());
-    }
-
+/// Pure in-memory passes (1, 2, 2.5) that turn `entries` into per-entity
+/// `Decision`s. Extracted from `sync_default_visibility_and_grouping` so
+/// the heuristic can be unit-tested without spinning up Postgres.
+fn compute_decisions(entries: &[HaEntityRegistryEntry]) -> Vec<Decision> {
     // Pass 1: per-entity (hidden, collapsed, group_id).
     let mut groups: HashMap<String, Vec<usize>> = HashMap::new();
     let mut decisions: Vec<Decision> = Vec::with_capacity(entries.len());
@@ -329,7 +378,56 @@ pub async fn sync_default_visibility_and_grouping(
         }
     }
 
-    // Pass 3: persist. Single transaction, INSERT ... ON CONFLICT DO NOTHING.
+    // Pass 2.5: per-(area_id, domain) K-cap. Among entities that survived
+    // tier-3 demotion AND group-primary demotion (i.e. would currently be
+    // surfaced on the home page for that room), keep only `cap_for_domain`
+    // and demote the overflow to `collapsed=true`. Without this cap a user
+    // with 30 lights in one room would see all 30 tiles inline; with it
+    // they see 4 + a "Show 26 more" reveal. None of this hides entities —
+    // it just controls the default fold state.
+    let mut buckets: HashMap<(Option<String>, String), Vec<usize>> = HashMap::new();
+    for (idx, e) in entries.iter().enumerate() {
+        let d = &decisions[idx];
+        if d.hidden || d.collapsed || !d.group_primary {
+            continue;
+        }
+        buckets
+            .entry((e.area_id.clone(), e.domain.clone()))
+            .or_default()
+            .push(idx);
+    }
+    for ((_area, domain), mut idxs) in buckets {
+        let cap = cap_for_domain(&domain);
+        if idxs.len() <= cap {
+            continue;
+        }
+        // Stable sort by primary_sort_key so the same K entities consistently
+        // win across re-syncs (otherwise a re-seal could shuffle the visible set).
+        idxs.sort_by(|&a, &b| entries[a].primary_sort_key().cmp(&entries[b].primary_sort_key()));
+        for &idx in idxs.iter().skip(cap) {
+            decisions[idx].collapsed = true;
+        }
+    }
+
+    decisions
+}
+
+/// First-import固化: insert default (hidden, collapsed, group_id,
+/// group_primary) for every HA entity that does not already have an
+/// `entity_overrides` row. Existing rows are re-sealed only when the stored
+/// `seal_version` is below `CURRENT_SEAL_VERSION`.
+pub async fn sync_default_visibility_and_grouping(
+    pool: &PgPool,
+    instance_id: Uuid,
+    entries: Vec<HaEntityRegistryEntry>,
+) -> Result<SyncStats, AppError> {
+    if entries.is_empty() {
+        return Ok(SyncStats::default());
+    }
+
+    let decisions = compute_decisions(&entries);
+
+    // Pass 3: persist. Single transaction, INSERT ... ON CONFLICT DO UPDATE.
     let mut tx = pool.begin().await?;
     let mut inserted = 0usize;
     let mut skipped = 0usize;
@@ -338,16 +436,15 @@ pub async fn sync_default_visibility_and_grouping(
         let res = sqlx::query(
             "INSERT INTO entity_overrides ( \
                 instance_id, entity_id, hidden, entity_category, \
-                collapsed, group_id, group_primary \
-             ) VALUES ($1, $2, $3, $4, $5, $6, $7) \
+                collapsed, group_id, group_primary, seal_version \
+             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) \
              ON CONFLICT (instance_id, entity_id) DO UPDATE SET \
                 collapsed = EXCLUDED.collapsed, \
                 group_id = EXCLUDED.group_id, \
-                group_primary = EXCLUDED.group_primary \
+                group_primary = EXCLUDED.group_primary, \
+                seal_version = EXCLUDED.seal_version \
              WHERE \
-                entity_overrides.collapsed = FALSE \
-                AND entity_overrides.group_id IS NULL \
-                AND entity_overrides.group_primary = TRUE",
+                entity_overrides.seal_version < EXCLUDED.seal_version",
         )
         .bind(instance_id)
         .bind(&e.entity_id)
@@ -356,6 +453,7 @@ pub async fn sync_default_visibility_and_grouping(
         .bind(d.collapsed)
         .bind(d.group_id.as_deref())
         .bind(d.group_primary)
+        .bind(CURRENT_SEAL_VERSION)
         .execute(&mut *tx)
         .await?;
 
@@ -388,6 +486,7 @@ mod tests {
             domain: eid.split('.').next().unwrap().to_string(),
             supported_features: None,
             attribute_count: None,
+            area_id: None,
         }
     }
 
@@ -481,5 +580,102 @@ mod tests {
 
         // a should outrank b
         assert!(a.primary_sort_key() < b.primary_sort_key());
+    }
+
+    #[test]
+    fn from_json_extracts_area_id() {
+        let v = json!({"entity_id": "light.kitchen", "area_id": "kitchen"});
+        let e = HaEntityRegistryEntry::from_json(&v).unwrap();
+        assert_eq!(e.area_id.as_deref(), Some("kitchen"));
+
+        let v2 = json!({"entity_id": "light.kitchen", "area_id": ""});
+        let e2 = HaEntityRegistryEntry::from_json(&v2).unwrap();
+        assert!(e2.area_id.is_none());
+    }
+
+    #[test]
+    fn cap_for_domain_values() {
+        assert_eq!(cap_for_domain("light"), 4);
+        assert_eq!(cap_for_domain("switch"), 4);
+        assert_eq!(cap_for_domain("scene"), 4);
+        assert_eq!(cap_for_domain("sensor"), 2);
+        assert_eq!(cap_for_domain("binary_sensor"), 2);
+        assert_eq!(cap_for_domain("nonexistent"), 4);
+    }
+
+    #[test]
+    fn collapsed_caps_per_domain_per_room() {
+        // 6 lights in the same room: 4 should stay visible, 2 collapse.
+        let mut entries: Vec<HaEntityRegistryEntry> = (0..6)
+            .map(|i| {
+                let mut e = entry(&format!("light.l{i}"));
+                e.area_id = Some("kitchen".into());
+                // Distinct primary_sort_key so cap chooses deterministically.
+                e.supported_features = Some((6 - i as i64) * 7); // more bits → wins
+                e.friendly_name = Some(format!("Light {i}"));
+                e
+            })
+            .collect();
+        // Add 2 lights in a *different* room — should NOT count toward kitchen cap.
+        for i in 0..2 {
+            let mut e = entry(&format!("light.bed{i}"));
+            e.area_id = Some("bedroom".into());
+            e.friendly_name = Some(format!("Bed {i}"));
+            entries.push(e);
+        }
+
+        let decisions = compute_decisions(&entries);
+
+        let kitchen_visible = decisions
+            .iter()
+            .zip(entries.iter())
+            .filter(|(d, e)| !d.collapsed && e.area_id.as_deref() == Some("kitchen"))
+            .count();
+        let bedroom_visible = decisions
+            .iter()
+            .zip(entries.iter())
+            .filter(|(d, e)| !d.collapsed && e.area_id.as_deref() == Some("bedroom"))
+            .count();
+
+        assert_eq!(kitchen_visible, 4, "kitchen should cap at K=4");
+        assert_eq!(bedroom_visible, 2, "bedroom under cap stays uncollapsed");
+    }
+
+    #[test]
+    fn collapsed_cap_is_per_domain_not_room_total() {
+        // 4 lights + 4 switches in the same room: both stay fully visible
+        // because the cap is per-(area, domain).
+        let mut entries: Vec<HaEntityRegistryEntry> = Vec::new();
+        for i in 0..4 {
+            let mut e = entry(&format!("light.l{i}"));
+            e.area_id = Some("kitchen".into());
+            e.friendly_name = Some(format!("Light {i}"));
+            entries.push(e);
+        }
+        for i in 0..4 {
+            let mut e = entry(&format!("switch.s{i}"));
+            e.area_id = Some("kitchen".into());
+            e.friendly_name = Some(format!("Switch {i}"));
+            entries.push(e);
+        }
+
+        let decisions = compute_decisions(&entries);
+        let visible = decisions.iter().filter(|d| !d.collapsed).count();
+        assert_eq!(visible, 8, "8 visible total — cap is per-domain");
+    }
+
+    #[test]
+    fn collapsed_cap_skips_already_demoted() {
+        // 5 sensors (Tier-3 → already collapsed) in one room.
+        // Cap should not "credit" them as visible; they stay collapsed.
+        let entries: Vec<HaEntityRegistryEntry> = (0..5)
+            .map(|i| {
+                let mut e = entry(&format!("sensor.s{i}"));
+                e.area_id = Some("kitchen".into());
+                e
+            })
+            .collect();
+        let decisions = compute_decisions(&entries);
+        assert!(decisions.iter().all(|d| d.collapsed));
     }
 }
