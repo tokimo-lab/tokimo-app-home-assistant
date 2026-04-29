@@ -54,26 +54,32 @@ pub async fn run_connection(instance: Arc<InstanceCtx>, pool: sqlx::PgPool) -> a
     info!(instance_id = %instance.id, %ws_url, verify_tls, "HA WS: connecting");
 
     let connector = crate::tls::ws_connector(verify_tls);
+    info!(instance_id = %instance.id, has_custom_connector = connector.is_some(), "HA WS: built connector, calling connect_async_tls_with_config");
 
     // Connect — tokio-tungstenite handles TLS via rustls. When verify_tls is
     // false we pass a custom Connector that accepts any cert.
-    let (mut stream, _) = timeout(
+    let (mut stream, resp) = timeout(
         Duration::from_secs(15),
         connect_async_tls_with_config(&ws_url, None, false, connector),
     )
     .await
     .map_err(|_| anyhow::anyhow!("WS connect timed out"))?
     .map_err(|e| anyhow::anyhow!("WS connect failed: {e}"))?;
+    info!(instance_id = %instance.id, http_status = ?resp.status(), "HA WS: connect_async returned ok");
 
     // ── Auth handshake ──────────────────────────────────────────────────────
 
     // Expect: {"type":"auth_required"}
-    let msg = read_msg(&mut stream).await?;
+    info!(instance_id = %instance.id, "HA WS: waiting for auth_required");
+    let msg = timeout(Duration::from_secs(30), read_msg(&mut stream))
+        .await
+        .map_err(|_| anyhow::anyhow!("WS read_msg timed out at auth_required"))??;
     if msg.kind != "auth_required" {
         anyhow::bail!("expected auth_required, got {}", msg.kind);
     }
 
     // Send: {"type":"auth","access_token":"..."}
+    info!(instance_id = %instance.id, "HA WS: sending auth");
     stream
         .send(Message::Text(
             json!({"type":"auth","access_token": access_token}).to_string(),
@@ -82,7 +88,10 @@ pub async fn run_connection(instance: Arc<InstanceCtx>, pool: sqlx::PgPool) -> a
         .map_err(|e| anyhow::anyhow!("WS send auth: {e}"))?;
 
     // Expect: {"type":"auth_ok"}  or  {"type":"auth_invalid"}
-    let msg = read_msg(&mut stream).await?;
+    info!(instance_id = %instance.id, "HA WS: waiting for auth_ok");
+    let msg = timeout(Duration::from_secs(30), read_msg(&mut stream))
+        .await
+        .map_err(|_| anyhow::anyhow!("WS read_msg timed out at auth_ok"))??;
     match msg.kind.as_str() {
         "auth_ok" => info!(instance_id = %instance.id, "HA WS: auth ok"),
         "auth_invalid" => anyhow::bail!("HA auth rejected (access token invalid)"),
@@ -92,6 +101,7 @@ pub async fn run_connection(instance: Arc<InstanceCtx>, pool: sqlx::PgPool) -> a
     // ── Bootstrap: get_states ───────────────────────────────────────────────
 
     let id_get_states: u64 = 1;
+    info!(instance_id = %instance.id, "HA WS: sending get_states");
     stream
         .send(Message::Text(
             json!({"id": id_get_states, "type": "get_states"}).to_string(),
@@ -99,7 +109,10 @@ pub async fn run_connection(instance: Arc<InstanceCtx>, pool: sqlx::PgPool) -> a
         .await
         .map_err(|e| anyhow::anyhow!("WS send get_states: {e}"))?;
 
-    let msg = read_msg(&mut stream).await?;
+    info!(instance_id = %instance.id, "HA WS: waiting for get_states result");
+    let msg = timeout(Duration::from_secs(30), read_msg(&mut stream))
+        .await
+        .map_err(|_| anyhow::anyhow!("WS read_msg timed out at get_states_result"))??;
     if msg.id != Some(id_get_states) || msg.kind != "result" {
         anyhow::bail!("unexpected response to get_states");
     }
@@ -111,6 +124,7 @@ pub async fn run_connection(instance: Arc<InstanceCtx>, pool: sqlx::PgPool) -> a
             serde_json::from_value(result).map_err(|e| anyhow::anyhow!("parse states: {e}"))?;
         let snapshot = states.clone();
         instance.store.states.clear();
+        info!(instance_id = %instance.id, count = states.len(), "HA WS: parsed states");
         for s in states {
             instance.store.states.insert(s.entity_id.clone(), s);
         }
@@ -121,6 +135,7 @@ pub async fn run_connection(instance: Arc<InstanceCtx>, pool: sqlx::PgPool) -> a
     // ── Subscribe to state_changed events ──────────────────────────────────
 
     let id_subscribe: u64 = 2;
+    info!(instance_id = %instance.id, "HA WS: sending subscribe_events");
     stream
         .send(Message::Text(
             json!({"id": id_subscribe, "type": "subscribe_events", "event_type": "state_changed"}).to_string(),
@@ -128,7 +143,10 @@ pub async fn run_connection(instance: Arc<InstanceCtx>, pool: sqlx::PgPool) -> a
         .await
         .map_err(|e| anyhow::anyhow!("WS send subscribe_events: {e}"))?;
 
-    let msg = read_msg(&mut stream).await?;
+    info!(instance_id = %instance.id, "HA WS: waiting for subscribe result");
+    let msg = timeout(Duration::from_secs(30), read_msg(&mut stream))
+        .await
+        .map_err(|_| anyhow::anyhow!("WS read_msg timed out at subscribe_events_result"))??;
     if msg.id != Some(id_subscribe) || msg.kind != "result" || msg.success != Some(true) {
         anyhow::bail!("subscribe_events failed: {:?}", msg.error);
     }
@@ -283,8 +301,23 @@ where
                     serde_json::from_str(&text).map_err(|e| anyhow::anyhow!("WS parse: {e} — raw: {text}"))?;
                 return Ok(msg);
             }
-            Some(Ok(Message::Close(_))) => anyhow::bail!("WS closed"),
-            Some(Ok(_)) => {} // skip binary / control frames
+            Some(Ok(Message::Close(c))) => anyhow::bail!("WS closed: {:?}", c),
+            Some(Ok(Message::Binary(b))) => {
+                tracing::info!(len = b.len(), "HA WS: skipping binary frame");
+                continue;
+            }
+            Some(Ok(Message::Ping(_))) => {
+                tracing::debug!("HA WS: got ping (auto-pong)");
+                continue;
+            }
+            Some(Ok(Message::Pong(_))) => {
+                tracing::debug!("HA WS: got pong");
+                continue;
+            }
+            Some(Ok(other)) => {
+                tracing::warn!(?other, "HA WS: unexpected frame variant");
+                continue;
+            }
         }
     }
 }
