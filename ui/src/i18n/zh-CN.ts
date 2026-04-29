@@ -364,6 +364,11 @@ export const zhCN: Record<string, string> = {
   "room.domain.sensor": "传感器",
   "room.domain.other": "其他",
 
+  // Collapsed entities (default-hidden secondary devices) inline expand UI
+  showSecondaryDevices: "显示 {n} 个次要设备",
+  hideSecondaryDevices: "收起次要设备",
+  showAllDevices: "展示所有设备",
+
   // Errors
   errorLoad: "加载失败",
   errorSave: "保存失败",
@@ -416,10 +421,6 @@ export const zhCN: Record<string, string> = {
   menuOpen: "打开菜单",
   menuReload: "重新加载",
   menuRescan: "重新扫描设备",
-  menuShowAll: "显示全部配件",
-  menuShowPriority: "只显示主要配件",
-  roomShowMore: "显示更多 ({n})",
-  roomShowLess: "收起",
   rescanModalTitle: "重新扫描",
   rescanClearLabel: "清空再扫描",
   rescanClearHint:
@@ -447,6 +448,15 @@ export const zhCN: Record<string, string> = {
   currentlyShown: "当前展示",
   noSimilarAccessories: "无相似配件",
 
+  // Entity management page (⋯ 菜单 → 实体管理)
+  entityManagement: "实体管理",
+  entityMgmtSearchPlaceholder: "搜索实体…",
+  entityMgmtShowing: "显示 {shown} / 共 {total}（{hidden} 已隐藏）",
+  entityMgmtHidden: "隐藏",
+  entityMgmtCollapsed: "折叠",
+  entityMgmtGroupSiblings: "分组：{n}",
+  entityMgmtNotPrimary: "非主项",
+
   // Family sidebar tooltips (removed — sidebar deleted)
 
   // Add menu (header [+])
@@ -457,6 +467,15 @@ export const zhCN: Record<string, string> = {
   addPeople: "添加成员",
   addNewHome: "添加家庭",
   comingSoon: "即将推出",
+
+  // Welcome page
+  welcomeTitle: "欢迎使用 Home Assistant",
+  welcomeSlogan: "将整个家居生态汇聚到一处，掌控由你定义",
+  welcomeFeatureControl: "一键控制灯光、温控、安防与场景",
+  welcomeFeatureVisual: "实时画面与传感器状态尽收眼底",
+  welcomeFeatureMulti: "支持多家庭、多房间、跨设备协同",
+  welcomeCta: "开始使用",
+  back: "返回",
 
   // Rooms tab (settings)
   roomsSyncDescription: "从 Home Assistant 同步区域为房间，并管理排序与图标",

@@ -367,6 +367,11 @@ export const enUS: Record<string, string> = {
   "room.domain.sensor": "Sensors",
   "room.domain.other": "Other",
 
+  // Collapsed entities (default-hidden secondary devices) inline expand UI
+  showSecondaryDevices: "Show {n} more",
+  hideSecondaryDevices: "Show less",
+  showAllDevices: "Show All Devices",
+
   // Errors
   errorLoad: "Failed to load",
   errorSave: "Failed to save",
@@ -420,10 +425,6 @@ export const enUS: Record<string, string> = {
   menuOpen: "Open menu",
   menuReload: "Reload",
   menuRescan: "Rescan Entities",
-  menuShowAll: "Show All Accessories",
-  menuShowPriority: "Show Priority Only",
-  roomShowMore: "Show {n} More",
-  roomShowLess: "Show Less",
   rescanModalTitle: "Rescan Entities",
   rescanClearLabel: "Clear and rescan",
   rescanClearHint:
@@ -451,6 +452,15 @@ export const enUS: Record<string, string> = {
   currentlyShown: "Currently Shown",
   noSimilarAccessories: "No similar accessories",
 
+  // Entity management page (⋯ menu → Entity Management)
+  entityManagement: "Entity Management",
+  entityMgmtSearchPlaceholder: "Search entities…",
+  entityMgmtShowing: "Showing {shown} of {total} ({hidden} hidden)",
+  entityMgmtHidden: "Hidden",
+  entityMgmtCollapsed: "Collapsed",
+  entityMgmtGroupSiblings: "Group: {n}",
+  entityMgmtNotPrimary: "Not primary",
+
   // Family sidebar tooltips (removed — sidebar deleted)
 
   // Add menu (header [+])
@@ -461,6 +471,15 @@ export const enUS: Record<string, string> = {
   addPeople: "Add People",
   addNewHome: "Add New Home",
   comingSoon: "Coming Soon",
+
+  // Welcome page
+  welcomeTitle: "Welcome to Home Assistant",
+  welcomeSlogan: "Bring your entire smart home together — your way",
+  welcomeFeatureControl: "Control lights, climate, security, and scenes",
+  welcomeFeatureVisual: "Live cameras and sensor status at a glance",
+  welcomeFeatureMulti: "Multi-home, multi-room, cross-device automations",
+  welcomeCta: "Get Started",
+  back: "Back",
 
   // Rooms tab (settings)
   roomsSyncDescription:

@@ -27,6 +27,8 @@ import { enUS, zhCN } from "./i18n";
 // @ts-expect-error -- side-effect css import
 import "./index.css";
 import { SetupPage } from "./pages/SetupPage";
+import { WelcomePage } from "./pages/WelcomePage";
+import { EntityManagementHost } from "./pages/EntityManagementHost";
 import { setActiveInstance } from "./state/activeInstanceStore";
 import { useCallService } from "./state/useCallService";
 import {
@@ -34,6 +36,7 @@ import {
   useDetailOverlay,
 } from "./state/useDetailOverlay";
 import { useEntities } from "./state/useEntities";
+import { closeEntityMgmt } from "./state/useEntityMgmtNav";
 import { useInstances } from "./state/useInstances";
 import { clearRoomStack, pushRoom } from "./state/useRoomNav";
 import { useRooms } from "./state/useRooms";
@@ -58,6 +61,7 @@ function writePreferredInstanceId(id: string): void {
 }
 
 function parseRoute(route: string): ParsedRoute {
+  if (route === "/welcome") return { page: "welcome" };
   if (route === "/setup") return { page: "setup" };
   const home = route.match(/^\/instance\/([^/]+)\/home$/);
   if (home) return { page: "home", instanceId: home[1] };
@@ -135,6 +139,7 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
     if (instanceId) writePreferredInstanceId(instanceId);
     // Switching home/family invalidates any pushed rooms or open detail card.
     clearRoomStack();
+    closeEntityMgmt();
     closeDetail();
   }, [instanceId, instances, closeDetail]);
 
@@ -179,7 +184,7 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
     if (parsed.page !== "root") return;
     if (instancesLoading) return;
     if (instances.length === 0) {
-      nav.replace("/setup", "Home Assistant");
+      nav.replace("/welcome", "Home Assistant");
     } else {
       // Prefer last-used instance from localStorage when available.
       const preferredId = readPreferredInstanceId();
@@ -200,7 +205,7 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
     if (!instanceId) return;
     if (instances.some((i) => i.id === instanceId)) return;
     if (instances.length === 0) {
-      nav.replace("/setup", "Home Assistant");
+      nav.replace("/welcome", "Home Assistant");
     } else {
       const first = instances[0];
       nav.replace(
@@ -215,6 +220,7 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
     const r = parseRoute(path);
     let title = "Home Assistant";
     if (r.page === "setup") title = t("setupTitle");
+    else if (r.page === "welcome") title = "Home Assistant";
     else if (r.page === "home") {
       const inst = instances.find((i) => i.id === r.instanceId);
       title = inst ? `${inst.name} · ${t("navHome")}` : "Home Assistant";
@@ -235,8 +241,32 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
     return <Spinner />;
   }
 
+  if (parsed.page === "welcome") {
+    return <WelcomePage t={t} onGetStarted={() => navigateTo("/setup")} />;
+  }
+
   if (parsed.page === "setup") {
-    return <SetupPage t={t} onCreated={handleFamilyCreated} />;
+    return (
+      <SetupPage
+        t={t}
+        onCreated={handleFamilyCreated}
+        onBack={
+          instances.length > 0
+            ? () => {
+                const preferredId = readPreferredInstanceId();
+                const target =
+                  (preferredId &&
+                    instances.find((i) => i.id === preferredId)) ||
+                  instances[0];
+                nav.replace(
+                  `/instance/${target.id}/home`,
+                  `${target.name} · ${t("navHome")}`,
+                );
+              }
+            : () => nav.replace("/welcome", "Home Assistant")
+        }
+      />
+    );
   }
 
   const activeInstance = instances.find((i) => i.id === instanceId) ?? null;
@@ -277,6 +307,11 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
               onCall={onCall}
               t={t}
             />
+            <EntityManagementHost
+              instance={activeInstance}
+              ctx={ctx}
+              t={t}
+            />
             <DetailOverlay
               getEntity={(id) => entities.get(id)}
               onCall={onCall}
@@ -309,7 +344,7 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
                 if (remaining.length > 0) {
                   navigateTo(`/instance/${remaining[0].id}/home`);
                 } else {
-                  nav.replace("/setup", "Home Assistant");
+                  nav.replace("/welcome", "Home Assistant");
                 }
               }}
               t={t}
