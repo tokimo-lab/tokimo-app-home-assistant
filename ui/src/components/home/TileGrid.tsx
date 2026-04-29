@@ -1,4 +1,5 @@
 import { cn } from "@tokimo/ui";
+import { LayoutGroup, motion } from "framer-motion";
 import type { CSSProperties, MouseEvent as ReactMouseEvent } from "react";
 import { useEditHomeView } from "../../state/useEditHomeView";
 import type {
@@ -42,6 +43,13 @@ const SIZE_SPAN: Record<EntitySize, string> = {
   medium: "col-span-2 row-span-1 aspect-[2/1]",
   large: "col-span-2 row-span-2 aspect-square",
 };
+
+const LAYOUT_SPRING = {
+  type: "spring",
+  stiffness: 380,
+  damping: 32,
+  mass: 0.8,
+} as const;
 
 /**
  * Deterministic per-entity jiggle delay so tiles don't all rotate in
@@ -102,7 +110,8 @@ export function TileGrid({
           "@[1440px]/tiles:grid-cols-10",
         )}
       >
-        {entities.map((entity) => {
+        <LayoutGroup>
+          {entities.map((entity) => {
           const Tile = resolveTile(entity);
           const size = forceSize ?? effectiveSizeForEntity(entity);
 
@@ -122,8 +131,11 @@ export function TileGrid({
               animationDelay: `${jiggleDelayMs(entity.entity_id)}ms`,
             };
             return (
-              <div
+              <motion.div
                 key={entity.entity_id}
+                layout
+                layoutId={entity.entity_id}
+                transition={LAYOUT_SPRING}
                 data-size={size}
                 data-entity-id={entity.entity_id}
                 className={cn(SIZE_SPAN[size], "relative")}
@@ -138,14 +150,17 @@ export function TileGrid({
                     {tile}
                   </EditableTileWrapper>
                 </div>
-              </div>
+              </motion.div>
             );
           }
 
           return (
             // biome-ignore lint/a11y/noStaticElementInteractions: contextmenu is a passive enhancement
-            <div
+            <motion.div
               key={entity.entity_id}
+              layout
+              layoutId={entity.entity_id}
+              transition={LAYOUT_SPRING}
               data-size={size}
               data-entity-id={entity.entity_id}
               className={SIZE_SPAN[size]}
@@ -159,9 +174,10 @@ export function TileGrid({
               }
             >
               {tile}
-            </div>
+            </motion.div>
           );
         })}
+        </LayoutGroup>
       </div>
     </div>
   );
