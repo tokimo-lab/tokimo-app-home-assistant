@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import {
   bySortOrder,
   CHIP_LABEL_KEY,
+  dedupByDevice,
   defaultHomeOrder,
   isRenderable,
   passesChip,
@@ -64,13 +65,17 @@ export function useHomePageData({
   );
 
   const visibleEntities = useMemo(() => {
+    let list: EntityState[];
     if (selectedChip && chipDomains) {
-      return allEntities.filter((e) =>
-        passesChip(e, selectedChip, chipDomains),
-      );
+      list = allEntities.filter((e) => passesChip(e, selectedChip, chipDomains));
+    } else if (showAll) {
+      list = allEntities;
+    } else {
+      list = allEntities.filter((e) => passesDefaultHome(e, false));
     }
-    if (showAll) return allEntities;
-    return allEntities.filter((e) => passesDefaultHome(e, false));
+    // Collapse same-physical-device duplicates after the tier/chip filter
+    // but before any per-room slicing or capping. See dedupByDevice docs.
+    return dedupByDevice(list);
   }, [allEntities, selectedChip, chipDomains, showAll]);
 
   const entityRoomId = useMemo(() => {

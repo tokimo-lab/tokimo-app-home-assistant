@@ -370,6 +370,112 @@ export function defaultHomeOrder(a: EntityState, b: EntityState): number {
   return a.entity_id.localeCompare(b.entity_id);
 }
 
+/**
+ * Trailing tokens stripped from a friendly_name when computing a
+ * fallback device key. These are domain-suffix words HA tacks onto an
+ * entity name to disambiguate it from the device itself
+ * (e.g. "主卧吸顶灯 灯", "客厅电脑插座 开关 开关").
+ *
+ * Match is case-insensitive on tokens (haystack already lowercased).
+ */
+const DEVICE_KEY_SUFFIX_TOKENS = new Set([
+  "灯",
+  "开关",
+  "插座",
+  "继电器",
+  "relay",
+  "light",
+  "switch",
+  "plug",
+  "outlet",
+]);
+
+/**
+ * Normalise a friendly_name into a device-grouping key by stripping
+ * trailing duplicate / domain-suffix tokens. Used as fallback when an
+ * entity has no `device_id` from the backend.
+ */
+function nameDeviceKey(name: string): string {
+  const tokens = name.toLowerCase().trim().split(/\s+/).filter(Boolean);
+  while (tokens.length > 1) {
+    const last = tokens[tokens.length - 1];
+    const prev = tokens[tokens.length - 2];
+    if (last === prev || DEVICE_KEY_SUFFIX_TOKENS.has(last)) {
+      tokens.pop();
+      continue;
+    }
+    break;
+  }
+  return tokens.join(" ");
+}
+
+/**
+ * Pick the "primary" entity within a same-device, same-domain group:
+ *   1. shortest resolved friendly name (likely the cleanest label)
+ *   2. shortest entity_id (id without redundant suffixes)
+ *   3. lexicographic entity_id for stability
+ */
+function pickPrimary(a: EntityState, b: EntityState): EntityState {
+  const na = resolveName(a);
+  const nb = resolveName(b);
+  if (na.length !== nb.length) return na.length < nb.length ? a : b;
+  if (a.entity_id.length !== b.entity_id.length) {
+    return a.entity_id.length < b.entity_id.length ? a : b;
+  }
+  return a.entity_id.localeCompare(b.entity_id) <= 0 ? a : b;
+}
+
+/**
+ * De-duplicate entities that represent the same physical device exposed
+ * under multiple entity_ids by HA. Within a (device, domain) group only
+ * the "primary" entity (see `pickPrimary`) survives.
+ *
+ * Grouping key:
+ *   - When `device_id` is present, it is the authoritative key.
+ *   - Otherwise, falls back to a normalised friendly_name + domain so
+ *     siblings like "主卧吸顶灯" / "主卧吸顶灯 灯" collapse together.
+ *   - Entities without `device_id` AND with an empty normalised name
+ *     are treated as unique (returned as-is).
+ *
+ * The relative order of surviving entities is preserved.
+ */
+export function dedupByDevice(entities: EntityState[]): EntityState[] {
+  const winners = new Map<string, EntityState>();
+  const order: string[] = [];
+  const passthrough: EntityState[] = [];
+
+  for (const e of entities) {
+    const domain = getDomain(e.entity_id);
+    let key: string | null = null;
+    if (e.device_id) {
+      key = `id::${e.device_id}::${domain}`;
+    } else {
+      const nk = nameDeviceKey(resolveName(e));
+      if (nk) key = `name::${nk}::${domain}`;
+    }
+    if (!key) {
+      passthrough.push(e);
+      order.push(`__pt::${passthrough.length - 1}`);
+      continue;
+    }
+    const existing = winners.get(key);
+    if (!existing) {
+      winners.set(key, e);
+      order.push(key);
+    } else {
+      winners.set(key, pickPrimary(existing, e));
+    }
+  }
+
+  return order.map((k) => {
+    if (k.startsWith("__pt::")) {
+      const idx = Number(k.slice(6));
+      return passthrough[idx];
+    }
+    return winners.get(k) as EntityState;
+  });
+}
+
 export const CHIP_LABEL_KEY: Record<ChipId, string> = {
   climate: "chipClimate",
   lights: "chipLights",
