@@ -112,36 +112,40 @@ export function HomePage({
   }
 
   return (
-    <div className="relative flex h-full flex-col gap-5 overflow-auto px-6 py-6">
-      {headerEl}
+    <div className="relative flex h-full flex-col">
+      <div className="shrink-0 px-6 pt-6 pb-3">{headerEl}</div>
       {!reorderSections && (
-        <FilterChipBar
-          availableChips={availableChips}
-          selectedChip={selectedChip}
-          onSelectChip={selectChip}
+        <div className="shrink-0 px-6 pb-3">
+          <FilterChipBar
+            availableChips={availableChips}
+            selectedChip={selectedChip}
+            onSelectChip={selectChip}
+            entities={entities}
+            t={t}
+          />
+        </div>
+      )}
+      <div className="flex flex-1 flex-col gap-5 overflow-auto px-6 pb-6">
+        <HomePageSections
+          instance={instance}
           entities={entities}
+          rooms={rooms}
+          cameras={cameras}
+          favorites={favorites}
+          entitiesByRoom={entitiesByRoom}
+          selectedChip={selectedChip}
+          editMode={editMode}
+          reorderSections={reorderSections}
+          sensors={sensors}
+          onDragEnd={handleDragEnd}
+          onSectionDragEnd={handleSectionDragEnd}
+          getPending={getPending}
+          onCall={onCall}
+          onContextMenu={openMenu}
+          onOpenRoom={onOpenRoom}
           t={t}
         />
-      )}
-      <HomePageSections
-        instance={instance}
-        entities={entities}
-        rooms={rooms}
-        cameras={cameras}
-        favorites={favorites}
-        entitiesByRoom={entitiesByRoom}
-        selectedChip={selectedChip}
-        editMode={editMode}
-        reorderSections={reorderSections}
-        sensors={sensors}
-        onDragEnd={handleDragEnd}
-        onSectionDragEnd={handleSectionDragEnd}
-        getPending={getPending}
-        onCall={onCall}
-        onContextMenu={openMenu}
-        onOpenRoom={onOpenRoom}
-        t={t}
-      />
+      </div>
       {menu && (
         <TileContextMenu
           entity={menu.entity}

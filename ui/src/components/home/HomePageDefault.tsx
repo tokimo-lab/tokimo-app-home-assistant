@@ -59,16 +59,14 @@ export function HomePageDefault({
           t={t}
         />
       )}
-      {(favorites.length > 0 || editMode) && (
-        <FavoritesSection
-          favorites={favorites}
-          instanceId={instance.id}
-          getPending={getPending}
-          onCall={onCall}
-          onContextMenu={onContextMenu}
-          t={t}
-        />
-      )}
+      <FavoritesSection
+        favorites={favorites}
+        instanceId={instance.id}
+        getPending={getPending}
+        onCall={onCall}
+        onContextMenu={onContextMenu}
+        t={t}
+      />
       {rooms.map((room) => {
         const list = (entitiesByRoom.get(room.id) ?? [])
           .slice()

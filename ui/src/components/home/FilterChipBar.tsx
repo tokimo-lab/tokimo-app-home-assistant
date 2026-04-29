@@ -140,7 +140,7 @@ export function FilterChipBar({
   return (
     <div
       className={cn(
-        "flex gap-2 overflow-x-auto pb-1",
+        "flex shrink-0 items-center gap-2 overflow-x-auto pb-1",
         "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
       )}
     >
@@ -157,7 +157,7 @@ export function FilterChipBar({
               type="button"
               onClick={() => onSelectChip(chip)}
               className={cn(
-                "flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full px-3 py-1.5 text-sm transition",
+                "flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-full px-3.5 text-sm transition",
                 active
                   ? "bg-white text-neutral-900 shadow-sm dark:bg-white dark:text-neutral-900"
                   : "bg-white/[0.06] text-[var(--text-primary)] hover:bg-white/[0.1] dark:bg-white/[0.06]",
@@ -165,14 +165,16 @@ export function FilterChipBar({
               aria-pressed={active}
             >
               <Icon
-                size={14}
+                size={15}
                 className={active ? "text-neutral-900" : "text-current"}
               />
-              <span className="font-medium">{t(meta.labelKey)}</span>
+              <span className="font-medium leading-none">
+                {t(meta.labelKey)}
+              </span>
               {summary && (
                 <span
                   className={cn(
-                    "text-xs",
+                    "text-xs leading-none",
                     active
                       ? "text-neutral-500"
                       : "text-[var(--text-secondary)]",

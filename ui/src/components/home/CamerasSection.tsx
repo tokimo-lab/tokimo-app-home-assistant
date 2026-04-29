@@ -1,7 +1,7 @@
 import { ChevronRight } from "lucide-react";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import type { CallParams, EntityState, PendingOp } from "../../types";
-import { TileGrid } from "./TileGrid";
+import { resolveTile } from "../tiles";
 
 interface CamerasSectionProps {
   cameras: EntityState[];
@@ -12,6 +12,11 @@ interface CamerasSectionProps {
   t: (k: string) => string;
 }
 
+/**
+ * Apple-Home cameras strip: horizontal scroll of fixed-width camera cards
+ * so multiple cameras don't dominate the viewport. Each card keeps the
+ * camera tile's native large-size visual (square aspect).
+ */
 export function CamerasSection({
   cameras,
   instanceId,
@@ -34,15 +39,34 @@ export function CamerasSection({
         <span>{t("sectionCameras")}</span>
         <ChevronRight size={18} />
       </button>
-      <TileGrid
-        entities={cameras}
-        instanceId={instanceId}
-        getPending={getPending}
-        onCall={onCall}
-        onContextMenu={onContextMenu}
-        forceSize="large"
-        t={t}
-      />
+      <div className="-mx-6 flex gap-3 overflow-x-auto px-6 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {cameras.map((entity) => {
+          const Tile = resolveTile(entity);
+          return (
+            // biome-ignore lint/a11y/noStaticElementInteractions: contextmenu is a passive enhancement
+            <div
+              key={entity.entity_id}
+              className="aspect-square w-[280px] shrink-0"
+              onContextMenu={
+                onContextMenu
+                  ? (e) => {
+                      e.preventDefault();
+                      onContextMenu(entity, e);
+                    }
+                  : undefined
+              }
+            >
+              <Tile
+                entity={entity}
+                instanceId={instanceId}
+                pending={getPending(entity.entity_id)}
+                onCall={onCall}
+                t={t}
+              />
+            </div>
+          );
+        })}
+      </div>
     </section>
   );
 }

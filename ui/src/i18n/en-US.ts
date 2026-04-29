@@ -143,8 +143,13 @@ export const enUS: Record<string, string> = {
   sectionUnassigned: "Unassigned",
   menuHomeSettings: "Home Settings",
   menuEditHomeView: "Edit Home View",
-  menuReorderSections: "Reorder Sections",
+  menuReorderSections: "Reorder Rooms",
   menuRoomsHeading: "Rooms",
+  menuAddAccessory: "Add Accessory",
+  menuRoomSettings: "Room Settings",
+  menuAutomation: "Automation",
+  homeSwitch: "Switch home",
+  favoritesEmpty: "Long-press a tile and choose “Add to Favorites”",
 
   // Filter chips (top-row category tabs)
   chipClimate: "Climate",

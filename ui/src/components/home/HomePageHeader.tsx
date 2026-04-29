@@ -1,4 +1,4 @@
-import { Plus } from "lucide-react";
+import { ChevronDown, Plus } from "lucide-react";
 import type { HaRoom } from "../../types";
 import { HomeMenu } from "./HomeMenu";
 
@@ -14,8 +14,9 @@ export interface HomePageHeaderProps {
 }
 
 /**
- * Apple-Home–style top bar: title left, [+] add accessory and [⋯] menu right.
- * The add button is currently a placeholder until the Add Accessory flow lands.
+ * Apple-Home-style top bar:
+ *   left  – home name (bold, large) + ChevronDown placeholder for switching homes
+ *   right – round [+] add accessory placeholder + round [⋯] menu button
  */
 export function HomePageHeader({
   title,
@@ -29,17 +30,26 @@ export function HomePageHeader({
 }: HomePageHeaderProps) {
   return (
     <div className="flex items-center justify-between">
-      <h1 className="text-2xl font-semibold text-[var(--text-primary)]">
-        {title}
-      </h1>
-      <div className="flex items-center gap-1">
+      <button
+        type="button"
+        aria-label={t("homeSwitch")}
+        onClick={() => {
+          // Placeholder: home switcher is a future feature.
+          console.log("[HomePage] switch home clicked");
+        }}
+        className="flex cursor-pointer items-center gap-1 text-[var(--text-primary)] transition hover:opacity-80"
+      >
+        <span className="text-3xl font-bold leading-tight">{title}</span>
+        <ChevronDown size={22} className="text-[var(--text-secondary)]" />
+      </button>
+      <div className="flex items-center gap-2">
         <button
           type="button"
           aria-label={t("homeAdd")}
           onClick={() => {
             console.log("[HomePage] add accessory clicked");
           }}
-          className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-[var(--text-secondary)] transition hover:bg-white/[0.06]"
+          className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-white/[0.06] text-[var(--text-primary)] transition hover:bg-white/[0.1]"
         >
           <Plus size={20} />
         </button>

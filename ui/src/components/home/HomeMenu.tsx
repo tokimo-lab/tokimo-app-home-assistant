@@ -11,11 +11,14 @@ import {
 } from "@floating-ui/react";
 import { cn } from "@tokimo/ui";
 import {
+  Cog,
   LayoutGrid,
   MoreHorizontal,
   Pencil,
+  Plus,
   Rows,
   Settings,
+  Workflow,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useState } from "react";
@@ -101,6 +104,13 @@ export function HomeMenu({
             <div className="my-1 h-px bg-white/[0.08]" />
 
             <MenuItem
+              icon={<Plus size={16} />}
+              label={t("menuAddAccessory")}
+              onClick={handle(() => {
+                console.log("[HomeMenu] add accessory placeholder");
+              })}
+            />
+            <MenuItem
               icon={<Settings size={16} />}
               label={t("menuHomeSettings")}
               onClick={handle(onOpenSettings)}
@@ -119,6 +129,20 @@ export function HomeMenu({
                 onClick={handle(onReorderSections)}
               />
             )}
+            <MenuItem
+              icon={<Cog size={16} />}
+              label={t("menuRoomSettings")}
+              onClick={handle(() => {
+                console.log("[HomeMenu] room settings placeholder");
+              })}
+            />
+            <MenuItem
+              icon={<Workflow size={16} />}
+              label={t("menuAutomation")}
+              onClick={handle(() => {
+                console.log("[HomeMenu] automation placeholder");
+              })}
+            />
 
             {rooms.length > 0 && (
               <>

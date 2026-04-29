@@ -143,8 +143,13 @@ export const zhCN: Record<string, string> = {
   sectionUnassigned: "未分组",
   menuHomeSettings: "家庭设置",
   menuEditHomeView: "编辑主页",
-  menuReorderSections: "排序章节",
+  menuReorderSections: "排序房间",
   menuRoomsHeading: "房间",
+  menuAddAccessory: "添加配件",
+  menuRoomSettings: "房间设置",
+  menuAutomation: "自动化",
+  homeSwitch: "切换家庭",
+  favoritesEmpty: "长按某个配件，选择「加入收藏」",
 
   // Filter chips
   chipClimate: "气候",
