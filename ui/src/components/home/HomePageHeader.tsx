@@ -5,6 +5,7 @@ import { HomeMenu } from "./HomeMenu";
 export interface HomePageHeaderProps {
   title: string;
   instanceId: string;
+  instanceBaseUrl: string;
   rooms: HaRoom[];
   t: (k: string) => string;
   onOpenSettings: () => void;
@@ -24,6 +25,7 @@ export interface HomePageHeaderProps {
 export function HomePageHeader({
   title,
   instanceId,
+  instanceBaseUrl,
   rooms,
   t,
   onOpenSettings,
@@ -34,6 +36,9 @@ export function HomePageHeader({
   showAll,
   onToggleShowAll,
 }: HomePageHeaderProps) {
+  const integrationsUrl = instanceBaseUrl
+    ? `${instanceBaseUrl.replace(/\/$/, "")}/config/integrations/dashboard`
+    : "";
   return (
     <div className="flex items-center justify-between">
       <button
@@ -52,10 +57,13 @@ export function HomePageHeader({
         <button
           type="button"
           aria-label={t("homeAdd")}
+          title={t("homeAdd")}
+          disabled={!integrationsUrl}
           onClick={() => {
-            console.log("[HomePage] add accessory clicked");
+            if (!integrationsUrl) return;
+            window.open(integrationsUrl, "_blank", "noopener,noreferrer");
           }}
-          className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-white/[0.06] text-[var(--text-primary)] transition hover:bg-white/[0.1]"
+          className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-white/[0.06] text-[var(--text-primary)] transition hover:bg-white/[0.1] disabled:cursor-not-allowed disabled:opacity-40"
         >
           <Plus size={20} />
         </button>

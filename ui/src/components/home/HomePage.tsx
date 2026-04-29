@@ -152,6 +152,7 @@ export function HomePage({
     <HomePageHeader
       title={headerTitle}
       instanceId={instance.id}
+      instanceBaseUrl={instance.base_url}
       rooms={rooms}
       t={t}
       onOpenSettings={onOpenSettings}
