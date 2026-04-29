@@ -47,10 +47,6 @@ pub async fn mark_default_hidden_for_diagnostic_entities(
     instance_id: Uuid,
     entries: &[HaEntityRegistryEntry],
 ) -> Result<usize, AppError> {
-    // TODO(P1.0-impl): Batch-insert using a CTE or unnest() for performance.
-    //   Current placeholder iterates one-by-one; acceptable for bootstrap
-    //   (runs once at startup per instance) but should be batched before
-    //   this is wired to a hot-path.
     let mut count: usize = 0;
 
     for entry in entries {
@@ -59,41 +55,21 @@ pub async fn mark_default_hidden_for_diagnostic_entities(
             continue;
         }
 
-        // TODO(P1.0-impl): Replace with actual sqlx query once schema is confirmed:
-        // ```sql
-        // INSERT INTO entity_overrides (instance_id, entity_id, hidden)
-        // VALUES ($1, $2, true)
-        // ON CONFLICT (instance_id, entity_id) DO NOTHING
-        // ```
-        let _ = pool; // placeholder — remove when implementing
-        let _ = instance_id;
-        let _ = &entry.entity_id;
+        let inserted = sqlx::query(
+            "INSERT INTO entity_overrides (instance_id, entity_id, hidden) \
+             VALUES ($1, $2, true) \
+             ON CONFLICT (instance_id, entity_id) DO NOTHING \
+             RETURNING entity_id",
+        )
+        .bind(instance_id)
+        .bind(&entry.entity_id)
+        .fetch_optional(pool)
+        .await?;
 
-        count += 1; // placeholder count
+        if inserted.is_some() {
+            count += 1;
+        }
     }
 
     Ok(count)
-}
-
-/// Upsert `hidden = true` for a single entity, never overwriting an
-/// existing user-set override (`DO NOTHING` on conflict).
-///
-/// Returns `true` if a new row was inserted, `false` if one already existed.
-///
-/// TODO(P1.0-impl): Execute the actual INSERT query.
-pub async fn upsert_default_hidden(
-    pool: &PgPool,
-    instance_id: Uuid,
-    entity_id: &str,
-) -> Result<bool, AppError> {
-    // TODO(P1.0-impl):
-    // ```sql
-    // INSERT INTO entity_overrides (instance_id, entity_id, hidden)
-    // VALUES ($1, $2, true)
-    // ON CONFLICT (instance_id, entity_id) DO NOTHING
-    // RETURNING entity_id
-    // ```
-    // If RETURNING returns a row → `true`; empty → `false`.
-    let _ = (pool, instance_id, entity_id);
-    Ok(false)
 }

@@ -1,14 +1,12 @@
 import { Cpu } from "lucide-react";
 import { memo } from "react";
-import { getTileGradient } from "../../lib/colors";
 import { getFriendlyName } from "../../lib/format";
 import { type TileProps, tilePropsEqual } from "./_types";
-import { TileBase } from "./TileBase";
+import { TileBaseStyle } from "./TileBaseStyle";
 
 function ScriptTileImpl({ entity, t, onCall }: TileProps) {
   const { entity_id, state } = entity;
   const isRunning = state === "on";
-  const gradient = getTileGradient("script", isRunning ? "on" : "off");
   const name = getFriendlyName(entity);
 
   function run() {
@@ -21,15 +19,14 @@ function ScriptTileImpl({ entity, t, onCall }: TileProps) {
   }
 
   return (
-    <TileBase gradient={gradient} onClick={run}>
-      <Cpu size={20} className="text-white/80" />
-      <div>
-        <p className="truncate text-sm font-semibold text-white">{name}</p>
-        <p className="text-xs text-white/70">
-          {isRunning ? t("stateActive") : t("tileActivate")}
-        </p>
-      </div>
-    </TileBase>
+    <TileBaseStyle
+      domain="script"
+      isOn={isRunning}
+      icon={<Cpu size={20} />}
+      name={name}
+      stateText={isRunning ? t("stateActive") : t("tileActivate")}
+      onClick={run}
+    />
   );
 }
 

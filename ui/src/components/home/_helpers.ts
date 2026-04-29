@@ -4,8 +4,8 @@
  */
 
 import { getDomain } from "../../lib/domain";
-import type { EntityState, EntitySize } from "../../types";
 import type { ChipId } from "../../state/useFilterChip";
+import type { EntitySize, EntityState } from "../../types";
 
 export const RENDERABLE_DOMAINS = new Set([
   "light",

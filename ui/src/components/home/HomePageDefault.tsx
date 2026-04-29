@@ -6,10 +6,10 @@ import type {
   HaRoom,
   PendingOp,
 } from "../../types";
+import { bySortOrder } from "./_helpers";
 import { CamerasSection } from "./CamerasSection";
 import { FavoritesSection } from "./FavoritesSection";
 import { RoomSection } from "./RoomSection";
-import { bySortOrder } from "./_helpers";
 
 export interface HomePageDefaultProps {
   instance: HaInstance;
@@ -31,11 +31,8 @@ export interface HomePageDefaultProps {
 /**
  * Default home layout: CamerasSection → FavoritesSection → RoomSections.
  *
- * Receives pre-computed lists from HomePage (orchestration layer).
- *
- * TODO(P1.1-impl): editMode 下用 DndContext + SortableContext 包裹（参考现
- *   HomePage.tsx L487-528）。DndContext 保留在 HomePage 层，此组件只负责
- *   把 sortableContainerId 透传给 RoomSection / FavoritesSection 的 TileGrid。
+ * DndContext is owned by the parent HomePage (orchestration layer).
+ * This component receives pre-computed lists and renders sections.
  */
 export function HomePageDefault({
   instance,

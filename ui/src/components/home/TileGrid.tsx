@@ -1,8 +1,13 @@
 import { cn } from "@tokimo/ui";
 import type { MouseEvent as ReactMouseEvent } from "react";
-import { useEditHomeView } from "../../state/useEditHomeView";
 import { getDomain } from "../../lib/domain";
-import type { CallParams, EntitySize, EntityState, PendingOp } from "../../types";
+import { useEditHomeView } from "../../state/useEditHomeView";
+import type {
+  CallParams,
+  EntitySize,
+  EntityState,
+  PendingOp,
+} from "../../types";
 import { EditableTileWrapper } from "../edit/EditableTileWrapper";
 import { ResizeHandle } from "../edit/ResizeHandle";
 import { resolveTile } from "../tiles";
@@ -44,7 +49,9 @@ function defaultSizeFor(entity: EntityState): EntitySize {
     return "small";
   }
   if (d === "cover") {
-    return typeof entity.attributes?.current_position === "number" ? "medium" : "small";
+    return typeof entity.attributes?.current_position === "number"
+      ? "medium"
+      : "small";
   }
   return "small";
 }
@@ -73,39 +80,22 @@ export function TileGrid({
   sortableContainerId,
   t,
 }: TileGridProps) {
-  const { toggleSize } = useEditHomeView();
+  const { selectedTileId, toggleSize } = useEditHomeView();
   if (entities.length === 0) return null;
 
   return (
-    /**
-     * Container query anchor. The inner grid responds to this element's width,
-     * not the viewport. Tailwind v4 `@container` + named container syntax:
-     * `@container ha-tile-grid`.
-     *
-     * TODO(P1.2-impl): Replace inline-style grid-template-columns with
-     *   Tailwind v4 container-query variants:
-     *   `grid-cols-4 @[640px]:grid-cols-6 @[1024px]:grid-cols-8`
-     */
-    <div data-tile-grid-container className="@container/ha-tile-grid w-full">
+    <div data-tile-grid-container className="@container w-full">
       <div
         data-edit-mode={editMode ? "true" : undefined}
         className={cn(
           "grid gap-2",
-          // Viewport-independent column layout via container query inline style.
-          // grid-cols-4 is the safe default; JS media-query-less override via CSS var below.
-          "grid-cols-4",
-          // TODO(P1.2-impl): swap for Tailwind v4 @container variants when design pass done
+          "grid-cols-4 @[640px]:grid-cols-6 @[1024px]:grid-cols-8",
         )}
-        style={{
-          // Inline @supports / @container not possible in Tailwind class strings;
-          // use CSS custom properties override as a stop-gap.
-          // The actual responsive override is in index.css via @layer utilities.
-        }}
       >
         {entities.map((entity) => {
           const Tile = resolveTile(entity);
           const size = forceSize ?? entity.size ?? defaultSizeFor(entity);
-          const isSelected = false; // TODO(P1.1-impl): derive from edit selection state
+          const isSelected = editMode && selectedTileId === entity.entity_id;
 
           const tile = (
             <Tile
@@ -119,14 +109,24 @@ export function TileGrid({
 
           if (editMode) {
             return (
-              <div key={entity.entity_id} className={cn(SIZE_SPAN[size], "relative")}>
+              <div
+                key={entity.entity_id}
+                className={cn(SIZE_SPAN[size], "relative")}
+              >
                 <div className="tile-jiggle h-full w-full">
-                  <EditableTileWrapper entity={entity} sortableContainerId={sortableContainerId}>
+                  <EditableTileWrapper
+                    entity={entity}
+                    sortableContainerId={sortableContainerId}
+                  >
                     {tile}
                   </EditableTileWrapper>
                 </div>
-                {/* TODO(P1.1-impl): render ResizeHandle only on selected tile */}
-                {isSelected && <ResizeHandle onClick={() => void toggleSize(entity.entity_id)} t={t} />}
+                {isSelected && (
+                  <ResizeHandle
+                    onClick={() => void toggleSize(entity.entity_id)}
+                    t={t}
+                  />
+                )}
               </div>
             );
           }
@@ -138,7 +138,10 @@ export function TileGrid({
               className={SIZE_SPAN[size]}
               onContextMenu={
                 onContextMenu
-                  ? (e) => { e.preventDefault(); onContextMenu(entity, e); }
+                  ? (e) => {
+                      e.preventDefault();
+                      onContextMenu(entity, e);
+                    }
                   : undefined
               }
             >

@@ -330,32 +330,6 @@ pub async fn reorder_favorites(
     }))
 }
 
-// ─── Tests ────────────────────────────────────────────────────────────────────
-
-/// Insert `hidden = true` for a single entity override, doing nothing if a row
-/// already exists (preserves any user-set override).
-///
-/// Returns `true` if a new row was inserted, `false` if one already existed.
-///
-/// TODO(P1.0-impl): Execute the SQL; current body is a no-op scaffold.
-///
-/// ```sql
-/// INSERT INTO entity_overrides (instance_id, entity_id, hidden)
-/// VALUES ($1, $2, true)
-/// ON CONFLICT (instance_id, entity_id) DO NOTHING
-/// RETURNING entity_id
-/// ```
-#[allow(dead_code)] // wired via sync_visibility in P1.0
-pub async fn upsert_default_hidden(
-    pool: &sqlx::PgPool,
-    instance_id: Uuid,
-    entity_id: &str,
-) -> Result<bool, sqlx::Error> {
-    // TODO(P1.0-impl): replace with actual query execution
-    let _ = (pool, instance_id, entity_id);
-    Ok(false)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

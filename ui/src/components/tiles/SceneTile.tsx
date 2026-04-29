@@ -1,13 +1,11 @@
 import { PlaySquare } from "lucide-react";
 import { memo } from "react";
-import { getTileGradient } from "../../lib/colors";
 import { getFriendlyName } from "../../lib/format";
 import { type TileProps, tilePropsEqual } from "./_types";
-import { TileBase } from "./TileBase";
+import { TileBaseStyle } from "./TileBaseStyle";
 
 function SceneTileImpl({ entity, t, onCall }: TileProps) {
   const { entity_id } = entity;
-  const gradient = getTileGradient("scene", "on");
   const name = getFriendlyName(entity);
 
   function activate() {
@@ -20,13 +18,14 @@ function SceneTileImpl({ entity, t, onCall }: TileProps) {
   }
 
   return (
-    <TileBase gradient={gradient} onClick={activate}>
-      <PlaySquare size={20} className="text-white/80" />
-      <div>
-        <p className="truncate text-sm font-semibold text-white">{name}</p>
-        <p className="text-xs text-white/70">{t("tileActivate")}</p>
-      </div>
-    </TileBase>
+    <TileBaseStyle
+      domain="scene"
+      isOn={false}
+      icon={<PlaySquare size={20} />}
+      name={name}
+      stateText={t("tileActivate")}
+      onClick={activate}
+    />
   );
 }
 

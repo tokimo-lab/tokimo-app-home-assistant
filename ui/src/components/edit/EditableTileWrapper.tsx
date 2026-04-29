@@ -89,7 +89,7 @@ export function EditableTileWrapper({
       data-selected={selected || undefined}
       data-entity-id={entity.entity_id}
       className={cn(
-        "ha-tile-jiggle relative h-full w-full rounded-[22px]",
+        "relative h-full w-full rounded-[22px]",
         selected &&
           "ring-2 ring-white/90 ring-offset-2 ring-offset-transparent",
       )}

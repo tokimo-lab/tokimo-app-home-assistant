@@ -2,27 +2,21 @@ import { Zap } from "lucide-react";
 import { memo } from "react";
 import { formatState, getFriendlyName } from "../../lib/format";
 import { type TileProps, tilePropsEqual } from "./_types";
-import { TileBase } from "./TileBase";
+import { TileBaseStyle } from "./TileBaseStyle";
 
-// Binary sensor active = motion/door/window open → orange
-// inactive = neutral
 function BinarySensorTileImpl({ entity, t }: TileProps) {
   const { state } = entity;
   const isActive = state === "on";
   const name = getFriendlyName(entity);
 
-  const gradient = isActive
-    ? "linear-gradient(135deg, #f97316 0%, #ea580c 100%)"
-    : "linear-gradient(135deg, #374151 0%, #1f2937 100%)";
-
   return (
-    <TileBase gradient={gradient} disabled={true}>
-      <Zap size={20} className="text-white/80" />
-      <div>
-        <p className="truncate text-sm font-semibold text-white">{name}</p>
-        <p className="text-xs text-white/70">{formatState(entity, t)}</p>
-      </div>
-    </TileBase>
+    <TileBaseStyle
+      domain="binary_sensor"
+      isOn={isActive}
+      icon={<Zap size={20} />}
+      name={name}
+      stateText={formatState(entity, t)}
+    />
   );
 }
 

@@ -3,7 +3,6 @@ import { memo, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { getFriendlyName } from "../../lib/format";
 import { type TileProps, tilePropsEqual } from "./_types";
-import { TileBase } from "./TileBase";
 
 const REFRESH_INTERVAL = 10_000;
 
@@ -40,30 +39,27 @@ function CameraTileImpl({ entity, instanceId, t }: TileProps) {
     return () => clearInterval(id);
   }, [isVisible, fullscreen, instanceId, entity_id]);
 
-  const gradient = "linear-gradient(135deg, #1f2937 0%, #111827 100%)";
-
   return (
     <>
-      <div ref={tileRef}>
-        <TileBase gradient={gradient} onClick={() => setFullscreen(true)}>
-          <div className="absolute inset-0 overflow-hidden rounded-[22px]">
-            <img
-              src={imgSrc}
-              alt={name}
-              className="h-full w-full object-cover opacity-60"
-              onError={() => {}}
-            />
-          </div>
-          <div className="relative z-10 flex items-start justify-between">
+      <div
+        ref={tileRef}
+        className="relative h-full w-full overflow-hidden rounded-2xl"
+      >
+        <img
+          src={imgSrc}
+          alt={name}
+          className="absolute inset-0 h-full w-full object-cover opacity-40"
+          onError={() => {}}
+        />
+        <div className="relative z-10 flex h-full w-full flex-col justify-between p-3">
+          <div className="flex items-start justify-between">
             <Camera size={16} className="text-white/80" />
             <Maximize2 size={14} className="text-white/60" />
           </div>
-          <div className="relative z-10">
-            <p className="truncate text-xs font-semibold text-white drop-shadow">
-              {name}
-            </p>
-          </div>
-        </TileBase>
+          <p className="truncate text-xs font-semibold text-white drop-shadow">
+            {name}
+          </p>
+        </div>
       </div>
 
       {fullscreen &&

@@ -1,14 +1,12 @@
 import { Lock, LockOpen } from "lucide-react";
 import { memo } from "react";
-import { getTileGradient } from "../../lib/colors";
 import { getFriendlyName } from "../../lib/format";
 import { type TileProps, tilePropsEqual } from "./_types";
-import { TileBase } from "./TileBase";
+import { TileBaseStyle } from "./TileBaseStyle";
 
 function LockTileImpl({ entity, t, onCall }: TileProps) {
   const { entity_id, state } = entity;
   const isLocked = state === "locked";
-  const gradient = getTileGradient("lock", state);
   const name = getFriendlyName(entity);
 
   function toggle() {
@@ -22,19 +20,15 @@ function LockTileImpl({ entity, t, onCall }: TileProps) {
   }
 
   return (
-    <TileBase gradient={gradient} onClick={toggle}>
-      {isLocked ? (
-        <Lock size={20} className="text-white/80" />
-      ) : (
-        <LockOpen size={20} className="text-white/80" />
-      )}
-      <div>
-        <p className="truncate text-sm font-semibold text-white">{name}</p>
-        <p className="text-xs text-white/70">
-          {isLocked ? t("stateLocked") : t("stateUnlocked")}
-        </p>
-      </div>
-    </TileBase>
+    <TileBaseStyle
+      domain="lock"
+      isOn={isLocked}
+      icon={isLocked ? <Lock size={20} /> : <LockOpen size={20} />}
+      name={name}
+      stateText={isLocked ? t("stateLocked") : t("stateUnlocked")}
+      onClick={toggle}
+      onIconClick={toggle}
+    />
   );
 }
 

@@ -15,6 +15,7 @@ use tokio_tungstenite::{connect_async_tls_with_config, tungstenite::Message};
 use tracing::{debug, info, warn};
 
 use crate::error::AppError;
+use crate::ha::sync_visibility;
 use crate::state::{ConnStatus, EntityEvent, EntityState, InstanceCtx};
 
 // ─── WS message shapes ───────────────────────────────────────────────────────
@@ -149,8 +150,9 @@ pub async fn run_connection(instance: Arc<InstanceCtx>, pool: sqlx::PgPool) -> a
     // mark Connected so the SSE clients see status flip immediately.
     {
         let inst = Arc::clone(&instance);
+        let pool_clone = pool.clone();
         tokio::spawn(async move {
-            if let Err(e) = refresh_registries(&inst).await {
+            if let Err(e) = refresh_registries(&inst, &pool_clone).await {
                 warn!(instance_id = %inst.id, error = %e.message, "HA WS: registry refresh failed");
             }
         });
@@ -411,7 +413,7 @@ pub async fn fetch_device_registry(
 /// one-shot WS commands against HA. Both maps are atomically swapped on
 /// success; on partial failure (one fetch errors) we keep the previous
 /// snapshot intact and log. Callers should treat this as best-effort.
-pub async fn refresh_registries(instance: &Arc<InstanceCtx>) -> Result<(), AppError> {
+pub async fn refresh_registries(instance: &Arc<InstanceCtx>, pool: &sqlx::PgPool) -> Result<(), AppError> {
     use std::collections::HashMap;
 
     use crate::state::DeviceMeta;
@@ -468,20 +470,23 @@ pub async fn refresh_registries(instance: &Arc<InstanceCtx>) -> Result<(), AppEr
     *instance.device_registry.write().await = Arc::new(device_map);
     *instance.entity_to_device.write().await = Arc::new(e2d_map);
 
-    // TODO(P1.0-impl): Wire mark_default_hidden_for_diagnostic_entities here.
-    //   Once `InstanceCtx` exposes the PgPool (or we thread it through), call:
-    //
-    //   let registry_entries: Vec<HaEntityRegistryEntry> = entity_arr
-    //       .iter()
-    //       .filter_map(HaEntityRegistryEntry::from_json)
-    //       .collect();
-    //   if let Err(e) = sync_visibility::mark_default_hidden_for_diagnostic_entities(
-    //       &pool, instance.id, &registry_entries,
-    //   ).await {
-    //       warn!(err = %e, "failed to mark diagnostic entities as hidden");
-    //   }
-    //
-    // Requires: `use crate::ha::sync_visibility::{self, HaEntityRegistryEntry};`
+    // Mark diagnostic/config-category entities as hidden-by-default.
+    // Uses ON CONFLICT DO NOTHING so existing user overrides are preserved.
+    {
+        let registry_entries: Vec<sync_visibility::HaEntityRegistryEntry> = entity_arr
+            .iter()
+            .filter_map(sync_visibility::HaEntityRegistryEntry::from_json)
+            .collect();
+        if let Err(e) = sync_visibility::mark_default_hidden_for_diagnostic_entities(
+            pool,
+            instance.id,
+            &registry_entries,
+        )
+        .await
+        {
+            warn!(instance_id = %instance.id, error = %e.message, "HA WS: failed to mark diagnostic entities as hidden");
+        }
+    }
 
     debug!(
         instance_id = %instance.id,
