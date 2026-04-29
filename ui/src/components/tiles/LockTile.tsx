@@ -1,13 +1,15 @@
 import { Lock, LockOpen } from "lucide-react";
 import { memo } from "react";
 import { getFriendlyName } from "../../lib/format";
+import { useDetailOverlay } from "../../state/useDetailOverlay";
 import { type TileProps, tilePropsEqual } from "./_types";
 import { TileBaseStyle } from "./TileBaseStyle";
 
-function LockTileImpl({ entity, t, onCall }: TileProps) {
+function LockTileImpl({ entity, instanceId, t, onCall }: TileProps) {
   const { entity_id, state } = entity;
   const isLocked = state === "locked";
   const name = getFriendlyName(entity);
+  const { openDetail } = useDetailOverlay();
 
   function toggle() {
     onCall({
@@ -28,6 +30,7 @@ function LockTileImpl({ entity, t, onCall }: TileProps) {
       stateText={isLocked ? t("stateLocked") : t("stateUnlocked")}
       onClick={toggle}
       onIconClick={toggle}
+      onLongPress={() => openDetail(entity_id, instanceId)}
     />
   );
 }

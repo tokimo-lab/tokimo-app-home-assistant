@@ -1,14 +1,16 @@
 import { Blinds } from "lucide-react";
 import { memo } from "react";
 import { getFriendlyName } from "../../lib/format";
+import { useDetailOverlay } from "../../state/useDetailOverlay";
 import { type TileProps, tilePropsEqual } from "./_types";
 import { TileBaseStyle } from "./TileBaseStyle";
 
-function CoverTileImpl({ entity, t, onCall }: TileProps) {
+function CoverTileImpl({ entity, instanceId, t, onCall }: TileProps) {
   const { entity_id, state, attributes } = entity;
   const isOpen = state === "open";
   const name = getFriendlyName(entity);
   const position = attributes.current_position;
+  const { openDetail } = useDetailOverlay();
 
   function toggle() {
     onCall({
@@ -36,6 +38,7 @@ function CoverTileImpl({ entity, t, onCall }: TileProps) {
       stateText={stateText}
       onClick={toggle}
       onIconClick={toggle}
+      onLongPress={() => openDetail(entity_id, instanceId)}
     />
   );
 }

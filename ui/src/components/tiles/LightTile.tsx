@@ -1,10 +1,11 @@
 import { Lightbulb } from "lucide-react";
 import { memo } from "react";
 import { brightnessToPercent, getFriendlyName } from "../../lib/format";
+import { useDetailOverlay } from "../../state/useDetailOverlay";
 import { type TileProps, tilePropsEqual } from "./_types";
 import { TileBaseStyle } from "./TileBaseStyle";
 
-function LightTileImpl({ entity, t, onCall }: TileProps) {
+function LightTileImpl({ entity, instanceId, t, onCall }: TileProps) {
   const { entity_id, state, attributes } = entity;
   const isOn = state === "on";
   const name = getFriendlyName(entity);
@@ -12,6 +13,7 @@ function LightTileImpl({ entity, t, onCall }: TileProps) {
     ? brightnessToPercent(attributes.brightness)
     : null;
   const hasBrightness = attributes.brightness != null;
+  const { openDetail } = useDetailOverlay();
 
   function toggle() {
     onCall({
@@ -38,6 +40,7 @@ function LightTileImpl({ entity, t, onCall }: TileProps) {
       stateText={stateText}
       onClick={toggle}
       onIconClick={toggle}
+      onLongPress={() => openDetail(entity_id, instanceId)}
     />
   );
 }

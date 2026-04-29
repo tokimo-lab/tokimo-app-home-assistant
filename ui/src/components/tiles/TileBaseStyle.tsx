@@ -1,9 +1,16 @@
 import { cn } from "@tokimo/ui";
-import type {
-  CSSProperties,
-  MouseEvent as ReactMouseEvent,
-  ReactNode,
+import {
+  type CSSProperties,
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
+  type PointerEvent as ReactPointerEvent,
+  useCallback,
+  useEffect,
+  useRef,
 } from "react";
+
+const LONG_PRESS_MS = 500;
+const MOVE_THRESHOLD_PX = 8;
 
 export type TileSize = "small" | "medium" | "large";
 
@@ -49,6 +56,8 @@ export interface TileBaseStyleProps {
   onClick?: () => void;
   /** Icon-region click (used by tiles whose icon doubles as toggle). */
   onIconClick?: (e: ReactMouseEvent) => void;
+  /** Long-press on body — used to open the entity detail overlay. */
+  onLongPress?: () => void;
   onContextMenu?: (e: ReactMouseEvent) => void;
 
   /** Extra background content (rendered behind labels), e.g. camera frame. */
@@ -74,6 +83,13 @@ function resolveAccent(domain: string, override?: string): string | undefined {
  *
  * Accent is exposed as `--ha-tile-accent` so callers can read it for
  * inner highlights if desired.
+ *
+ * Interaction:
+ * - tap/click on body → onClick (typically toggle)
+ * - tap/click on icon region → onIconClick (also toggle)
+ * - long-press on body (≥500ms, no movement) → onLongPress (open detail)
+ *   The synthetic click that follows pointerup is suppressed so single-tap
+ *   and long-press are mutually exclusive.
  */
 export function TileBaseStyle({
   domain,
@@ -85,6 +101,7 @@ export function TileBaseStyle({
   stateText,
   onClick,
   onIconClick,
+  onLongPress,
   onContextMenu,
   children,
   className,
@@ -97,6 +114,75 @@ export function TileBaseStyle({
     ? ({ "--ha-tile-accent": accent } as CSSProperties)
     : undefined;
 
+  const pointerIdRef = useRef<number | null>(null);
+  const startPosRef = useRef<{ x: number; y: number } | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longFiredRef = useRef(false);
+  const movedRef = useRef(false);
+
+  const cancelTimer = useCallback(() => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => () => cancelTimer(), [cancelTimer]);
+
+  const handlePointerDown = useCallback(
+    (e: ReactPointerEvent<HTMLDivElement>) => {
+      if (!onLongPress) return;
+      if (e.button !== 0 && e.pointerType === "mouse") return;
+      pointerIdRef.current = e.pointerId;
+      startPosRef.current = { x: e.clientX, y: e.clientY };
+      longFiredRef.current = false;
+      movedRef.current = false;
+      cancelTimer();
+      timerRef.current = setTimeout(() => {
+        longFiredRef.current = true;
+        timerRef.current = null;
+        onLongPress();
+      }, LONG_PRESS_MS);
+    },
+    [cancelTimer, onLongPress],
+  );
+
+  const handlePointerMove = useCallback(
+    (e: ReactPointerEvent<HTMLDivElement>) => {
+      if (pointerIdRef.current !== e.pointerId) return;
+      const start = startPosRef.current;
+      if (!start) return;
+      const dx = e.clientX - start.x;
+      const dy = e.clientY - start.y;
+      if (Math.sqrt(dx * dx + dy * dy) > MOVE_THRESHOLD_PX) {
+        movedRef.current = true;
+        cancelTimer();
+      }
+    },
+    [cancelTimer],
+  );
+
+  const handlePointerEnd = useCallback(
+    (e: ReactPointerEvent<HTMLDivElement>) => {
+      if (pointerIdRef.current !== e.pointerId) return;
+      cancelTimer();
+      pointerIdRef.current = null;
+      startPosRef.current = null;
+    },
+    [cancelTimer],
+  );
+
+  const handleClick = useCallback(() => {
+    if (longFiredRef.current || movedRef.current) {
+      longFiredRef.current = false;
+      movedRef.current = false;
+      return;
+    }
+    onClick?.();
+  }, [onClick]);
+
+  const interactive = onClick || onLongPress;
+
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: conditional role=button + onKeyDown applied below.
     <div
@@ -105,27 +191,31 @@ export function TileBaseStyle({
       data-on={active ? "true" : undefined}
       data-domain={domain}
       style={style}
-      onClick={onClick}
+      onClick={interactive ? handleClick : undefined}
+      onPointerDown={onLongPress ? handlePointerDown : undefined}
+      onPointerMove={onLongPress ? handlePointerMove : undefined}
+      onPointerUp={onLongPress ? handlePointerEnd : undefined}
+      onPointerCancel={onLongPress ? handlePointerEnd : undefined}
       onContextMenu={onContextMenu}
       onKeyDown={
-        onClick
+        interactive
           ? (e) => {
               if (e.key === "Enter" || e.key === " ") {
                 e.preventDefault();
-                onClick();
+                onClick?.();
               }
             }
           : undefined
       }
-      tabIndex={onClick ? 0 : undefined}
-      role={onClick ? "button" : undefined}
+      tabIndex={interactive ? 0 : undefined}
+      role={interactive ? "button" : undefined}
       className={cn(
         "relative flex h-full w-full flex-col overflow-hidden rounded-2xl p-3 transition-colors",
         active
           ? "bg-[var(--ha-tile-accent)] text-white"
           : "bg-white text-gray-500 dark:bg-white/[0.06] dark:text-gray-400",
         isLarge ? "items-center justify-center gap-2" : "justify-between",
-        onClick &&
+        interactive &&
           "cursor-pointer select-none active:scale-[0.97] transition-transform",
         className,
       )}
