@@ -242,7 +242,6 @@ export const zhCN: Record<string, string> = {
   detailCameraPreview: "摄像头预览",
   detailCameraUnavailable: "摄像头不可用",
   detailCameraSnapshotNote: "快照 — 每隔几秒刷新",
-  detailSubFunctions: "子功能",
   detailSubFunctionRun: "执行",
 
   // Binary sensor states

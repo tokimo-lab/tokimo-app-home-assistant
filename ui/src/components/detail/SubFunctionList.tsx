@@ -30,11 +30,8 @@ export function SubFunctionList({
   }
 
   return (
-    <div className="mt-6 rounded-2xl border border-zinc-200 bg-white/80 shadow-sm backdrop-blur-sm dark:border-zinc-700 dark:bg-zinc-900/80">
-      <h3 className="px-4 pt-4 pb-2 font-semibold text-sm text-zinc-700 uppercase tracking-wide dark:text-zinc-300">
-        {t("detailSubFunctions")}
-      </h3>
-      <div className="divide-y divide-zinc-200 dark:divide-zinc-700">
+    <div className="mt-6 overflow-hidden rounded-2xl bg-white/60 backdrop-blur-sm dark:bg-zinc-900/40">
+      <div className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
         {subMembers.map((entity) => (
           <SubFunctionRow
             key={entity.entity_id}

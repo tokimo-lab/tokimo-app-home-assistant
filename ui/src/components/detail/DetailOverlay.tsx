@@ -115,7 +115,7 @@ export function DetailOverlay({
           )}
         </header>
 
-        <div className="flex-1 overflow-y-auto px-6 py-4">
+        <div className="flex-1 overflow-y-auto px-6 py-4 pb-20">
           {entity ? (
             <>
               <DomainComponent

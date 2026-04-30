@@ -243,7 +243,6 @@ export const enUS: Record<string, string> = {
   detailCameraPreview: "Camera preview",
   detailCameraUnavailable: "Camera unavailable",
   detailCameraSnapshotNote: "Snapshot — refreshed every few seconds",
-  detailSubFunctions: "Sub-functions",
   detailSubFunctionRun: "Run",
 
   // Binary sensor states (device-class specific)
