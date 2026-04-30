@@ -428,13 +428,32 @@ pub struct SyncStats {
     pub skipped_existing: usize,
 }
 
+/// Strip an area's display name from the start of `friendly_name`.
+///
+/// Also trims any leading separator (space, dash, underscore, Chinese
+/// middle dot) that remains after stripping.
+///
+/// Used as the *comparison key* for Layer-3 LCP — the area already partitions
+/// clustering, so repeating the area name in the prefix carries no
+/// information and only encourages over-merging.
+fn strip_area_prefix(friendly_name: &str, area_name: &str) -> String {
+    if area_name.is_empty() {
+        return friendly_name.to_string();
+    }
+    let stripped = friendly_name.strip_prefix(area_name).unwrap_or(friendly_name);
+    stripped
+        .trim_start_matches(|c: char| c.is_whitespace() || matches!(c, '-' | '_' | '·' | '・'))
+        .to_string()
+}
+
 /// Pure in-memory passes that turn `entries` into per-entity `Decision`s.
+///
 /// Implements three-layer fallback for group_id:
 /// 1. Same device_id (no domain suffix) → cross-domain aggregation
 /// 2. Same via_device + area → hub-based aggregation
 /// 3. Same area + LCP clustering (cross-group merge) → name-based aggregation
 /// 4. None of above → singleton
-fn compute_decisions(entries: &[HaEntityRegistryEntry]) -> Vec<Decision> {
+fn compute_decisions(entries: &[HaEntityRegistryEntry], area_names: &HashMap<String, String>) -> Vec<Decision> {
     let mut decisions: Vec<Decision> = entries
         .iter()
         .map(|e| Decision {
@@ -493,7 +512,12 @@ fn compute_decisions(entries: &[HaEntityRegistryEntry]) -> Vec<Decision> {
         representative_idx: usize,
         #[allow(dead_code)]
         area_id: String,
+        #[allow(dead_code)]
         friendly_name: String,
+        /// Comparison key used for Layer-3 LCP: `friendly_name` with the
+        /// area's display name stripped from the start (plus separator
+        /// trim). The original `friendly_name` is kept for display only.
+        comparison_key: String,
         member_idxs: Vec<usize>,
         #[allow(dead_code)]
         current_group_id: Option<String>,
@@ -514,10 +538,16 @@ fn compute_decisions(entries: &[HaEntityRegistryEntry]) -> Vec<Decision> {
         if let (Some(area), Some(name)) = (&e.area_id, &e.friendly_name)
             && !name.is_empty()
         {
+            let area_name = area_names.get(area).map(String::as_str).unwrap_or("");
+            let comparison_key = strip_area_prefix(name, area_name);
+            if comparison_key.is_empty() {
+                continue;
+            }
             area_candidates.entry(area.clone()).or_default().push(Candidate {
                 representative_idx: primary_idx,
                 area_id: area.clone(),
                 friendly_name: name.clone(),
+                comparison_key,
                 member_idxs: member_idxs.clone(),
                 current_group_id: Some(group_id.clone()),
             });
@@ -532,10 +562,16 @@ fn compute_decisions(entries: &[HaEntityRegistryEntry]) -> Vec<Decision> {
         if let (Some(area), Some(name)) = (&e.area_id, &e.friendly_name)
             && !name.is_empty()
         {
+            let area_name = area_names.get(area).map(String::as_str).unwrap_or("");
+            let comparison_key = strip_area_prefix(name, area_name);
+            if comparison_key.is_empty() {
+                continue;
+            }
             area_candidates.entry(area.clone()).or_default().push(Candidate {
                 representative_idx: idx,
                 area_id: area.clone(),
                 friendly_name: name.clone(),
+                comparison_key,
                 member_idxs: vec![idx],
                 current_group_id: None,
             });
@@ -550,11 +586,12 @@ fn compute_decisions(entries: &[HaEntityRegistryEntry]) -> Vec<Decision> {
 
         let mut uf = UnionFind::new(candidates.len());
 
-        // Compare all pairs for LCP
+        // Compare all pairs for LCP (using comparison_key, which has the
+        // area display-name prefix stripped — see strip_area_prefix).
         for i in 0..candidates.len() {
             for j in (i + 1)..candidates.len() {
-                let name_a = &candidates[i].friendly_name;
-                let name_b = &candidates[j].friendly_name;
+                let name_a = &candidates[i].comparison_key;
+                let name_b = &candidates[j].comparison_key;
 
                 let lcp = longest_common_prefix(name_a, name_b);
                 let lcp_len = char_count(&lcp);
@@ -565,8 +602,10 @@ fn compute_decisions(entries: &[HaEntityRegistryEntry]) -> Vec<Decision> {
                 }
                 let ratio = (lcp_len * 100) / shorter_len;
 
-                // Minimum length check: ≥2 Chinese chars or ≥3 Latin chars
-                let min_len = if lcp.chars().any(is_chinese_char) { 2 } else { 3 };
+                // Minimum length check: ≥3 chars (Chinese or Latin).
+                // Two Chinese chars (e.g. "主卧", "客厅") is just an area
+                // name and is information-free, so it no longer qualifies.
+                let min_len = 3;
 
                 if lcp_len >= min_len && ratio >= 50 {
                     uf.union(i, j);
@@ -581,15 +620,27 @@ fn compute_decisions(entries: &[HaEntityRegistryEntry]) -> Vec<Decision> {
                 continue;
             }
 
-            // Compute base name: LCP of all candidate friendly names in cluster
-            let mut base_name = candidates[cluster[0]].friendly_name.clone();
+            // Compute base name: LCP of all candidate comparison_keys in
+            // cluster (same key as pairwise comparison above).
+            let mut base_name = candidates[cluster[0]].comparison_key.clone();
             for &local_idx in cluster.iter().skip(1) {
-                let name = &candidates[local_idx].friendly_name;
+                let name = &candidates[local_idx].comparison_key;
                 base_name = longest_common_prefix(&base_name, name);
             }
             base_name = trim_suffix(&base_name);
 
             if base_name.is_empty() {
+                continue;
+            }
+
+            // Safety net: reject final clusters whose base_name is too
+            // generic. Even if pairwise LCP slipped through (e.g. via
+            // transitive union), a base_name of <3 Chinese chars (or <5
+            // Latin chars for ASCII) is not specific enough to justify
+            // merging across multiple devices.
+            let chinese_count = base_name.chars().filter(|c| is_chinese_char(*c)).count();
+            let total_count = base_name.chars().count();
+            if chinese_count < 3 && total_count < 5 {
                 continue;
             }
 
@@ -644,12 +695,13 @@ pub async fn sync_default_visibility_and_grouping(
     pool: &PgPool,
     instance_id: Uuid,
     entries: Vec<HaEntityRegistryEntry>,
+    area_names: &HashMap<String, String>,
 ) -> Result<SyncStats, AppError> {
     if entries.is_empty() {
         return Ok(SyncStats::default());
     }
 
-    let decisions = compute_decisions(&entries);
+    let decisions = compute_decisions(&entries, area_names);
 
     // Pass 3: persist. Single transaction, INSERT ... ON CONFLICT DO NOTHING.
     let mut tx = pool.begin().await?;
@@ -898,7 +950,7 @@ mod tests {
             },
         ];
 
-        let decisions = compute_decisions(&entries);
+        let decisions = compute_decisions(&entries, &HashMap::new());
 
         // All three should be grouped (LCP = "次卧吸顶灯", 5 chars, ≥50% threshold)
         let group_ids: Vec<_> = decisions.iter().filter_map(|d| d.group_id.as_ref()).collect();
@@ -929,7 +981,7 @@ mod tests {
             },
         ];
 
-        let decisions = compute_decisions(&entries);
+        let decisions = compute_decisions(&entries, &HashMap::new());
 
         // Different areas should not group
         assert!(decisions[0].group_id.is_none());
@@ -953,7 +1005,7 @@ mod tests {
             },
         ];
 
-        let decisions = compute_decisions(&entries);
+        let decisions = compute_decisions(&entries, &HashMap::new());
 
         // Different prefixes (客厅 vs 厨房), should not group
         assert!(decisions[0].group_id.is_none());
@@ -977,7 +1029,7 @@ mod tests {
             },
         ];
 
-        let decisions = compute_decisions(&entries);
+        let decisions = compute_decisions(&entries, &HashMap::new());
 
         // Same via_device + area should group
         assert!(decisions[0].group_id.is_some());
@@ -995,7 +1047,7 @@ mod tests {
             e
         }];
 
-        let decisions = compute_decisions(&entries);
+        let decisions = compute_decisions(&entries, &HashMap::new());
 
         // device_id should take priority over via_device_id
         assert!(decisions[0].group_id.as_ref().unwrap().starts_with("device::dev1"));
@@ -1046,7 +1098,7 @@ mod tests {
         })
         .collect();
 
-        let decisions = compute_decisions(&entries);
+        let decisions = compute_decisions(&entries, &HashMap::new());
         let visible = decisions.iter().filter(|d| !d.collapsed && d.group_primary).count();
         // All unique names, no clustering, all should be independent primaries
         assert_eq!(visible, 30, "all 30 lights stay visible without K-cap");
@@ -1104,7 +1156,7 @@ mod tests {
             },
         ];
 
-        let decisions = compute_decisions(&entries);
+        let decisions = compute_decisions(&entries, &HashMap::new());
 
         // All 6 entities should be merged into one group via Layer-3 LCP
         let group_ids: Vec<_> = decisions.iter().filter_map(|d| d.group_id.as_ref()).collect();
@@ -1135,14 +1187,9 @@ mod tests {
 
     #[test]
     fn test_singletons_still_cluster() {
-        // Entities without device_id but with same area + LCP should still cluster
+        // Entities without device_id but with same area + LCP should still cluster.
+        // Need ≥3 Chinese chars of shared prefix under the new threshold.
         let entries = vec![
-            {
-                let mut e = entry("light.living_main");
-                e.area_id = Some("living".into());
-                e.friendly_name = Some("客厅主灯".into());
-                e
-            },
             {
                 let mut e = entry("light.living_spot1");
                 e.area_id = Some("living".into());
@@ -1155,11 +1202,17 @@ mod tests {
                 e.friendly_name = Some("客厅射灯2".into());
                 e
             },
+            {
+                let mut e = entry("light.living_spot3");
+                e.area_id = Some("living".into());
+                e.friendly_name = Some("客厅射灯3".into());
+                e
+            },
         ];
 
-        let decisions = compute_decisions(&entries);
+        let decisions = compute_decisions(&entries, &HashMap::new());
 
-        // All three should cluster (LCP = "客厅", 2 chars ≥ 50% and ≥2 Chinese chars)
+        // All three should cluster (LCP = "客厅射灯", 4 Chinese chars ≥ threshold)
         assert!(decisions[0].group_id.is_some());
         assert_eq!(decisions[0].group_id, decisions[1].group_id);
         assert_eq!(decisions[0].group_id, decisions[2].group_id);
@@ -1209,7 +1262,7 @@ mod tests {
             },
         ];
 
-        let decisions = compute_decisions(&entries);
+        let decisions = compute_decisions(&entries, &HashMap::new());
 
         // First 4 entities should merge (3 device-grouped + 1 singleton, all "次卧灯")
         assert!(decisions[0].group_id.is_some());
@@ -1233,5 +1286,105 @@ mod tests {
             .map(|(i, _)| i)
             .collect();
         assert_eq!(primaries.len(), 1, "only one primary in merged group");
+    }
+
+    #[test]
+    fn compute_decisions_does_not_over_merge_via_area_prefix() {
+        // Real-world reproduction: multiple devices in the same area whose
+        // friendly_names all start with the area's display name. Without
+        // area-prefix stripping, all three would transitively union via
+        // the shared "主卧" prefix. With stripping, only the two ceiling
+        // lights (sharing "吸顶灯") cluster; the bedside lamp stays alone.
+        let mut area_names = HashMap::new();
+        area_names.insert("main_bedroom".to_string(), "主卧".to_string());
+
+        let entries = vec![
+            {
+                let mut e = entry("light.x");
+                e.device_id = Some("device_X".into());
+                e.area_id = Some("main_bedroom".into());
+                e.friendly_name = Some("主卧吸顶灯1".into());
+                e
+            },
+            {
+                let mut e = entry("light.y");
+                e.device_id = Some("device_Y".into());
+                e.area_id = Some("main_bedroom".into());
+                e.friendly_name = Some("主卧吸顶灯2".into());
+                e
+            },
+            {
+                let mut e = entry("light.z");
+                e.device_id = Some("device_Z".into());
+                e.area_id = Some("main_bedroom".into());
+                e.friendly_name = Some("主卧床头灯".into());
+                e
+            },
+        ];
+
+        let decisions = compute_decisions(&entries, &area_names);
+
+        // X and Y → cluster on stripped LCP "吸顶灯" (3 Chinese chars ✓)
+        let g_x = decisions[0].group_id.as_ref().expect("X has group");
+        let g_y = decisions[1].group_id.as_ref().expect("Y has group");
+        assert_eq!(g_x, g_y, "X and Y should cluster on '吸顶灯'");
+        assert!(g_x.starts_with("name::"), "should be name-cluster, got {g_x}");
+
+        // Z (床头灯) shares only "" with the cluster after stripping
+        // (or "灯" = 1 char, well below threshold) — must NOT merge in.
+        // Its only group is its own Layer-1 device::device_Z.
+        let g_z = decisions[2]
+            .group_id
+            .as_ref()
+            .expect("Z still has Layer-1 device group");
+        assert_ne!(g_x, g_z, "Z must not transitively merge into the X/Y cluster");
+        assert!(
+            g_z.starts_with("device::device_Z"),
+            "Z keeps its Layer-1 group, got {g_z}"
+        );
+    }
+
+    #[test]
+    fn compute_decisions_rejects_generic_only_cluster() {
+        // After stripping the area prefix "主卧", the comparison_keys are
+        // "A" and "B" — they share NO prefix (and even if they did, the
+        // post-cluster safety net would reject any base_name shorter
+        // than 3 Chinese / 5 Latin chars). Result: no name-cluster.
+        let mut area_names = HashMap::new();
+        area_names.insert("x".to_string(), "主卧".to_string());
+
+        let entries = vec![
+            {
+                let mut e = entry("light.a");
+                e.area_id = Some("x".into());
+                e.friendly_name = Some("主卧A".into());
+                e
+            },
+            {
+                let mut e = entry("light.b");
+                e.area_id = Some("x".into());
+                e.friendly_name = Some("主卧B".into());
+                e
+            },
+        ];
+
+        let decisions = compute_decisions(&entries, &area_names);
+
+        assert!(decisions[0].group_id.is_none(), "no Layer-3 group expected");
+        assert!(decisions[1].group_id.is_none(), "no Layer-3 group expected");
+    }
+
+    #[test]
+    fn strip_area_prefix_handles_separators() {
+        assert_eq!(strip_area_prefix("主卧吸顶灯", "主卧"), "吸顶灯");
+        assert_eq!(strip_area_prefix("主卧 吸顶灯", "主卧"), "吸顶灯");
+        assert_eq!(strip_area_prefix("主卧-吸顶灯", "主卧"), "吸顶灯");
+        assert_eq!(strip_area_prefix("主卧·吸顶灯", "主卧"), "吸顶灯");
+        // No prefix match → unchanged
+        assert_eq!(strip_area_prefix("客厅吸顶灯", "主卧"), "客厅吸顶灯");
+        // Empty area_name → identity
+        assert_eq!(strip_area_prefix("anything", ""), "anything");
+        // Stripping leaves nothing
+        assert_eq!(strip_area_prefix("主卧", "主卧"), "");
     }
 }

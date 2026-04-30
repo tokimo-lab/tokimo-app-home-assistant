@@ -456,6 +456,35 @@ pub async fn refresh_registries(instance: &Arc<InstanceCtx>, pool: &sqlx::PgPool
 
     let devices = fetch_device_registry(&base_url, &access_token, verify_tls).await?;
     let entities = fetch_entity_registry(&base_url, &access_token, verify_tls).await?;
+    // Best-effort area registry — used only to strip the area's display
+    // name from friendly_name during Layer-3 LCP clustering. If this
+    // call fails we fall back to an empty map (no stripping).
+    let area_name_map: HashMap<String, String> = match fetch_area_registry(&base_url, &access_token, verify_tls).await {
+        Ok(v) => v
+            .as_array()
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|a| {
+                        let id = a.get("area_id").and_then(|v| v.as_str())?;
+                        let name = a.get("name").and_then(|v| v.as_str())?;
+                        if id.is_empty() || name.is_empty() {
+                            None
+                        } else {
+                            Some((id.to_string(), name.to_string()))
+                        }
+                    })
+                    .collect()
+            })
+            .unwrap_or_default(),
+        Err(e) => {
+            warn!(
+                instance_id = %instance.id,
+                error = %e.message,
+                "HA WS: failed to fetch area registry; LCP will not strip area prefix",
+            );
+            HashMap::new()
+        }
+    };
 
     let empty = Vec::new();
     let device_arr = devices.as_array().unwrap_or(&empty);
@@ -531,7 +560,9 @@ pub async fn refresh_registries(instance: &Arc<InstanceCtx>, pool: &sqlx::PgPool
                 entry.area_id = Some(area.clone());
             }
         }
-        match sync_visibility::sync_default_visibility_and_grouping(pool, instance.id, registry_entries).await {
+        match sync_visibility::sync_default_visibility_and_grouping(pool, instance.id, registry_entries, &area_name_map)
+            .await
+        {
             Ok(stats) => debug!(
                 instance_id = %instance.id,
                 inserted = stats.inserted,
