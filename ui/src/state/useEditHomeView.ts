@@ -1,8 +1,14 @@
-import { useCallback, useSyncExternalStore } from "react";
+import { useCallback, useMemo, useSyncExternalStore } from "react";
 
 interface EditHomeViewState {
   editMode: boolean;
-  selectedTileId: string | null;
+  /**
+   * Set of currently selected tile entity_ids (the tile's primary entity).
+   * Multi-select drives the bottom action bar (merge / split). Always
+   * replaced with a fresh Set on update so reference equality works for
+   * `useSyncExternalStore` consumers.
+   */
+  selectedTileIds: ReadonlySet<string>;
   /**
    * When true, the home view is in the "Reorder Sections" sub-mode of
    * edit mode (drag whole rooms vertically). Mutually exclusive with
@@ -12,9 +18,11 @@ interface EditHomeViewState {
   reorderSections: boolean;
 }
 
+const EMPTY_SELECTION: ReadonlySet<string> = new Set();
+
 let state: EditHomeViewState = {
   editMode: false,
-  selectedTileId: null,
+  selectedTileIds: EMPTY_SELECTION,
   reorderSections: false,
 };
 
@@ -28,7 +36,7 @@ function setState(patch: Partial<EditHomeViewState>) {
   const next = { ...state, ...patch };
   if (
     next.editMode === state.editMode &&
-    next.selectedTileId === state.selectedTileId &&
+    next.selectedTileIds === state.selectedTileIds &&
     next.reorderSections === state.reorderSections
   ) {
     return;
@@ -70,16 +78,27 @@ export interface UseEditHomeViewResult {
   enterEditMode: () => void;
   enterReorderSections: () => void;
   exitEditMode: () => void;
+  /** Set of selected tile primary entity_ids. Frozen-by-reference. */
+  selectedTileIds: ReadonlySet<string>;
+  /**
+   * Single-selection convenience: returns the only id when exactly one tile
+   * is selected, otherwise `null`. Used by the resize-handle UI which only
+   * makes sense for a single tile.
+   */
   selectedTileId: string | null;
-  selectTile: (id: string | null) => void;
+  toggleTileSelection: (id: string) => void;
+  clearSelection: () => void;
   toggleSize: (id: string) => Promise<void>;
 }
 
 /**
  * Global edit-mode toggle for the home view (Apple-Home-style "jiggle"
- * mode). Edit mode is mutually exclusive with normal interaction, and only
- * one tile may be `selected` at a time (this is what shows the ↗ resize
- * handle).
+ * mode). Edit mode is mutually exclusive with normal interaction. Selection
+ * is multi-select: tapping a tile toggles its membership in
+ * `selectedTileIds`.
+ *
+ * The bottom action bar reads `selectedTileIds.size` to decide whether to
+ * render Merge (≥2) / Split (1, when the tile has ≥2 members) / nothing (0).
  *
  * `toggleSize` is a thin pass-through to whatever was registered via
  * `registerToggleSize`. Until something registers it, calls warn and
@@ -93,19 +112,32 @@ export function useEditHomeView(): UseEditHomeViewResult {
   }, []);
 
   const enterReorderSections = useCallback(() => {
-    setState({ editMode: true, reorderSections: true, selectedTileId: null });
+    setState({
+      editMode: true,
+      reorderSections: true,
+      selectedTileIds: EMPTY_SELECTION,
+    });
   }, []);
 
   const exitEditMode = useCallback(() => {
     setState({
       editMode: false,
       reorderSections: false,
-      selectedTileId: null,
+      selectedTileIds: EMPTY_SELECTION,
     });
   }, []);
 
-  const selectTile = useCallback((id: string | null) => {
-    setState({ selectedTileId: id });
+  const toggleTileSelection = useCallback((id: string) => {
+    const current = state.selectedTileIds;
+    const next = new Set(current);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setState({ selectedTileIds: next });
+  }, []);
+
+  const clearSelection = useCallback(() => {
+    if (state.selectedTileIds.size === 0) return;
+    setState({ selectedTileIds: EMPTY_SELECTION });
   }, []);
 
   const toggleSize = useCallback(async (id: string) => {
@@ -118,21 +150,33 @@ export function useEditHomeView(): UseEditHomeViewResult {
     await toggleSizeImpl(id);
   }, []);
 
+  const selectedTileId = useMemo(() => {
+    if (snap.selectedTileIds.size !== 1) return null;
+    const it = snap.selectedTileIds.values().next();
+    return it.done ? null : it.value;
+  }, [snap.selectedTileIds]);
+
   return {
     editMode: snap.editMode,
     reorderSections: snap.reorderSections,
     enterEditMode,
     enterReorderSections,
     exitEditMode,
-    selectedTileId: snap.selectedTileId,
-    selectTile,
+    selectedTileIds: snap.selectedTileIds,
+    selectedTileId,
+    toggleTileSelection,
+    clearSelection,
     toggleSize,
   };
 }
 
 // Test-only reset hook (also useful when the active HA instance changes).
 export function __resetEditHomeViewForTests(): void {
-  state = { editMode: false, selectedTileId: null, reorderSections: false };
+  state = {
+    editMode: false,
+    selectedTileIds: EMPTY_SELECTION,
+    reorderSections: false,
+  };
   toggleSizeImpl = null;
   emit();
 }

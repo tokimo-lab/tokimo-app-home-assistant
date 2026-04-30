@@ -1,7 +1,7 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@tokimo/ui";
-import { Maximize2, Minus } from "lucide-react";
+import { Check, Maximize2, Minus } from "lucide-react";
 import {
   type CSSProperties,
   type MouseEvent as ReactMouseEvent,
@@ -53,8 +53,13 @@ export function EditableTileWrapper({
   removeLabel,
   children,
 }: EditableTileWrapperProps) {
-  const { selectedTileId, selectTile, toggleSize } = useEditHomeView();
-  const selected = selectedTileId === entity.entity_id;
+  const { selectedTileIds, toggleTileSelection, toggleSize } =
+    useEditHomeView();
+  const selected = selectedTileIds.has(entity.entity_id);
+  // Resize handle only makes sense when exactly one tile is selected and
+  // it's this one — otherwise multi-select would render a confusing per-tile
+  // resize UI on every selected card.
+  const showResizeHandle = selected && selectedTileIds.size === 1;
 
   // useSortable is always called (Rules of Hooks); we just feed it a
   // throwaway containerId when DnD is disabled. The disabled flag below
@@ -78,9 +83,9 @@ export function EditableTileWrapper({
     (e: ReactMouseEvent<HTMLElement>) => {
       e.preventDefault();
       e.stopPropagation();
-      selectTile(selected ? null : entity.entity_id);
+      toggleTileSelection(entity.entity_id);
     },
-    [selected, entity.entity_id, selectTile],
+    [entity.entity_id, toggleTileSelection],
   );
 
   const handleResize = useCallback(
@@ -110,7 +115,7 @@ export function EditableTileWrapper({
       className={cn(
         "relative h-full w-full rounded-[22px]",
         selected &&
-          "ring-2 ring-white/90 ring-offset-2 ring-offset-transparent",
+          "ring-2 ring-blue-400 ring-offset-2 ring-offset-transparent",
       )}
       style={style}
     >
@@ -152,6 +157,19 @@ export function EditableTileWrapper({
       )}
 
       {selected && (
+        <div
+          data-testid="tile-selected-check"
+          aria-hidden
+          className={cn(
+            "pointer-events-none absolute -bottom-1.5 -right-1.5 z-10 flex h-6 w-6 items-center justify-center",
+            "rounded-full bg-blue-500 text-white shadow-lg ring-2 ring-white/90",
+          )}
+        >
+          <Check size={14} strokeWidth={3} />
+        </div>
+      )}
+
+      {showResizeHandle && (
         <button
           type="button"
           data-testid="tile-resize-handle"
