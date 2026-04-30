@@ -19,6 +19,7 @@ import type {
   PendingOp,
 } from "../../types";
 import { EmptyState } from "../EmptyState";
+import { BottomActionBar } from "../edit/BottomActionBar";
 import { EditModeToolbar } from "../edit/EditModeToolbar";
 import { FilterChipBar } from "./FilterChipBar";
 import { HomePageHeader } from "./HomePageHeader";
@@ -73,6 +74,8 @@ export function HomePage({
     exitEditMode,
     enterEditMode,
     enterReorderSections,
+    selectedTileIds,
+    clearSelection,
   } = useEditHomeView();
 
   const {
@@ -105,7 +108,7 @@ export function HomePage({
 
   // Drives the per-instance accessory cache; downstream hooks
   // (useEntityAccessory, useHomePageData) read from the snapshot.
-  useAccessories(instance.id);
+  const accessoriesSnap = useAccessories(instance.id);
 
   // Sibling count for the long-press menu's "Similar Accessories" item.
   // Only render the menu item when the right-clicked entity belongs to a
@@ -147,6 +150,84 @@ export function HomePage({
       metadata: { instanceId: instance.id, locale: ctx.locale },
     });
   }, [ctx, instance.id, t]);
+
+  // Resolve {groupId, members[]} for each currently-selected tile by
+  // matching the selected primary entity_id against the group where it's
+  // is_primary=true. Falls back to the first group containing the entity
+  // when no is_primary match is found (e.g. cache lag).
+  const resolveSelectedGroups = useCallback((): {
+    groupIds: string[];
+    memberEntityIds: string[];
+  } => {
+    const groupIds: string[] = [];
+    const memberSet = new Set<string>();
+    for (const eid of selectedTileIds) {
+      const candidates = accessoriesSnap.entityToGroups.get(eid) ?? [];
+      let matched: string | null = null;
+      for (const gid of candidates) {
+        const members = accessoriesSnap.membersByGroup.get(gid) ?? [];
+        if (members.some((m) => m.entity_id === eid && m.is_primary)) {
+          matched = gid;
+          break;
+        }
+      }
+      if (!matched && candidates.length > 0) matched = candidates[0]!;
+      if (!matched || groupIds.includes(matched)) continue;
+      groupIds.push(matched);
+      const members = accessoriesSnap.membersByGroup.get(matched) ?? [];
+      for (const m of members) memberSet.add(m.entity_id);
+    }
+    return { groupIds, memberEntityIds: Array.from(memberSet) };
+  }, [selectedTileIds, accessoriesSnap]);
+
+  const handleMerge = useCallback(() => {
+    const { groupIds, memberEntityIds } = resolveSelectedGroups();
+    if (groupIds.length < 2 || memberEntityIds.length === 0) return;
+    const suggestedPrimaryId =
+      Array.from(selectedTileIds).find((id) =>
+        memberEntityIds.includes(id),
+      ) ?? memberEntityIds[0];
+    ctx.shell.openModalWindow({
+      component: () => import("../edit/MergeTilesModal"),
+      title: t("mergeTilesTitle"),
+      width: 560,
+      height: 600,
+      metadata: {
+        instanceId: instance.id,
+        locale: ctx.locale,
+        groupIds,
+        memberEntityIds,
+        suggestedPrimaryId,
+      },
+    });
+    // Don't clear selection here — leave it intact so the user can cancel
+    // the modal and still see what they had picked. The modal's success
+    // path triggers `refreshAccessoriesCache`, after which the old tiles
+    // simply disappear from the view; we exit edit mode in the same
+    // render via the effect below.
+  }, [ctx, instance.id, resolveSelectedGroups, selectedTileIds, t]);
+
+  // After merge/split succeeds the source tiles vanish from the snapshot.
+  // Drop selection entries that no longer correspond to a known primary so
+  // the bottom bar reflects reality.
+  useEffect(() => {
+    if (!editMode || selectedTileIds.size === 0) return;
+    let stale = false;
+    for (const id of selectedTileIds) {
+      if (!accessoriesSnap.entityToGroups.has(id)) {
+        stale = true;
+        break;
+      }
+    }
+    if (stale) clearSelection();
+  }, [editMode, selectedTileIds, accessoriesSnap, clearSelection]);
+
+  const handleSplit = useCallback(() => {
+    // Implemented in P8.3.5 (separate commit).
+  }, []);
+
+  // P8.3.5 split modal is wired in a follow-up commit.
+  const canSplitSelected = false;
 
   // ESC exits edit mode (Apple Home parity). Skipped while reorderSections
   // sub-mode is active so the picker doesn't double-handle the key.
@@ -300,6 +381,12 @@ export function HomePage({
           />
         )}
       </div>
+      <BottomActionBar
+        canSplit={canSplitSelected}
+        onMerge={handleMerge}
+        onSplit={handleSplit}
+        t={t}
+      />
       <RescanModal
         open={rescanOpen}
         loading={rescanLoading}
