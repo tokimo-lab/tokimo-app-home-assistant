@@ -50,6 +50,10 @@ interface EntityIconProps {
   className?: string;
 }
 
+export function hasEntityIcon(domain: string): boolean {
+  return domain in DOMAIN_ICONS;
+}
+
 export function EntityIcon({
   domain,
   state,

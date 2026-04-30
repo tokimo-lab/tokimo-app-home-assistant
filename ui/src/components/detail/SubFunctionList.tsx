@@ -5,6 +5,7 @@
 import { ChevronRight } from "lucide-react";
 import { getFriendlyName } from "../../lib/format";
 import type { CallParams, EntityState } from "../../types";
+import { EntityIcon, hasEntityIcon } from "../EntityIcon";
 import { SubFunctionBinarySensor } from "./subfunctions/SubFunctionBinarySensor";
 import { SubFunctionButton } from "./subfunctions/SubFunctionButton";
 import { SubFunctionNumber } from "./subfunctions/SubFunctionNumber";
@@ -59,19 +60,28 @@ function SubFunctionRow({
   onNavigate,
   t,
 }: SubFunctionRowProps) {
-  const { entity_id, attributes } = entity;
+  const { entity_id, state } = entity;
   const domain = entity_id.split(".")[0] ?? "";
   const name = getFriendlyName(entity);
-  const icon = attributes.icon ?? getDefaultIcon(domain);
+  const showIcon = hasEntityIcon(domain);
 
   const control = renderControl(entity, domain, onCall, t);
   const hasControl = control !== null;
 
+  const iconNode = showIcon ? (
+    <EntityIcon
+      domain={domain}
+      state={state}
+      size={20}
+      className="shrink-0 text-zinc-500 dark:text-zinc-400"
+    />
+  ) : null;
+
   if (hasControl) {
     return (
-      <div className="flex items-center gap-3 px-4 py-3">
-        <span className="text-xl">{icon}</span>
-        <span className="flex-1 text-sm font-medium text-zinc-900 dark:text-zinc-100">
+      <div className="flex items-center gap-3 px-5 py-3.5">
+        {iconNode}
+        <span className="flex-1 text-[15px] text-zinc-900 dark:text-zinc-100">
           {name}
         </span>
         <div className="flex items-center gap-2">{control}</div>
@@ -83,10 +93,10 @@ function SubFunctionRow({
     <button
       type="button"
       onClick={() => onNavigate(entity_id)}
-      className="flex w-full cursor-pointer items-center gap-3 px-4 py-3 text-left transition hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
+      className="flex w-full cursor-pointer items-center gap-3 px-5 py-3.5 text-left transition hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
     >
-      <span className="text-xl">{icon}</span>
-      <span className="flex-1 text-sm font-medium text-zinc-900 dark:text-zinc-100">
+      {iconNode}
+      <span className="flex-1 text-[15px] text-zinc-900 dark:text-zinc-100">
         {name}
       </span>
       <ChevronRight size={16} className="text-zinc-400 dark:text-zinc-500" />
@@ -182,31 +192,8 @@ function renderControl(
 
   // Fallback: show state text (non-interactive)
   return (
-    <span className="text-sm text-zinc-500 dark:text-zinc-400">{state}</span>
+    <span className="text-[15px] font-medium text-zinc-900 dark:text-zinc-100">
+      {state}
+    </span>
   );
-}
-
-function getDefaultIcon(domain: string): string {
-  const DOMAIN_ICONS: Record<string, string> = {
-    light: "💡",
-    switch: "🔌",
-    fan: "🌀",
-    sensor: "📊",
-    binary_sensor: "🔍",
-    climate: "🌡️",
-    cover: "🪟",
-    lock: "🔒",
-    camera: "📷",
-    media_player: "🎵",
-    vacuum: "🤖",
-    button: "🔘",
-    scene: "🎬",
-    script: "📜",
-    select: "📋",
-    number: "🔢",
-    input_boolean: "🔘",
-    input_select: "📋",
-    input_number: "🔢",
-  };
-  return DOMAIN_ICONS[domain] ?? "⚙️";
 }
