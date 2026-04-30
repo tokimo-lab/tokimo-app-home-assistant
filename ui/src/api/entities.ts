@@ -29,21 +29,6 @@ export function listEntities(
 }
 
 /**
- * Fetch every entity in a group (`device::…` or `name::…` key from the
- * backend's first-import固化 logic). Returns members regardless of
- * `hidden`, `collapsed`, or `group_primary` — use this to render a
- * "show all members" expansion of a collapsed primary tile.
- */
-export function listEntitiesByGroup(
-  instanceId: string,
-  groupId: string,
-): Promise<EntityState[]> {
-  return apiFetch(
-    `/instances/${encodeURIComponent(instanceId)}/entities/groups/${encodeURIComponent(groupId)}`,
-  );
-}
-
-/**
  * Fetch a single entity with full metadata (including `device` registry info).
  * Use this on detail / accessory-settings pages where manufacturer / model /
  * firmware fields are needed — list endpoints intentionally omit them.

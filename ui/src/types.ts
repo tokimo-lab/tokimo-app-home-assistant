@@ -92,14 +92,15 @@ export interface EntityDisplay {
   size: EntitySize;
   sort_order: number;
   collapsed: boolean;
-  group_id: string | null;
-  group_primary: boolean;
+  /**
+   * Accessory membership (P8.0.2 M:N): UUIDs of accessory groups this entity
+   * belongs to. Primary / sub-function role now live on
+   * `accessory_group_members` and are exposed via the `/accessories/:gid/members`
+   * endpoint as {@link AccessoryMember}.
+   */
+  group_ids: string[];
   /** Per-entity numeric precision. `null` means "use frontend default". */
   decimal_places?: number | null;
-  /** Sub-function role within accessory: null (default in detail card),
-   * 'hidden_in_aggregate' (excluded from detail card), or
-   * 'promoted_to_tile' (shown as tile badge in phase-2). */
-  sub_function_role?: "hidden_in_aggregate" | "promoted_to_tile" | null;
   updated_at?: string;
 }
 
@@ -114,27 +115,48 @@ export interface UpdateEntityDisplayDto {
   sort_order?: number;
   collapsed?: boolean;
   /**
-   * Only `true` is accepted by the backend — setting `false` directly
-   * returns 400. Elect a new primary by PATCHing another entity in the
-   * same group with `group_primary: true` (the backend demotes the
-   * previous primary in the same transaction).
-   */
-  group_primary?: true;
-  /**
    * Per-entity numeric precision (0..=4).
    * - `number`: set the precision explicitly
    * - `null`: clear back to frontend default
    * - omitted: leave unchanged
    */
   decimal_places?: number | null;
-  /**
-   * Sub-function role within accessory.
-   * - 'hidden_in_aggregate': exclude from detail card
-   * - 'promoted_to_tile': show as badge (phase-2)
-   * - `null`: clear to default (show in detail card)
-   * - omitted: leave unchanged
-   */
-  sub_function_role?: "hidden_in_aggregate" | "promoted_to_tile" | null;
+}
+
+/**
+ * Accessory group (a "tile" that aggregates one or more entities). Returned
+ * by `GET /instances/:id/accessories`. Membership lives on
+ * {@link AccessoryMember} via `GET /accessories/:gid/members`.
+ *
+ * `source = 'auto'` rows are owned by sync_visibility and may be replaced on
+ * the next sync; `source = 'manual'` rows are user-curated and never auto-removed.
+ */
+export interface AccessoryGroup {
+  id: string;
+  instance_id: string;
+  natural_key: string;
+  display_name: string | null;
+  custom_icon: string | null;
+  source: "auto" | "manual";
+  sort_order: number;
+}
+
+/**
+ * Single membership row from `accessory_group_members`. Returned by
+ * `GET /accessories/:gid/members`. Mutate via:
+ *   - PATCH `/accessories/:gid/members/:entity_id` (is_primary / sub_function_role / sort_order)
+ *   - DELETE `/accessories/:gid/members/:entity_id`
+ *   - POST `/accessories/:gid/members` (append)
+ */
+export interface AccessoryMember {
+  entity_id: string;
+  is_primary: boolean;
+  sub_function_role: "hidden_in_aggregate" | "promoted_to_tile" | null;
+  sort_order: number;
+  /** Domain from the live entity state. `null` when HA hasn't pushed the entity yet. */
+  domain: string | null;
+  /** Friendly name from live state. */
+  friendly_name: string | null;
 }
 
 export interface RoomReorderItem {
@@ -191,20 +213,14 @@ export interface EntityState {
    * `PATCH /entities/:eid/display`. Collapsed entities still render but
    * sit under a "show all" reveal. */
   collapsed?: boolean;
-  /** Stable group key (`device::{device_id}::{domain}` or
-   * `name::{normalized_name}::{domain}`) shared by entities the backend
-   * considers the same physical thing. `null` for singletons. */
-  group_id?: string | null;
-  /** Whether this entity is the elected representative of its group.
-   * Within a `group_id` exactly one entity has `group_primary=true` at
-   * any time; demoted siblings still appear in the snapshot but a
-   * card-list view should usually render only the primary. */
-  group_primary?: boolean;
+  /**
+   * Accessory membership (P8.0.2 M:N): list of accessory_group UUIDs this
+   * entity belongs to. Primary status / sub-function role are no longer on
+   * the entity — fetch via `/accessories/:gid/members`.
+   */
+  group_ids?: string[];
   /** Per-entity numeric precision override; `null`/undefined → frontend default. */
   decimal_places?: number | null;
-  /** Sub-function role within accessory (P7): null (default in detail),
-   * 'hidden_in_aggregate' (excluded), 'promoted_to_tile' (badge). */
-  sub_function_role?: "hidden_in_aggregate" | "promoted_to_tile" | null;
   /** Forward-compat: device grouping id from HA's entity_registry. */
   device_id?: string | null;
   /** Only populated by GET /entities/:eid single-fetch path. */
