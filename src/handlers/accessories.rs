@@ -1,6 +1,7 @@
 //! Accessory (tile) member management — M:N entity ↔ tile relationship.
 //!
 //! Routes:
+//!   GET    /instances/:id/accessories           (list all groups for instance)
 //!   GET    /accessories/:gid/members
 //!   POST   /accessories/:gid/members             (append entity to tile)
 //!   PATCH  /accessories/:gid/members/:entity_id  (toggle is_primary / sub_function_role / sort_order)
@@ -430,6 +431,43 @@ pub async fn remove_member(
     broadcast_entity(&instance, &entity_id);
 
     Ok(StatusCode::NO_CONTENT)
+}
+
+// ─── GET /instances/:id/accessories ──────────────────────────────────────────
+
+/// List all accessory groups for a given instance, ordered by sort_order ASC.
+/// Returns group metadata only (no members).
+pub async fn list_groups(
+    State(ctx): State<Arc<AppCtx>>,
+    Path(instance_id): Path<Uuid>,
+) -> Result<Json<Vec<AccessoryGroup>>, AppError> {
+    // Verify instance exists.
+    let _ = get_instance(&ctx, instance_id)?;
+
+    let rows = sqlx::query(
+        "SELECT id, instance_id, natural_key, display_name, custom_icon, source, sort_order \
+           FROM accessory_groups \
+          WHERE instance_id = $1 \
+          ORDER BY sort_order ASC, natural_key ASC",
+    )
+    .bind(instance_id)
+    .fetch_all(&ctx.pool)
+    .await?;
+
+    let groups: Vec<AccessoryGroup> = rows
+        .iter()
+        .map(|row| AccessoryGroup {
+            id: row.get("id"),
+            instance_id: row.get("instance_id"),
+            natural_key: row.get("natural_key"),
+            display_name: row.get("display_name"),
+            custom_icon: row.get("custom_icon"),
+            source: row.get("source"),
+            sort_order: row.get("sort_order"),
+        })
+        .collect();
+
+    Ok(Json(groups))
 }
 
 // ─── POST /instances/:id/accessories ─────────────────────────────────────────

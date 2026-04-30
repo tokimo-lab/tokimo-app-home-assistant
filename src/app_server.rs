@@ -31,6 +31,7 @@
 //!   DELETE /rooms/:room_id/entities/:entity_id
 //!
 //! Accessory tile creation (per-instance natural_key namespace):
+//!   GET    /instances/:id/accessories
 //!   POST   /instances/:id/accessories
 //!
 //! Accessory tile sub-resources (gid is globally unique UUID):
@@ -114,7 +115,7 @@ fn build_router(ctx: Arc<AppCtx>) -> Router {
         // because `natural_key` uniqueness is scoped to instance_id.
         .route(
             "/instances/{id}/accessories",
-            post(accessories::create_manual_group),
+            get(accessories::list_groups).post(accessories::create_manual_group),
         )
         .route("/accessories/{gid}/entities", get(groups::list_by_group))
         .route(
