@@ -31,7 +31,7 @@ export function SubFunctionList({
   }
 
   return (
-    <div className="mt-6 overflow-hidden rounded-2xl bg-white/60 backdrop-blur-sm dark:bg-zinc-900/40">
+    <div className="mt-6 border-t border-zinc-100 pt-2 dark:border-zinc-800/60">
       <div className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
         {subMembers.map((entity) => (
           <SubFunctionRow
@@ -79,7 +79,7 @@ function SubFunctionRow({
 
   if (hasControl) {
     return (
-      <div className="flex items-center gap-3 px-5 py-3.5">
+      <div className="flex items-center gap-3 py-3.5">
         {iconNode}
         <span className="flex-1 text-[15px] text-zinc-900 dark:text-zinc-100">
           {name}
@@ -93,7 +93,7 @@ function SubFunctionRow({
     <button
       type="button"
       onClick={() => onNavigate(entity_id)}
-      className="flex w-full cursor-pointer items-center gap-3 px-5 py-3.5 text-left transition hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
+      className="flex w-full cursor-pointer items-center gap-3 py-3.5 text-left transition hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
     >
       {iconNode}
       <span className="flex-1 text-[15px] text-zinc-900 dark:text-zinc-100">
