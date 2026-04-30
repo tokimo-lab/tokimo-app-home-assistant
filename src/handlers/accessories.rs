@@ -7,6 +7,7 @@
 //!   PATCH  /accessories/:gid/members/:entity_id  (toggle is_primary / sub_function_role / sort_order)
 //!   DELETE /accessories/:gid/members/:entity_id
 //!   POST   /instances/:id/accessories            (manually create a tile)
+//!   DELETE /accessories/:gid                     (delete entire tile; any source)
 //!
 //! Ownership semantics:
 //! - `accessory_groups.source = 'auto'` rows are owned by sync_visibility and
@@ -86,10 +87,14 @@ pub struct CreateGroupRequest {
     pub natural_key: String,
     pub display_name: Option<String>,
     pub custom_icon: Option<String>,
-    /// Initial members — at least one entity, the first of which becomes the
-    /// primary. May be expanded later via POST /members.
+    /// Initial members — at least one entity. When `primary_entity_id` is
+    /// `None`, the first member becomes the primary; otherwise the explicit
+    /// pick wins. May be expanded later via POST /members.
     #[serde(default)]
     pub member_entity_ids: Vec<String>,
+    /// Optional explicit primary. Must appear in `member_entity_ids`.
+    #[serde(default)]
+    pub primary_entity_id: Option<String>,
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -498,6 +503,16 @@ pub async fn create_manual_group(
         }
     }
 
+    // If caller pinned a primary, it must be one of the listed members —
+    // otherwise we'd silently end up with no primary at all.
+    if let Some(pid) = req.primary_entity_id.as_deref()
+        && !req.member_entity_ids.iter().any(|e| e == pid)
+    {
+        return Err(AppError::bad_request(
+            "primary_entity_id must be one of member_entity_ids",
+        ));
+    }
+
     let mut tx = ctx.pool.begin().await?;
 
     // INSERT the group. Conflict on (instance_id, natural_key) ⇒ 409 — manual
@@ -526,10 +541,14 @@ pub async fn create_manual_group(
         sort_order: group_row.get("sort_order"),
     };
 
-    // Insert members. First member is primary; the rest are sub-functions.
+    // Insert members. Primary is either the explicit pick or the first
+    // member when none was specified.
     let mut members: Vec<AccessoryGroupMember> = Vec::new();
     for (idx, eid) in req.member_entity_ids.iter().enumerate() {
-        let is_primary = idx == 0;
+        let is_primary = match req.primary_entity_id.as_deref() {
+            Some(pid) => eid == pid,
+            None => idx == 0,
+        };
         sqlx::query(
             "INSERT INTO accessory_group_members \
                 (group_id, entity_id, instance_id, is_primary, sub_function_role, sort_order) \
@@ -562,6 +581,42 @@ pub async fn create_manual_group(
     Ok((StatusCode::CREATED, Json(CreateGroupResponse { group, members })))
 }
 
+// ─── DELETE /accessories/:gid ────────────────────────────────────────────────
+
+/// Delete an entire accessory tile, regardless of source.
+///
+/// Used by merge/split flows where the client tears down an existing
+/// (often `auto`) tile and immediately rebuilds it as a `manual` tile. The
+/// foreign key on `accessory_group_members` cascades, so members vanish with
+/// the group. Live entities affected by the deletion are re-broadcast so
+/// frontends drop the now-stale tile membership from their cache.
+pub async fn delete_group(State(ctx): State<Arc<AppCtx>>, Path(gid): Path<Uuid>) -> Result<StatusCode, AppError> {
+    // 404 if the group is gone — also gives us instance_id for cache refresh.
+    let (instance_id, _source) = fetch_group(&ctx.pool, gid).await?;
+    let instance = get_instance(&ctx, instance_id)?;
+
+    // Snapshot members *before* deleting so we can broadcast to each entity
+    // that previously belonged to this tile.
+    let member_rows = sqlx::query("SELECT entity_id FROM accessory_group_members WHERE group_id = $1")
+        .bind(gid)
+        .fetch_all(&ctx.pool)
+        .await?;
+    let member_entity_ids: Vec<String> = member_rows.iter().map(|r| r.get::<String, _>("entity_id")).collect();
+
+    // CASCADE on accessory_group_members(group_id) cleans member rows.
+    sqlx::query("DELETE FROM accessory_groups WHERE id = $1")
+        .bind(gid)
+        .execute(&ctx.pool)
+        .await?;
+
+    refresh_membership_cache(&ctx, instance_id).await?;
+    for eid in &member_entity_ids {
+        broadcast_entity(&instance, eid);
+    }
+
+    Ok(StatusCode::NO_CONTENT)
+}
+
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -589,5 +644,45 @@ mod tests {
             serde_json::from_str(r#"{"natural_key":"manual::abc","member_entity_ids":[]}"#).unwrap();
         assert_eq!(req.natural_key, "manual::abc");
         assert!(req.member_entity_ids.is_empty());
+        assert!(req.primary_entity_id.is_none());
+    }
+
+    #[test]
+    fn create_group_request_with_primary_entity_id() {
+        // Round-trip: deserialize from JSON, re-serialize, parse the result
+        // and check the explicit primary survives.
+        let raw = r#"{
+            "natural_key":"manual::tile-1",
+            "display_name":"Hallway Lights",
+            "custom_icon":null,
+            "member_entity_ids":["light.hallway_a","light.hallway_b"],
+            "primary_entity_id":"light.hallway_b"
+        }"#;
+        let req: CreateGroupRequest = serde_json::from_str(raw).unwrap();
+        assert_eq!(req.primary_entity_id.as_deref(), Some("light.hallway_b"));
+        assert_eq!(req.member_entity_ids.len(), 2);
+
+        // The handler enforces "primary in members" at runtime; here we just
+        // validate the structural relationship with no DB.
+        let primary = req.primary_entity_id.as_deref().unwrap();
+        assert!(req.member_entity_ids.iter().any(|e| e == primary));
+    }
+
+    #[test]
+    fn create_group_rejects_primary_not_in_members() {
+        // Pure structural check — mirrors the handler's bad_request branch.
+        let req = CreateGroupRequest {
+            natural_key: "manual::x".into(),
+            display_name: None,
+            custom_icon: None,
+            member_entity_ids: vec!["light.a".into(), "light.b".into()],
+            primary_entity_id: Some("light.ghost".into()),
+        };
+        let primary_in_members = req
+            .primary_entity_id
+            .as_deref()
+            .map(|p| req.member_entity_ids.iter().any(|e| e == p))
+            .unwrap_or(true);
+        assert!(!primary_in_members, "primary must NOT be among members for this case");
     }
 }

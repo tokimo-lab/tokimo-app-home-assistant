@@ -40,6 +40,7 @@
 //!   POST   /accessories/:gid/members
 //!   PATCH  /accessories/:gid/members/:entity_id
 //!   DELETE /accessories/:gid/members/:entity_id
+//!   DELETE /accessories/:gid                       (delete entire tile, any source)
 //!
 //! Data plane (SSE):
 //!   GET    /instances/:id/events
@@ -118,6 +119,10 @@ fn build_router(ctx: Arc<AppCtx>) -> Router {
             get(accessories::list_groups).post(accessories::create_manual_group),
         )
         .route("/accessories/{gid}/entities", get(groups::list_by_group))
+        .route(
+            "/accessories/{gid}",
+            delete(accessories::delete_group),
+        )
         .route(
             "/accessories/{gid}/members",
             get(accessories::list_members).post(accessories::add_member),

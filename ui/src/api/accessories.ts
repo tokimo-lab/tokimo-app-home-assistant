@@ -4,25 +4,18 @@
  * Routes:
  *   GET    /instances/:id/accessories           → AccessoryGroup[]
  *   POST   /instances/:id/accessories           → manual group create
+ *   DELETE /accessories/:gid                    → 204 (delete entire tile)
  *   GET    /accessories/:gid/entities           → EntityState[] (joined live state)
  *   GET    /accessories/:gid/members            → AccessoryMember[]
  *   POST   /accessories/:gid/members            → AccessoryMember (append)
  *   PATCH  /accessories/:gid/members/:entity_id → is_primary / sub_function_role / sort_order
  *   DELETE /accessories/:gid/members/:entity_id → 204
  */
-import type {
-  AccessoryGroup,
-  AccessoryMember,
-  EntityState,
-} from "../types";
+import type { AccessoryGroup, AccessoryMember, EntityState } from "../types";
 import { apiFetch } from "./client";
 
-export function listAccessories(
-  instanceId: string,
-): Promise<AccessoryGroup[]> {
-  return apiFetch(
-    `/instances/${encodeURIComponent(instanceId)}/accessories`,
-  );
+export function listAccessories(instanceId: string): Promise<AccessoryGroup[]> {
+  return apiFetch(`/instances/${encodeURIComponent(instanceId)}/accessories`);
 }
 
 export interface CreateManualGroupBody {
@@ -30,6 +23,11 @@ export interface CreateManualGroupBody {
   display_name?: string | null;
   custom_icon?: string | null;
   member_entity_ids?: string[];
+  /**
+   * Optional: pin a specific member as the tile's primary. Must appear in
+   * `member_entity_ids`. When omitted, the first member is auto-promoted.
+   */
+  primary_entity_id?: string | null;
 }
 
 export interface CreateManualGroupResponse {
@@ -41,26 +39,20 @@ export function createManualGroup(
   instanceId: string,
   body: CreateManualGroupBody,
 ): Promise<CreateManualGroupResponse> {
-  return apiFetch(
-    `/instances/${encodeURIComponent(instanceId)}/accessories`,
-    { method: "POST", body: JSON.stringify(body) },
-  );
+  return apiFetch(`/instances/${encodeURIComponent(instanceId)}/accessories`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
 }
 
-export function getAccessoryEntities(
-  groupId: string,
-): Promise<EntityState[]> {
-  return apiFetch(
-    `/accessories/${encodeURIComponent(groupId)}/entities`,
-  );
+export function getAccessoryEntities(groupId: string): Promise<EntityState[]> {
+  return apiFetch(`/accessories/${encodeURIComponent(groupId)}/entities`);
 }
 
 export function getAccessoryMembers(
   groupId: string,
 ): Promise<AccessoryMember[]> {
-  return apiFetch(
-    `/accessories/${encodeURIComponent(groupId)}/members`,
-  );
+  return apiFetch(`/accessories/${encodeURIComponent(groupId)}/members`);
 }
 
 export interface AddMemberBody {
@@ -75,10 +67,10 @@ export function addMember(
   groupId: string,
   body: AddMemberBody,
 ): Promise<AccessoryMember> {
-  return apiFetch(
-    `/accessories/${encodeURIComponent(groupId)}/members`,
-    { method: "POST", body: JSON.stringify(body) },
-  );
+  return apiFetch(`/accessories/${encodeURIComponent(groupId)}/members`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
 }
 
 export interface PatchMemberBody {
@@ -106,12 +98,20 @@ export function updateMember(
   );
 }
 
-export function removeMember(
-  groupId: string,
-  entityId: string,
-): Promise<void> {
+export function removeMember(groupId: string, entityId: string): Promise<void> {
   return apiFetch(
     `/accessories/${encodeURIComponent(groupId)}/members/${encodeURIComponent(entityId)}`,
     { method: "DELETE" },
   );
+}
+
+/**
+ * Delete an entire accessory tile, regardless of source (`auto` / `lcp` /
+ * `manual`). Used by the merge/split flows where the client tears down an
+ * existing tile and rebuilds it as a new manual group.
+ */
+export function deleteAccessoryGroup(groupId: string): Promise<void> {
+  return apiFetch(`/accessories/${encodeURIComponent(groupId)}`, {
+    method: "DELETE",
+  });
 }
