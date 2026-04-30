@@ -25,7 +25,7 @@ export function SubFunctionToggle({
       aria-label={isOn ? "Turn Off" : "Turn On"}
     >
       <span
-        className={`absolute top-1 h-6 w-6 transform rounded-full bg-white shadow-md transition-transform ${
+        className={`absolute top-1 left-0 h-6 w-6 rounded-full bg-white shadow-md transition-transform ${
           isOn ? "translate-x-7" : "translate-x-1"
         }`}
       />
