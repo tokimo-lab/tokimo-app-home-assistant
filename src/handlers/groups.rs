@@ -1,13 +1,11 @@
-//! Group-scoped entity listing.
+//! Accessory-group entity listing.
 //!
 //! Routes:
-//!   GET /instances/:id/entities/groups/:group_id
+//!   GET /accessories/:gid/entities
 //!
-//! Returns every `EntityDto` in the group regardless of `hidden`,
-//! `collapsed`, or `group_primary` — UI surfaces that need to render the
-//! "show all members of this group" expansion can fetch the full set in
-//! one call. Backed by the partial index
-//! `entity_overrides_group_idx (instance_id, group_id) WHERE group_id IS NOT NULL`.
+//! Returns every `EntityDto` belonging to the given accessory group,
+//! regardless of `hidden` / `collapsed`. Backed by `accessory_group_members`
+//! joined to `entity_overrides`.
 
 use std::sync::Arc;
 
@@ -19,12 +17,18 @@ use uuid::Uuid;
 
 use super::AppCtx;
 use crate::error::AppError;
-use crate::handlers::entities::{EntityDto, OVERRIDE_COLS, apply_override, row_to_override};
+use crate::handlers::entities::{EntityDto, OVERRIDE_COLS, apply_override, group_ids_for, row_to_override};
 
 pub async fn list_by_group(
     State(ctx): State<Arc<AppCtx>>,
-    Path((instance_id, group_id)): Path<(Uuid, String)>,
+    Path(group_id): Path<Uuid>,
 ) -> Result<Json<Vec<EntityDto>>, AppError> {
+    let instance_id: Uuid = sqlx::query_scalar("SELECT instance_id FROM accessory_groups WHERE id = $1")
+        .bind(group_id)
+        .fetch_optional(&ctx.pool)
+        .await?
+        .ok_or_else(|| AppError::not_found("accessory group not found"))?;
+
     let instance = ctx
         .conn_pool
         .instances
@@ -33,28 +37,43 @@ pub async fn list_by_group(
         .value()
         .clone();
 
-    let rows = sqlx::query(&format!(
-        "SELECT {OVERRIDE_COLS} FROM entity_overrides \
-         WHERE instance_id = $1 AND group_id = $2"
-    ))
-    .bind(instance_id)
-    .bind(&group_id)
+    // Fetch member entity_ids in stable order, then SELECT their overrides.
+    let member_ids: Vec<String> = sqlx::query_scalar(
+        "SELECT entity_id FROM accessory_group_members \
+          WHERE group_id = $1 \
+          ORDER BY sort_order ASC, entity_id ASC",
+    )
+    .bind(group_id)
     .fetch_all(&ctx.pool)
     .await?;
 
-    // Join with in-memory state. Override rows whose entity hasn't been
-    // pushed by HA yet are skipped — there's no live state to merge against.
-    // Empty group (no override rows) returns []; we don't 404 because
-    // group_id is a user-derivable string, not a database resource id.
-    let dtos: Vec<EntityDto> = rows
+    if member_ids.is_empty() {
+        return Ok(Json(Vec::new()));
+    }
+
+    let rows = sqlx::query(&format!(
+        "SELECT {OVERRIDE_COLS} FROM entity_overrides \
+          WHERE instance_id = $1 AND entity_id = ANY($2)"
+    ))
+    .bind(instance_id)
+    .bind(&member_ids)
+    .fetch_all(&ctx.pool)
+    .await?;
+    let ov_map: std::collections::HashMap<String, _> = rows
         .iter()
-        .map(row_to_override)
-        .filter_map(|ov| {
-            instance
-                .store
-                .states
-                .get(&ov.entity_id)
-                .map(|s| apply_override(s.clone(), Some(&ov)))
+        .map(|r| {
+            let ov = row_to_override(r);
+            (ov.entity_id.clone(), ov)
+        })
+        .collect();
+
+    let dtos: Vec<EntityDto> = member_ids
+        .iter()
+        .filter_map(|eid| {
+            instance.store.states.get(eid).map(|s| {
+                let gids = group_ids_for(&instance, eid);
+                apply_override(s.clone(), ov_map.get(eid), gids)
+            })
         })
         .collect();
 

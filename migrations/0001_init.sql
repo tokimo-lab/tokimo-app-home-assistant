@@ -1,4 +1,10 @@
 -- HA app schema. Single-file init. CREATE … IF NOT EXISTS for idempotency.
+--
+-- Dev-stage rewrite (P8.0.1): tile / group attributes were previously stored
+-- on `entity_overrides` (group_id, group_primary, sub_function_role) which
+-- forced a 1:1 entity ↔ tile relation. They now live on a dedicated pair of
+-- tables (`accessory_groups` + `accessory_group_members`) so a single entity
+-- can participate in multiple tiles (M:N).
 
 CREATE TABLE IF NOT EXISTS instances (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -47,8 +53,6 @@ CREATE TABLE IF NOT EXISTS entity_overrides (
     sort_order      INTEGER NOT NULL DEFAULT 0,
     entity_category TEXT,
     collapsed       BOOLEAN NOT NULL DEFAULT FALSE,
-    group_id        TEXT,
-    group_primary   BOOLEAN NOT NULL DEFAULT TRUE,
     decimal_places  INTEGER,
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     PRIMARY KEY (instance_id, entity_id)
@@ -62,30 +66,56 @@ CREATE INDEX IF NOT EXISTS entity_overrides_area_idx
 CREATE INDEX IF NOT EXISTS entity_overrides_category_idx
     ON entity_overrides (instance_id, entity_category)
     WHERE entity_category IS NOT NULL;
-CREATE INDEX IF NOT EXISTS entity_overrides_group_idx
-    ON entity_overrides (instance_id, group_id)
-    WHERE group_id IS NOT NULL;
 
--- Idempotent migration: add decimal_places to existing deployments without
--- requiring a DB reset. NULL means "use frontend default" (1 decimal place).
-ALTER TABLE entity_overrides
-  ADD COLUMN IF NOT EXISTS decimal_places INTEGER;
+-- Accessory tiles (M:N entity participation).
+--
+-- `natural_key` is the algorithmically stable identifier produced by
+-- sync_visibility (e.g. `device::xxx`, `via::vid::aid`, `name::sha`). It is
+-- the join key for idempotent UPSERT — re-running the sync with identical
+-- inputs preserves the row's UUID `id` so foreign keys remain valid.
+--
+-- `source` distinguishes auto-generated groups (recreated by every sync)
+-- from user-created `manual` groups (immune to auto teardown). Auto sync
+-- never touches manual groups.
+--
+-- `display_name` / `custom_icon` are optional overrides; NULL means "fall
+-- back to the primary entity's defaults" so a freshly synced tile renders
+-- without requiring per-tile display state.
+CREATE TABLE IF NOT EXISTS accessory_groups (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    instance_id     UUID NOT NULL REFERENCES instances(id) ON DELETE CASCADE,
+    natural_key     TEXT NOT NULL,
+    display_name    TEXT,
+    custom_icon     TEXT,
+    source          TEXT NOT NULL DEFAULT 'auto'
+                        CHECK (source IN ('auto', 'manual')),
+    sort_order      INTEGER NOT NULL DEFAULT 0,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (instance_id, natural_key)
+);
+CREATE INDEX IF NOT EXISTS accessory_groups_instance_idx
+    ON accessory_groups (instance_id, sort_order);
 
--- Idempotent migration: add visibility/grouping defaults columns to existing
--- deployments. The CREATE TABLE block above only fires on fresh databases;
--- pre-existing entity_overrides tables (created before these features
--- shipped) need explicit ALTERs. Defaults match the post-`sync_default_*`
--- baseline so existing rows look "untouched" until the next sync rewrites
--- them with computed values.
-ALTER TABLE entity_overrides
-  ADD COLUMN IF NOT EXISTS collapsed BOOLEAN NOT NULL DEFAULT FALSE;
-ALTER TABLE entity_overrides
-  ADD COLUMN IF NOT EXISTS group_id TEXT;
-ALTER TABLE entity_overrides
-  ADD COLUMN IF NOT EXISTS group_primary BOOLEAN NOT NULL DEFAULT TRUE;
-
--- Idempotent migration: add sub_function_role for accessory member
--- annotation. NULL means default sub-function behavior.
-ALTER TABLE entity_overrides
-  ADD COLUMN IF NOT EXISTS sub_function_role TEXT
-    CHECK (sub_function_role IS NULL OR sub_function_role IN ('hidden_in_aggregate','promoted_to_tile'));
+-- M:N membership.
+--
+-- A single entity can belong to several tiles (e.g. the `_action` sensor of
+-- a 2-gang switch promoted onto both the kitchen-light and sink-light tiles).
+-- The composite PK enforces "one link per (group, entity)" while the partial
+-- unique index `accessory_group_members_one_primary_idx` makes "≥2 primaries
+-- per group" a hard DB-level error rather than a soft handler invariant.
+CREATE TABLE IF NOT EXISTS accessory_group_members (
+    group_id          UUID NOT NULL REFERENCES accessory_groups(id) ON DELETE CASCADE,
+    entity_id         TEXT NOT NULL,
+    instance_id       UUID NOT NULL REFERENCES instances(id) ON DELETE CASCADE,
+    is_primary        BOOLEAN NOT NULL DEFAULT FALSE,
+    sub_function_role TEXT
+                          CHECK (sub_function_role IS NULL
+                                 OR sub_function_role IN ('hidden_in_aggregate','promoted_to_tile')),
+    sort_order        INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (group_id, entity_id)
+);
+CREATE INDEX IF NOT EXISTS accessory_group_members_entity_idx
+    ON accessory_group_members (instance_id, entity_id);
+CREATE UNIQUE INDEX IF NOT EXISTS accessory_group_members_one_primary_idx
+    ON accessory_group_members (group_id) WHERE is_primary = TRUE;

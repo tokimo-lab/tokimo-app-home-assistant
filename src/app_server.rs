@@ -30,6 +30,16 @@
 //!   POST   /rooms/:room_id/entities
 //!   DELETE /rooms/:room_id/entities/:entity_id
 //!
+//! Accessory tile creation (per-instance natural_key namespace):
+//!   POST   /instances/:id/accessories
+//!
+//! Accessory tile sub-resources (gid is globally unique UUID):
+//!   GET    /accessories/:gid/entities
+//!   GET    /accessories/:gid/members
+//!   POST   /accessories/:gid/members
+//!   PATCH  /accessories/:gid/members/:entity_id
+//!   DELETE /accessories/:gid/members/:entity_id
+//!
 //! Data plane (SSE):
 //!   GET    /instances/:id/events
 
@@ -98,22 +108,22 @@ fn build_router(ctx: Arc<AppCtx>) -> Router {
         // ── Entities ─────────────────────────────────────────────────────
         .route("/instances/{id}/entities", get(entities::list))
         .route("/instances/{id}/entities/{entity_id}", get(entities::get))
+        // ── Accessories (M:N tile membership) ────────────────────────────
+        // Accessory tile UUIDs are globally unique, so member sub-resources
+        // sit outside `/instances/:id`. Manual tile creation is per-instance
+        // because `natural_key` uniqueness is scoped to instance_id.
         .route(
-            "/instances/{id}/entities/groups/{group_id}",
-            get(groups::list_by_group),
+            "/instances/{id}/accessories",
+            post(accessories::create_manual_group),
         )
-        // ── Accessories (accessory members management) ──────────────────
+        .route("/accessories/{gid}/entities", get(groups::list_by_group))
         .route(
-            "/instances/{id}/accessories/{group_id}",
-            get(accessories::list_members),
+            "/accessories/{gid}/members",
+            get(accessories::list_members).post(accessories::add_member),
         )
         .route(
-            "/instances/{id}/accessories/{group_id}/members",
-            post(accessories::add_member),
-        )
-        .route(
-            "/instances/{id}/accessories/{group_id}/members/{entity_id}",
-            delete(accessories::remove_member),
+            "/accessories/{gid}/members/{entity_id}",
+            patch(accessories::update_member).delete(accessories::remove_member),
         )
         // ─────────────────────────────────────────────────────────────────
         .route(

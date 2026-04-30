@@ -100,6 +100,11 @@ pub struct DeviceMeta {
 }
 
 /// Cached entity override snapshot (subset of entity_overrides row minus entity_id).
+///
+/// Intentionally does **not** carry `group_id` / `group_primary` /
+/// `sub_function_role` since P8.0.1 — those moved to `accessory_groups` /
+/// `accessory_group_members`. Per-entity group membership is cached
+/// separately in `InstanceCtx::group_membership_cache`.
 #[derive(Debug, Clone)]
 pub struct OverrideSnapshot {
     pub display_name: Option<String>,
@@ -111,17 +116,37 @@ pub struct OverrideSnapshot {
     pub size: Option<String>,
     pub sort_order: i32,
     pub collapsed: bool,
-    pub group_id: Option<String>,
-    pub group_primary: bool,
     /// User-chosen decimal precision for numeric entity states. `None` means
     /// "fall back to the frontend default" (currently 1 decimal place for
     /// most numeric domains, 0 for percentage-style values). Set via the
     /// Accessory Settings page; nulled out to revert to default.
     pub decimal_places: Option<i32>,
-    /// Sub-function role within an accessory. `None` = normal sub-function
-    /// (shown in detail card). `Some("hidden_in_aggregate")` = user marked
-    /// as hidden within the accessory context.
+}
+
+/// Accessory group row (M:N tile, see migrations/0001_init.sql).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub struct AccessoryGroup {
+    pub id: Uuid,
+    pub instance_id: Uuid,
+    pub natural_key: String,
+    pub display_name: Option<String>,
+    pub custom_icon: Option<String>,
+    /// `"auto"` (created by sync_visibility) or `"manual"` (created by user).
+    pub source: String,
+    pub sort_order: i32,
+}
+
+/// Single membership link between an accessory group and an entity.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub struct AccessoryGroupMember {
+    pub group_id: Uuid,
+    pub entity_id: String,
+    pub instance_id: Uuid,
+    pub is_primary: bool,
     pub sub_function_role: Option<String>,
+    pub sort_order: i32,
 }
 
 /// Events broadcast to SSE subscribers.
@@ -223,6 +248,11 @@ pub struct InstanceCtx {
     /// Cached entity overrides (entity_id → OverrideSnapshot) to eliminate
     /// per-event DB queries. Populated on boot and updated by writers.
     pub override_cache: DashMap<String, OverrideSnapshot>,
+    /// Cached accessory-group membership (entity_id → list of group UUIDs).
+    /// Populated on boot, refreshed by sync_visibility and accessory mutation
+    /// handlers. Empty `Vec` semantically means "entity is in no tile" — same
+    /// as the entity being absent from the map.
+    pub group_membership_cache: DashMap<String, Vec<Uuid>>,
     /// HA device registry cache (device_id → DeviceMeta). Populated on
     /// supervisor startup via `config/device_registry/list`. Reads are cheap
     /// `Arc::clone` of the inner map; writers swap the whole `Arc`.
@@ -245,6 +275,7 @@ impl InstanceCtx {
             store: EntityStore::new(),
             status: RwLock::new(Arc::new(ConnStatus::Connecting)),
             override_cache: DashMap::new(),
+            group_membership_cache: DashMap::new(),
             device_registry: RwLock::new(Arc::new(HashMap::new())),
             entity_to_device: RwLock::new(Arc::new(HashMap::new())),
         })

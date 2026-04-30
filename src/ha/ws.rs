@@ -563,12 +563,25 @@ pub async fn refresh_registries(instance: &Arc<InstanceCtx>, pool: &sqlx::PgPool
         match sync_visibility::sync_default_visibility_and_grouping(pool, instance.id, registry_entries, &area_name_map)
             .await
         {
-            Ok(stats) => debug!(
-                instance_id = %instance.id,
-                inserted = stats.inserted,
-                skipped_existing = stats.skipped_existing,
-                "HA WS: default visibility / grouping sync complete",
-            ),
+            Ok(stats) => {
+                debug!(
+                    instance_id = %instance.id,
+                    inserted = stats.inserted,
+                    skipped_existing = stats.skipped_existing,
+                    "HA WS: default visibility / grouping sync complete",
+                );
+                // Refresh in-memory tile-membership cache so subsequent SSE
+                // events / API responses see the new accessory_groups state.
+                if let Err(e) =
+                    crate::handlers::entities::populate_group_membership_cache(pool, instance, instance.id).await
+                {
+                    warn!(
+                        instance_id = %instance.id,
+                        error = %e.message,
+                        "HA WS: failed to refresh group membership cache after sync",
+                    );
+                }
+            }
             Err(e) => warn!(
                 instance_id = %instance.id,
                 error = %e.message,

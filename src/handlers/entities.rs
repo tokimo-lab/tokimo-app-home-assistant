@@ -35,16 +35,13 @@ pub struct EntityDto {
     pub size: Option<String>,
     pub sort_order: i32,
     pub collapsed: bool,
-    pub group_id: Option<String>,
-    pub group_primary: bool,
+    /// IDs of accessory groups this entity belongs to (M:N).
+    /// Empty when the entity is not a member of any tile.
+    pub group_ids: Vec<Uuid>,
     /// Per-entity numeric precision override. `None` → frontend chooses a
     /// sensible default (1 for most numeric entities, 0 for percentage-style
     /// fields). Configured from the Accessory Settings page.
     pub decimal_places: Option<i32>,
-    /// Sub-function role within an accessory. `None` = normal sub-function
-    /// (shown in detail card). `Some("hidden_in_aggregate")` = user marked
-    /// as hidden within the accessory context.
-    pub sub_function_role: Option<String>,
     /// Device metadata (manufacturer / model / sw_version / serial_number /
     /// name) sourced from HA's device registry. Only populated by the
     /// per-entity `GET /entities/:eid` endpoint — list endpoints leave this
@@ -54,7 +51,7 @@ pub struct EntityDto {
     pub device: Option<crate::state::DeviceMeta>,
 }
 
-pub(crate) fn apply_override(state: EntityState, ov: Option<&OverrideRow>) -> EntityDto {
+pub(crate) fn apply_override(state: EntityState, ov: Option<&OverrideRow>, group_ids: Vec<Uuid>) -> EntityDto {
     EntityDto {
         entity_id: state.entity_id,
         state: state.state,
@@ -71,16 +68,18 @@ pub(crate) fn apply_override(state: EntityState, ov: Option<&OverrideRow>) -> En
         size: ov.and_then(|o| o.size.clone()),
         sort_order: ov.map(|o| o.sort_order).unwrap_or(0),
         collapsed: ov.map(|o| o.collapsed).unwrap_or(false),
-        group_id: ov.and_then(|o| o.group_id.clone()),
-        group_primary: ov.map(|o| o.group_primary).unwrap_or(true),
+        group_ids,
         decimal_places: ov.and_then(|o| o.decimal_places),
-        sub_function_role: ov.and_then(|o| o.sub_function_role.clone()),
         device: None,
     }
 }
 
 /// Apply overrides from cached snapshot (avoids per-event DB query).
-pub(crate) fn apply_override_snapshot(state: EntityState, ov: Option<&crate::state::OverrideSnapshot>) -> EntityDto {
+pub(crate) fn apply_override_snapshot(
+    state: EntityState,
+    ov: Option<&crate::state::OverrideSnapshot>,
+    group_ids: Vec<Uuid>,
+) -> EntityDto {
     EntityDto {
         entity_id: state.entity_id,
         state: state.state,
@@ -97,10 +96,8 @@ pub(crate) fn apply_override_snapshot(state: EntityState, ov: Option<&crate::sta
         size: ov.and_then(|o| o.size.clone()),
         sort_order: ov.map(|o| o.sort_order).unwrap_or(0),
         collapsed: ov.map(|o| o.collapsed).unwrap_or(false),
-        group_id: ov.and_then(|o| o.group_id.clone()),
-        group_primary: ov.map(|o| o.group_primary).unwrap_or(true),
+        group_ids,
         decimal_places: ov.and_then(|o| o.decimal_places),
-        sub_function_role: ov.and_then(|o| o.sub_function_role.clone()),
         device: None,
     }
 }
@@ -117,10 +114,7 @@ pub(crate) fn override_row_to_snapshot(o: &OverrideRow) -> crate::state::Overrid
         size: o.size.clone(),
         sort_order: o.sort_order,
         collapsed: o.collapsed,
-        group_id: o.group_id.clone(),
-        group_primary: o.group_primary,
         decimal_places: o.decimal_places,
-        sub_function_role: o.sub_function_role.clone(),
     }
 }
 
@@ -135,13 +129,10 @@ pub(crate) struct OverrideRow {
     pub size: Option<String>,
     pub sort_order: i32,
     pub collapsed: bool,
-    pub group_id: Option<String>,
-    pub group_primary: bool,
     pub decimal_places: Option<i32>,
-    pub sub_function_role: Option<String>,
 }
 
-pub(crate) const OVERRIDE_COLS: &str = "entity_id, display_name, custom_icon, area_id, hidden, is_favorite, favorite_order, size, sort_order, collapsed, group_id, group_primary, decimal_places, sub_function_role";
+pub(crate) const OVERRIDE_COLS: &str = "entity_id, display_name, custom_icon, area_id, hidden, is_favorite, favorite_order, size, sort_order, collapsed, decimal_places";
 
 pub(crate) fn row_to_override(r: &sqlx::postgres::PgRow) -> OverrideRow {
     OverrideRow {
@@ -155,10 +146,7 @@ pub(crate) fn row_to_override(r: &sqlx::postgres::PgRow) -> OverrideRow {
         size: r.get("size"),
         sort_order: r.get("sort_order"),
         collapsed: r.get("collapsed"),
-        group_id: r.get("group_id"),
-        group_primary: r.get("group_primary"),
         decimal_places: r.get("decimal_places"),
-        sub_function_role: r.get("sub_function_role"),
     }
 }
 
@@ -172,8 +160,8 @@ pub(crate) async fn load_overrides(pool: &sqlx::PgPool, instance_id: Uuid) -> Re
     Ok(rows.iter().map(row_to_override).collect())
 }
 
-/// Populate the override cache for an instance from the DB.
-/// Clears the cache first, then loads all overrides.
+/// Populate the override + group-membership caches for an instance from the DB.
+/// Clears both caches first, then loads everything atomically (per cache).
 pub(crate) async fn populate_override_cache(
     pool: &sqlx::PgPool,
     instance: &Arc<crate::state::InstanceCtx>,
@@ -185,7 +173,43 @@ pub(crate) async fn populate_override_cache(
         let snapshot = override_row_to_snapshot(&o);
         instance.override_cache.insert(o.entity_id.clone(), snapshot);
     }
+    populate_group_membership_cache(pool, instance, instance_id).await?;
     Ok(())
+}
+
+/// Populate just the (entity_id → group_ids) cache. Called by accessory
+/// mutation handlers after they finish writing to `accessory_group_members`
+/// so subsequent SSE/snapshot reads see the new layout.
+pub(crate) async fn populate_group_membership_cache(
+    pool: &sqlx::PgPool,
+    instance: &Arc<crate::state::InstanceCtx>,
+    instance_id: Uuid,
+) -> Result<(), AppError> {
+    let rows = sqlx::query("SELECT entity_id, group_id FROM accessory_group_members WHERE instance_id = $1")
+        .bind(instance_id)
+        .fetch_all(pool)
+        .await?;
+    instance.group_membership_cache.clear();
+    for r in rows {
+        let entity_id: String = r.get("entity_id");
+        let group_id: Uuid = r.get("group_id");
+        instance
+            .group_membership_cache
+            .entry(entity_id)
+            .or_default()
+            .push(group_id);
+    }
+    Ok(())
+}
+
+/// Look up an entity's group membership from the cache. Returns empty vec if
+/// the entity is not a member of any tile.
+pub(crate) fn group_ids_for(instance: &Arc<crate::state::InstanceCtx>, entity_id: &str) -> Vec<Uuid> {
+    instance
+        .group_membership_cache
+        .get(entity_id)
+        .map(|r| r.clone())
+        .unwrap_or_default()
 }
 
 // ─── List entities ────────────────────────────────────────────────────────────
@@ -219,7 +243,10 @@ pub(crate) async fn snapshot_entities(
         .store
         .states
         .iter()
-        .map(|e| apply_override(e.value().clone(), ov_map.get(e.key())))
+        .map(|e| {
+            let gids = group_ids_for(instance, e.key());
+            apply_override(e.value().clone(), ov_map.get(e.key()), gids)
+        })
         .collect())
 }
 
@@ -231,7 +258,8 @@ pub(crate) fn snapshot_entities_cached(instance: &Arc<crate::state::InstanceCtx>
         .iter()
         .map(|e| {
             let ov = instance.override_cache.get(e.key()).map(|r| r.clone());
-            apply_override_snapshot(e.value().clone(), ov.as_ref())
+            let gids = group_ids_for(instance, e.key());
+            apply_override_snapshot(e.value().clone(), ov.as_ref(), gids)
         })
         .collect()
 }
@@ -295,8 +323,9 @@ pub async fn get(
 
     let ov = fetch_override(&ctx.pool, id, &entity_id).await?;
     let device = instance.device_for_entity(&entity_id).await;
+    let gids = group_ids_for(&instance, &entity_id);
 
-    let mut dto = apply_override(state, ov.as_ref());
+    let mut dto = apply_override(state, ov.as_ref(), gids);
     dto.device = device;
     Ok(Json(dto))
 }
@@ -338,7 +367,7 @@ pub async fn upsert_override(
                updated_at   = NOW()
            RETURNING entity_id, display_name, custom_icon, hidden, is_favorite, updated_at,
                      area_id, favorite_order, size, sort_order,
-                     collapsed, group_id, group_primary, decimal_places"#,
+                     collapsed, decimal_places"#,
     )
     .bind(instance_id)
     .bind(&entity_id)
@@ -361,10 +390,7 @@ pub async fn upsert_override(
             size: r.get("size"),
             sort_order: r.get("sort_order"),
             collapsed: r.get("collapsed"),
-            group_id: r.get("group_id"),
-            group_primary: r.get("group_primary"),
             decimal_places: r.get("decimal_places"),
-            sub_function_role: r.get("sub_function_role"),
         };
         instance.override_cache.insert(entity_id.clone(), snapshot);
     }

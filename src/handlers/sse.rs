@@ -15,7 +15,7 @@ use futures_util::Stream;
 use uuid::Uuid;
 
 use super::AppCtx;
-use super::entities::{apply_override_snapshot, snapshot_entities, snapshot_entities_cached};
+use super::entities::{apply_override_snapshot, group_ids_for, snapshot_entities, snapshot_entities_cached};
 use crate::error::AppError;
 use crate::state::EntityEvent;
 
@@ -98,7 +98,8 @@ pub async fn events(
                                 .override_cache
                                 .get(&entity.entity_id)
                                 .map(|r| r.clone());
-                            let dto = apply_override_snapshot((*entity.as_ref()).clone(), ov.as_ref());
+                            let gids = group_ids_for(&instance_for_stream, &entity.entity_id);
+                            let dto = apply_override_snapshot((*entity.as_ref()).clone(), ov.as_ref(), gids);
                             serde_json::json!({
                                 "type": "updated",
                                 "entity": dto,

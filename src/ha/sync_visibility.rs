@@ -1,17 +1,16 @@
-//! Default-presentation seal of (hidden, collapsed, group_id, group_primary)
-//! onto `entity_overrides`.
+//! Default-presentation seal of (hidden, collapsed) onto `entity_overrides`,
+//! plus M:N tile registration into `accessory_groups` / `accessory_group_members`.
 //!
-//! Strategy: for every HA entity we know about, compute the four "default
-//! presentation" fields and `INSERT ... ON CONFLICT DO NOTHING`. Existing
-//! rows are left unchanged to preserve user manual adjustments. Only new
-//! entities get the computed default values.
+//! Strategy: for every HA entity we know about, compute the "default
+//! presentation" fields and `INSERT ... ON CONFLICT DO NOTHING` on
+//! `entity_overrides` so existing rows with user adjustments stay intact.
 //!
-//! Why seal in DB instead of recomputing per-render in the frontend:
-//!   * The frontend used to run a chain of dynamic filters (noise keyword
-//!     match, domain-tier demotion, dedup-by-device) on every render which
-//!     made debugging "where did 次卧灯 go?" extremely hard.
-//!   * Persisting the decision means user can override any one cell by
-//!     hand and the override sticks across reconnects / refreshes.
+//! Group membership is **not** stored on `entity_overrides` anymore (P8.0.1):
+//! it lives in `accessory_groups` (one row per tile, keyed by `natural_key`)
+//! and `accessory_group_members` (M:N, with `is_primary` and
+//! `sub_function_role` per link). This decouples "is the entity hidden?" from
+//! "which tiles is the entity on?" so a single entity can appear on multiple
+//! tiles (e.g. a `_action` sensor promoted onto two adjacent gang switches).
 //!
 //! The default rules:
 //!   * `hidden` — `entity_category` ∈ {`diagnostic`, `config`}.
@@ -20,20 +19,27 @@
 //!     trigger-style domains (`sensor`, `binary_sensor`, `automation`,
 //!     `script`, `scene`, …) default collapsed. Plus a per-entity
 //!     name-keyword demotion for noise switches.
-//!   * `group_id` (Accessory ID) — three-layer fallback:
+//!   * Tiles (`accessory_groups`) — three-layer fallback for the
+//!     `natural_key` that identifies a tile:
 //!     1. Same device_id → `device::{device_id}` (no domain suffix)
 //!     2. Same via_device + area → `via::{root_device_id}::{area_id}`
 //!     3. Same area + LCP clustering → `name::{base_sha1}::{area_id}`
-//!     4. None of above → `None` (singleton)
-//!   * `group_primary` — within an accessory, the entity with the highest
+//!     4. None of above → singleton entity, **no tile** (was previously a
+//!        no-membership row; now: just absent from accessory_groups).
+//!   * Per-tile primary — within an accessory, the entity with the highest
 //!     domain priority (light > climate > cover > media_player > fan >
 //!     lock > switch > input_boolean > sensor > binary_sensor > others),
 //!     then most supported_features, then shortest friendly_name wins.
+//!
+//! Sync ownership: this module only touches `accessory_groups.source = 'auto'`
+//! rows. User-created `manual` groups (and their members) are never touched
+//! by the auto sync. Auto groups whose `natural_key` no longer appears in the
+//! current pass are deleted (cascading their members).
 
 use std::collections::HashMap;
 
 use sha1::{Digest, Sha1};
-use sqlx::PgPool;
+use sqlx::{PgPool, Row};
 use uuid::Uuid;
 
 use crate::error::AppError;
@@ -341,6 +347,11 @@ pub fn primary_sort_key<'a>(
 }
 
 /// Per-entity decision baked at first import.
+///
+/// `group_id` is the algorithmically derived **natural_key** of the tile
+/// (e.g. `device::xxx`). It is *not* the UUID `accessory_groups.id` — that
+/// only exists after the sync persistence step UPSERTs a row. Singletons
+/// (entities not joined to any tile) carry `group_id == None`.
 struct Decision {
     hidden: bool,
     collapsed: bool,
@@ -688,9 +699,17 @@ fn compute_decisions(entries: &[HaEntityRegistryEntry], area_names: &HashMap<Str
     decisions
 }
 
-/// Sync default visibility / grouping: insert (hidden, collapsed, group_id,
-/// group_primary) for every HA entity. Uses `INSERT ... ON CONFLICT DO NOTHING`
-/// to preserve user manual adjustments. Only new entities get computed defaults.
+/// Sync default visibility into `entity_overrides` AND tile membership into
+/// `accessory_groups` + `accessory_group_members` (M:N).
+///
+/// Idempotent: re-running with the same inputs produces the same DB state.
+/// `entity_overrides` rows use `INSERT ... ON CONFLICT DO NOTHING` to
+/// preserve any user adjustments. Tiles are upserted by `(instance_id,
+/// natural_key)` so existing tile UUIDs survive across syncs.
+///
+/// Auto groups whose `natural_key` no longer appears (because their member
+/// devices were removed from HA, etc.) are deleted; manual groups are never
+/// touched.
 pub async fn sync_default_visibility_and_grouping(
     pool: &PgPool,
     instance_id: Uuid,
@@ -703,17 +722,16 @@ pub async fn sync_default_visibility_and_grouping(
 
     let decisions = compute_decisions(&entries, area_names);
 
-    // Pass 3: persist. Single transaction, INSERT ... ON CONFLICT DO NOTHING.
     let mut tx = pool.begin().await?;
     let mut inserted = 0usize;
     let mut skipped = 0usize;
 
+    // Pass A: upsert per-entity overrides (DO NOTHING preserves user state).
     for (e, d) in entries.iter().zip(decisions.iter()) {
         let res = sqlx::query(
             "INSERT INTO entity_overrides ( \
-                instance_id, entity_id, hidden, entity_category, \
-                collapsed, group_id, group_primary \
-             ) VALUES ($1, $2, $3, $4, $5, $6, $7) \
+                instance_id, entity_id, hidden, entity_category, collapsed \
+             ) VALUES ($1, $2, $3, $4, $5) \
              ON CONFLICT (instance_id, entity_id) DO NOTHING",
         )
         .bind(instance_id)
@@ -721,8 +739,6 @@ pub async fn sync_default_visibility_and_grouping(
         .bind(d.hidden)
         .bind(e.entity_category.as_deref())
         .bind(d.collapsed)
-        .bind(d.group_id.as_deref())
-        .bind(d.group_primary)
         .execute(&mut *tx)
         .await?;
 
@@ -732,6 +748,99 @@ pub async fn sync_default_visibility_and_grouping(
             skipped += 1;
         }
     }
+
+    // Pass B: collect per-tile groupings. Group natural_keys → list of
+    // (entity_id, is_primary, sort_order). Singletons (no group_id) skipped.
+    #[derive(Clone)]
+    struct PlannedMember {
+        entity_id: String,
+        is_primary: bool,
+        sort_order: i32,
+    }
+    let mut planned: HashMap<String, Vec<PlannedMember>> = HashMap::new();
+    for (e, d) in entries.iter().zip(decisions.iter()) {
+        if let Some(natural_key) = &d.group_id {
+            let bucket = planned.entry(natural_key.clone()).or_default();
+            let sort_order = bucket.len() as i32;
+            bucket.push(PlannedMember {
+                entity_id: e.entity_id.clone(),
+                is_primary: d.group_primary,
+                sort_order,
+            });
+        }
+    }
+
+    // Pass C: UPSERT auto accessory_groups by natural_key. Capture the
+    // returning UUID so we can replace members in pass D.
+    let mut natural_to_id: HashMap<String, Uuid> = HashMap::new();
+    for natural_key in planned.keys() {
+        let row = sqlx::query(
+            "INSERT INTO accessory_groups (instance_id, natural_key, source) \
+             VALUES ($1, $2, 'auto') \
+             ON CONFLICT (instance_id, natural_key) DO UPDATE SET \
+                updated_at = NOW() \
+             RETURNING id",
+        )
+        .bind(instance_id)
+        .bind(natural_key)
+        .fetch_one(&mut *tx)
+        .await?;
+        let gid: Uuid = row.get("id");
+        natural_to_id.insert(natural_key.clone(), gid);
+    }
+
+    // Pass D: collect ids of auto groups for this instance (BEFORE the
+    // delete-stale step so we know what existed). We replace the member
+    // list of every auto group we just upserted, then delete any auto
+    // group whose natural_key wasn't in this pass.
+    let auto_group_ids: Vec<Uuid> = natural_to_id.values().copied().collect();
+
+    // Wipe existing members of every auto group we know about, then re-insert
+    // the planned set. `accessory_group_members.group_id` has ON DELETE
+    // CASCADE only on the group row, not on the member row, so we DELETE
+    // explicitly. Manual groups are not in `auto_group_ids` and are skipped.
+    if !auto_group_ids.is_empty() {
+        sqlx::query("DELETE FROM accessory_group_members WHERE group_id = ANY($1)")
+            .bind(&auto_group_ids)
+            .execute(&mut *tx)
+            .await?;
+    }
+
+    // Insert new auto memberships. Demote-then-promote ordering inside
+    // a single tile is unnecessary because we just wiped — there are no
+    // pre-existing primaries to clash with the partial unique index.
+    for (natural_key, members) in &planned {
+        let gid = natural_to_id[natural_key];
+        for m in members {
+            sqlx::query(
+                "INSERT INTO accessory_group_members \
+                    (group_id, entity_id, instance_id, is_primary, sub_function_role, sort_order) \
+                 VALUES ($1, $2, $3, $4, NULL, $5)",
+            )
+            .bind(gid)
+            .bind(&m.entity_id)
+            .bind(instance_id)
+            .bind(m.is_primary)
+            .bind(m.sort_order)
+            .execute(&mut *tx)
+            .await?;
+        }
+    }
+
+    // Pass E: delete stale auto groups (auto groups for this instance whose
+    // natural_key no longer exists). Manual groups are filtered out by
+    // `source = 'auto'`. Cascade clears their (already-empty) member rows.
+    let live_keys: Vec<String> = planned.keys().cloned().collect();
+    sqlx::query(
+        "DELETE FROM accessory_groups \
+          WHERE instance_id = $1 \
+            AND source = 'auto' \
+            AND NOT (natural_key = ANY($2))",
+    )
+    .bind(instance_id)
+    .bind(&live_keys)
+    .execute(&mut *tx)
+    .await?;
 
     tx.commit().await?;
 
@@ -1386,5 +1495,284 @@ mod tests {
         assert_eq!(strip_area_prefix("anything", ""), "anything");
         // Stripping leaves nothing
         assert_eq!(strip_area_prefix("主卧", "主卧"), "");
+    }
+
+    // ---------------- DB-backed tests (sqlx::test) ----------------
+
+    fn ent_with_dev(eid: &str, dev: &str, area: &str, name: &str) -> HaEntityRegistryEntry {
+        let mut e = entry(eid);
+        e.device_id = Some(dev.into());
+        e.area_id = Some(area.into());
+        e.friendly_name = Some(name.into());
+        e
+    }
+
+    #[sqlx::test]
+    async fn m_n_membership_allows_entity_in_multiple_groups(pool: PgPool) {
+        // Manually create two manual tiles and add the same entity to both.
+        let inst = Uuid::new_v4();
+        // Create instance first (FK required by all tables).
+        sqlx::query("INSERT INTO instances (id, base_url, access_token) VALUES ($1, 'http://test', 'token')")
+            .bind(inst)
+            .execute(&pool)
+            .await
+            .unwrap();
+        // entity_overrides FK requires the row exists first.
+        sqlx::query(
+            "INSERT INTO entity_overrides (instance_id, entity_id, hidden, collapsed) \
+             VALUES ($1, 'sensor.shared', false, false)",
+        )
+        .bind(inst)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let g1 = Uuid::new_v4();
+        let g2 = Uuid::new_v4();
+        for (gid, key) in [(g1, "manual::a"), (g2, "manual::b")] {
+            sqlx::query(
+                "INSERT INTO accessory_groups (id, instance_id, natural_key, source) \
+                 VALUES ($1, $2, $3, 'manual')",
+            )
+            .bind(gid)
+            .bind(inst)
+            .bind(key)
+            .execute(&pool)
+            .await
+            .unwrap();
+
+            sqlx::query(
+                "INSERT INTO accessory_group_members \
+                    (group_id, entity_id, instance_id, is_primary) \
+                 VALUES ($1, 'sensor.shared', $2, true)",
+            )
+            .bind(gid)
+            .bind(inst)
+            .execute(&pool)
+            .await
+            .unwrap();
+        }
+
+        let count: (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM accessory_group_members WHERE entity_id = 'sensor.shared'")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(count.0, 2, "entity must be member of two distinct tiles");
+    }
+
+    #[sqlx::test]
+    async fn partial_unique_one_primary_per_group(pool: PgPool) {
+        let inst = Uuid::new_v4();
+        // Create instance first (FK required by all tables).
+        sqlx::query("INSERT INTO instances (id, base_url, access_token) VALUES ($1, 'http://test', 'token')")
+            .bind(inst)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let gid = Uuid::new_v4();
+        sqlx::query(
+            "INSERT INTO accessory_groups (id, instance_id, natural_key, source) \
+             VALUES ($1, $2, 'manual::x', 'manual')",
+        )
+        .bind(gid)
+        .bind(inst)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        for eid in ["sensor.a", "sensor.b"] {
+            sqlx::query(
+                "INSERT INTO entity_overrides (instance_id, entity_id, hidden, collapsed) \
+                 VALUES ($1, $2, false, false)",
+            )
+            .bind(inst)
+            .bind(eid)
+            .execute(&pool)
+            .await
+            .unwrap();
+        }
+
+        sqlx::query(
+            "INSERT INTO accessory_group_members \
+                (group_id, entity_id, instance_id, is_primary) \
+             VALUES ($1, 'sensor.a', $2, true)",
+        )
+        .bind(gid)
+        .bind(inst)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        // Inserting a SECOND primary in the same group must fail (partial
+        // unique index `accessory_group_members_one_primary_idx`).
+        let dup = sqlx::query(
+            "INSERT INTO accessory_group_members \
+                (group_id, entity_id, instance_id, is_primary) \
+             VALUES ($1, 'sensor.b', $2, true)",
+        )
+        .bind(gid)
+        .bind(inst)
+        .execute(&pool)
+        .await;
+        assert!(dup.is_err(), "second primary in same group must violate partial unique");
+    }
+
+    #[sqlx::test]
+    async fn sync_idempotent_natural_key_upsert(pool: PgPool) {
+        let inst = Uuid::new_v4();
+        // Create instance first (FK required by sync function).
+        sqlx::query("INSERT INTO instances (id, base_url, access_token) VALUES ($1, 'http://test', 'token')")
+            .bind(inst)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let entries = vec![
+            ent_with_dev("light.a", "dev1", "bedroom", "lamp"),
+            ent_with_dev("switch.a", "dev1", "bedroom", "switch"),
+        ];
+
+        sync_default_visibility_and_grouping(&pool, inst, entries.clone(), &HashMap::new())
+            .await
+            .unwrap();
+        let id1: (Uuid,) =
+            sqlx::query_as("SELECT id FROM accessory_groups WHERE instance_id = $1 AND natural_key = 'device::dev1'")
+                .bind(inst)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+
+        // Run again — UUID must not change (UPSERT preserves id).
+        sync_default_visibility_and_grouping(&pool, inst, entries, &HashMap::new())
+            .await
+            .unwrap();
+        let id2: (Uuid,) =
+            sqlx::query_as("SELECT id FROM accessory_groups WHERE instance_id = $1 AND natural_key = 'device::dev1'")
+                .bind(inst)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(id1.0, id2.0, "natural_key UPSERT must preserve UUID");
+
+        let cnt: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM accessory_group_members WHERE group_id = $1")
+            .bind(id1.0)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(cnt.0, 2, "members re-inserted to current count, not duplicated");
+    }
+
+    #[sqlx::test]
+    async fn sync_keeps_manual_groups(pool: PgPool) {
+        let inst = Uuid::new_v4();
+        // Create instance first (FK required by all tables).
+        sqlx::query("INSERT INTO instances (id, base_url, access_token) VALUES ($1, 'http://test', 'token')")
+            .bind(inst)
+            .execute(&pool)
+            .await
+            .unwrap();
+        // Pre-existing manual group + member.
+        let manual_gid = Uuid::new_v4();
+        sqlx::query(
+            "INSERT INTO accessory_groups (id, instance_id, natural_key, source) \
+             VALUES ($1, $2, 'manual::keep', 'manual')",
+        )
+        .bind(manual_gid)
+        .bind(inst)
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO entity_overrides (instance_id, entity_id, hidden, collapsed) \
+             VALUES ($1, 'sensor.manual_member', false, false)",
+        )
+        .bind(inst)
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO accessory_group_members \
+                (group_id, entity_id, instance_id, is_primary) \
+             VALUES ($1, 'sensor.manual_member', $2, true)",
+        )
+        .bind(manual_gid)
+        .bind(inst)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        // Run sync with totally unrelated auto entries.
+        let entries = vec![
+            ent_with_dev("light.x", "devX", "kitchen", "ceiling"),
+            ent_with_dev("switch.x", "devX", "kitchen", "switch"),
+        ];
+        sync_default_visibility_and_grouping(&pool, inst, entries, &HashMap::new())
+            .await
+            .unwrap();
+
+        let still_there: (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM accessory_groups WHERE id = $1 AND source = 'manual'")
+                .bind(manual_gid)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(still_there.0, 1, "manual group must survive auto sync");
+
+        let member_cnt: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM accessory_group_members WHERE group_id = $1")
+            .bind(manual_gid)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(member_cnt.0, 1, "manual group members untouched");
+    }
+
+    #[sqlx::test]
+    async fn sync_deletes_stale_auto_groups(pool: PgPool) {
+        let inst = Uuid::new_v4();
+        // Create instance first (FK required by sync function).
+        sqlx::query("INSERT INTO instances (id, base_url, access_token) VALUES ($1, 'http://test', 'token')")
+            .bind(inst)
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        // First sync: dev1 + dev2 exist.
+        let initial = vec![
+            ent_with_dev("light.a", "dev1", "br", "lamp1"),
+            ent_with_dev("switch.a", "dev1", "br", "sw1"),
+            ent_with_dev("light.b", "dev2", "br", "lamp2"),
+            ent_with_dev("switch.b", "dev2", "br", "sw2"),
+        ];
+        sync_default_visibility_and_grouping(&pool, inst, initial, &HashMap::new())
+            .await
+            .unwrap();
+        let initial_count: (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM accessory_groups WHERE instance_id = $1 AND source = 'auto'")
+                .bind(inst)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(initial_count.0, 2);
+
+        // Second sync: dev2 vanished. Its auto group should be deleted.
+        let later = vec![
+            ent_with_dev("light.a", "dev1", "br", "lamp1"),
+            ent_with_dev("switch.a", "dev1", "br", "sw1"),
+        ];
+        sync_default_visibility_and_grouping(&pool, inst, later, &HashMap::new())
+            .await
+            .unwrap();
+
+        let remaining_keys: Vec<(String,)> = sqlx::query_as(
+            "SELECT natural_key FROM accessory_groups \
+              WHERE instance_id = $1 AND source = 'auto' \
+              ORDER BY natural_key",
+        )
+        .bind(inst)
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(remaining_keys.len(), 1);
+        assert_eq!(remaining_keys[0].0, "device::dev1");
     }
 }

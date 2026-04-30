@@ -12,6 +12,12 @@ pub struct AppError {
     pub message: String,
 }
 
+impl std::fmt::Debug for AppError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "AppError({}, {})", self.status, self.message)
+    }
+}
+
 impl AppError {
     pub fn bad_request(msg: impl Into<String>) -> Self {
         Self {
