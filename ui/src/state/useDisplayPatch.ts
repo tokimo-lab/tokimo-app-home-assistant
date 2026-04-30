@@ -36,9 +36,6 @@ function mergeDisplay(
       decimal_places: patch.decimal_places,
     }),
     ...(patch.collapsed !== undefined && { collapsed: patch.collapsed }),
-    ...(patch.group_primary !== undefined && {
-      group_primary: patch.group_primary,
-    }),
   };
 }
 

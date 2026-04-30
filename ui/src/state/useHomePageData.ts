@@ -8,6 +8,7 @@ import {
 } from "../components/home/_helpers";
 import { getDomain } from "../lib/domain";
 import type { EntityState, HaInstance, HaRoom } from "../types";
+import { useAccessoriesSnapshot } from "./useAccessories";
 import { type ChipId, domainsForChip } from "./useFilterChip";
 
 export interface UseHomePageDataParams {
@@ -26,9 +27,9 @@ export interface HomePageData {
   /** visibleEntities grouped by room id. */
   entitiesByRoom: ReadonlyMap<string, EntityState[]>;
   /**
-   * Default-home secondary entities grouped by room id: entities the
-   * backend marked `collapsed=true` or `group_primary=false`. Empty when
-   * a chip is active.
+   * Default-home secondary entities grouped by room id: entities marked
+   * `collapsed=true` plus accessory members that aren't primary in any
+   * group. Empty when a chip is active.
    */
   collapsedByRoom: ReadonlyMap<string, EntityState[]>;
   /** All renderable cameras, sorted by sort_order. */
@@ -56,6 +57,8 @@ export function useHomePageData({
     [entities],
   );
 
+  const { secondaryEntityIds } = useAccessoriesSnapshot(instance.id);
+
   const chipDomains = useMemo<ReadonlySet<string> | null>(
     () => (selectedChip ? new Set(domainsForChip(selectedChip)) : null),
     [selectedChip],
@@ -67,17 +70,19 @@ export function useHomePageData({
         passesChip(e, selectedChip, chipDomains),
       );
     }
-    return allEntities.filter(isHomeVisible);
-  }, [allEntities, selectedChip, chipDomains]);
+    return allEntities.filter((e) => isHomeVisible(e, secondaryEntityIds));
+  }, [allEntities, selectedChip, chipDomains, secondaryEntityIds]);
 
   const collapsedEntities = useMemo(() => {
     // Only meaningful in the default (no-chip) view; chip view shows
     // everything matching the chip and ignores the collapsed concept.
     if (selectedChip) return [] as EntityState[];
     return allEntities.filter(
-      (e) => !e.hidden && (e.collapsed === true || e.group_primary === false),
+      (e) =>
+        !e.hidden &&
+        (e.collapsed === true || secondaryEntityIds.has(e.entity_id)),
     );
-  }, [allEntities, selectedChip]);
+  }, [allEntities, selectedChip, secondaryEntityIds]);
 
   const entityRoomId = useMemo(() => {
     const map = new Map<string, string>();

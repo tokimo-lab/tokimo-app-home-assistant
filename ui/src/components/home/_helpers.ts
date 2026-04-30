@@ -94,18 +94,27 @@ export function effectiveSizeForEntity(entity: EntityState): EntitySize {
 }
 
 /**
- * Default-home visibility filter. Reflects backend-curated state from
- * `entity_overrides`:
+ * Default-home visibility filter. Reflects backend-curated state plus the
+ * accessory-membership join (P8.0.2 M:N):
  *  - `hidden`        — entity is hidden everywhere.
  *  - `collapsed`     — entity belongs to a section the user collapsed.
- *  - `group_primary` — when entities are grouped by `group_id`, only the
- *                      primary entity is shown on the home page.
+ *  - `secondaryIds`  — entities that are members of an accessory but NOT
+ *                      `is_primary` in any group; the primary tile stands
+ *                      in for them on the home page.
  *
- * `group_primary` defaults to `true` for ungrouped entities, so we treat
- * `undefined` / `null` as visible and only suppress when explicitly false.
+ * `secondaryIds` is sourced from `useAccessoriesSnapshot(...).secondaryEntityIds`
+ * (see `state/useAccessories.ts`). Pass an empty Set when accessories
+ * aren't loaded yet — every entity falls through unchanged.
  */
-export function isHomeVisible(entity: EntityState): boolean {
-  return !entity.hidden && !entity.collapsed && entity.group_primary !== false;
+export function isHomeVisible(
+  entity: EntityState,
+  secondaryIds: ReadonlySet<string>,
+): boolean {
+  return (
+    !entity.hidden &&
+    !entity.collapsed &&
+    !secondaryIds.has(entity.entity_id)
+  );
 }
 
 export const CHIP_LABEL_KEY: Record<ChipId, string> = {
