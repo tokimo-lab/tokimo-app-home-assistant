@@ -1,9 +1,11 @@
 import { cn } from "@tokimo/ui";
 import { Crown, Eye, EyeOff, Trash2, TrendingUp } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { apiFetch } from "../../api/client";
-import { updateEntityDisplay } from "../../api/display";
-import { useEntityAccessory } from "../../state/useAccessories";
+import * as accessoriesApi from "../../api/accessories";
+import {
+  type AccessoryMemberView,
+  useEntityAccessory,
+} from "../../state/useAccessories";
 import type { EntityState } from "../../types";
 import { AddMemberModal } from "./AddMemberModal";
 
@@ -38,11 +40,14 @@ export function MembersSection({
   }, []);
 
   if (!accessory) return null;
+  const groupId = accessory.groupId;
 
   async function setPrimary(entityId: string) {
     setOperating(entityId);
     try {
-      await updateEntityDisplay(instanceId, entityId, { group_primary: true });
+      await accessoriesApi.updateMember(groupId, entityId, {
+        is_primary: true,
+      });
       await onRefresh();
     } catch (e) {
       console.error("Failed to set primary:", e);
@@ -51,14 +56,14 @@ export function MembersSection({
     }
   }
 
-  async function toggleHidden(member: EntityState) {
+  async function toggleHidden(member: AccessoryMemberView) {
     setOperating(member.entity_id);
     try {
       const nextRole =
         member.sub_function_role === "hidden_in_aggregate"
           ? null
           : "hidden_in_aggregate";
-      await updateEntityDisplay(instanceId, member.entity_id, {
+      await accessoriesApi.updateMember(groupId, member.entity_id, {
         sub_function_role: nextRole,
       });
       await onRefresh();
@@ -72,10 +77,7 @@ export function MembersSection({
   async function removeMember(entityId: string) {
     setOperating(entityId);
     try {
-      await apiFetch(
-        `/instances/${instanceId}/accessories/${accessory.groupId}/members/${entityId}`,
-        { method: "DELETE" },
-      );
+      await accessoriesApi.removeMember(groupId, entityId);
       await onRefresh();
     } catch (e) {
       console.error("Failed to remove member:", e);
@@ -92,7 +94,7 @@ export function MembersSection({
 
       <div className="flex flex-col gap-1">
         {accessory.members.map((member) => {
-          const isPrimary = member.group_primary === true;
+          const isPrimary = member.is_primary;
           const isHidden = member.sub_function_role === "hidden_in_aggregate";
           const isPromoted = member.sub_function_role === "promoted_to_tile";
           const isOperating = operating === member.entity_id;

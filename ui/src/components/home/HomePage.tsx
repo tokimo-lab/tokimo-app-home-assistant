@@ -25,6 +25,7 @@ import { HomePageHeader } from "./HomePageHeader";
 import { HomePageSections } from "./HomePageSections";
 import { RescanModal } from "./RescanModal";
 import { TileContextMenu } from "./TileContextMenu";
+import { useAccessories, useEntityAccessory } from "../../state/useAccessories";
 
 interface HomePageProps {
   instance: HaInstance;
@@ -102,22 +103,18 @@ export function HomePage({
 
   useToggleSizeRegistry(entities, patch);
 
+  // Drives the per-instance accessory cache; downstream hooks
+  // (useEntityAccessory, useHomePageData) read from the snapshot.
+  useAccessories(instance.id);
+
   // Sibling count for the long-press menu's "Similar Accessories" item.
   // Only render the menu item when the right-clicked entity belongs to a
-  // group with ≥2 members; derived from the in-memory entity map (no
-  // extra fetch).
-  const menuGroupSiblingCount = (() => {
-    const gid = menu?.entity.group_id;
-    if (!gid) return 0;
-    let n = 0;
-    for (const e of entities.values()) {
-      if (e.group_id === gid) n++;
-    }
-    return n;
-  })();
+  // group with ≥2 members.
+  const menuAccessory = useEntityAccessory(menu?.entity.entity_id ?? "");
+  const menuGroupSiblingCount = menuAccessory?.members.length ?? 0;
 
   const onShowSimilar = useCallback(() => {
-    if (!menu?.entity.group_id) return;
+    if (!menu || !menuAccessory) return;
     ctx.shell.openModalWindow({
       component: () => import("../settings/AccessorySettingsPage"),
       title: t("detailOpenSettings"),
@@ -130,7 +127,7 @@ export function HomePage({
         initialTab: "members",
       },
     });
-  }, [ctx, instance.id, menu, t]);
+  }, [ctx, instance.id, menu, menuAccessory, t]);
 
   const handleRemoveTile = useCallback(
     (entityId: string) => {

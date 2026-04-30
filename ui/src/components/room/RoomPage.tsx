@@ -14,6 +14,7 @@ import { cn } from "@tokimo/ui";
 import { ChevronLeft, Eye, MoreHorizontal } from "lucide-react";
 import { useMemo, useState } from "react";
 import { getDomain } from "../../lib/domain";
+import { useAccessories } from "../../state/useAccessories";
 import type {
   CallParams,
   EntityState,
@@ -86,16 +87,24 @@ function passesBase(entity: EntityState): boolean {
   );
 }
 
-function isVisible(entity: EntityState): boolean {
+function isVisible(
+  entity: EntityState,
+  secondaryIds: ReadonlySet<string>,
+): boolean {
   return (
-    passesBase(entity) && !entity.collapsed && entity.group_primary !== false
+    passesBase(entity) &&
+    !entity.collapsed &&
+    !secondaryIds.has(entity.entity_id)
   );
 }
 
-function isSecondary(entity: EntityState): boolean {
+function isSecondary(
+  entity: EntityState,
+  secondaryIds: ReadonlySet<string>,
+): boolean {
   return (
     passesBase(entity) &&
-    (entity.collapsed === true || entity.group_primary === false)
+    (entity.collapsed === true || secondaryIds.has(entity.entity_id))
   );
 }
 
@@ -126,7 +135,10 @@ interface DomainGroup {
   collapsed: EntityState[];
 }
 
-function groupByDomain(roomEntities: EntityState[]): DomainGroup[] {
+function groupByDomain(
+  roomEntities: EntityState[],
+  secondaryIds: ReadonlySet<string>,
+): DomainGroup[] {
   const byDomain = new Map<
     string,
     { visible: EntityState[]; collapsed: EntityState[] }
@@ -138,8 +150,8 @@ function groupByDomain(roomEntities: EntityState[]): DomainGroup[] {
       bucket = { visible: [], collapsed: [] };
       byDomain.set(d, bucket);
     }
-    if (isVisible(e)) bucket.visible.push(e);
-    else if (isSecondary(e)) bucket.collapsed.push(e);
+    if (isVisible(e, secondaryIds)) bucket.visible.push(e);
+    else if (isSecondary(e, secondaryIds)) bucket.collapsed.push(e);
   }
 
   const groups: DomainGroup[] = [];
@@ -188,12 +200,16 @@ export function RoomPage({
 }: RoomPageProps) {
   const room = rooms.find((r) => r.id === roomId);
   const [forceExpandAll, setForceExpandAll] = useState(false);
+  const { secondaryEntityIds } = useAccessories(instance.id);
 
   const roomEntities = useMemo(
     () => (room ? resolveRoomEntities(room, entities) : []),
     [room, entities],
   );
-  const groups = useMemo(() => groupByDomain(roomEntities), [roomEntities]);
+  const groups = useMemo(
+    () => groupByDomain(roomEntities, secondaryEntityIds),
+    [roomEntities, secondaryEntityIds],
+  );
   const totalCollapsed = useMemo(
     () => groups.reduce((acc, g) => acc + g.collapsed.length, 0),
     [groups],

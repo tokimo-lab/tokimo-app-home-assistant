@@ -30,7 +30,7 @@ interface TileContextMenuProps {
   /**
    * When provided, the "Similar Accessories" menu item is rendered. Caller
    * is responsible for only supplying this when the entity belongs to a
-   * group with ≥2 members (gated by `entity.group_id` + sibling count).
+   * group with ≥2 members (gated by `useEntityAccessory` member count).
    */
   onShowSimilar?: () => void;
   t: (k: string) => string;

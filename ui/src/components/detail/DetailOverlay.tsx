@@ -83,13 +83,17 @@ export function DetailOverlay({
   const name = entity ? getFriendlyName(entity) : currentEntity.entityId;
   const subtitle = entity ? formatState(entity, t) : "";
 
+  // `useEntityAccessory` returns the accessory only when the entity is
+  // present as a member; `subMembers` is filtered to non-primary, non-hidden.
+  // When the current entity isn't the primary, the accessory join still
+  // surfaces siblings, so guard explicitly on primary identity.
   const showSubFunctions =
-    entity?.group_primary === true &&
-    accessory?.subMembers &&
+    accessory != null &&
+    accessory.primary.entity_id === currentEntity?.entityId &&
     accessory.subMembers.length > 0;
 
   const handleNavigateToSubFunction = (entityId: string) => {
-    openDetail(entityId);
+    openDetail(entityId, currentEntity.instanceId);
   };
 
   return createPortal(

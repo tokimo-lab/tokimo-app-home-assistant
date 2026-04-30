@@ -12,9 +12,10 @@ interface RoomSectionProps {
   /** Default-visible entities (passes isHomeVisible). */
   entities: EntityState[];
   /**
-   * Backend-collapsed entities for this room (collapsed=true or
-   * group_primary=false). Rendered inline below the visible grid when
-   * the user expands the section. Edit mode ignores this list.
+   * Secondary entities for this room — `collapsed=true` plus accessory
+   * members that aren't `is_primary` in any group. Rendered inline below
+   * the visible grid when the user expands the section. Edit mode
+   * ignores this list.
    */
   collapsed?: EntityState[];
   instanceId: string;

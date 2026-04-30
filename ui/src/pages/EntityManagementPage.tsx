@@ -7,7 +7,8 @@ import { updateEntityDisplay } from "../api/display";
 import { listEntities } from "../api/entities";
 import { EntityIcon } from "../components/EntityIcon";
 import { getDomain } from "../lib/domain";
-import type { EntityState, HaInstance } from "../types";
+import { useAccessories } from "../state/useAccessories";
+import type { AccessoryGroup, EntityState, HaInstance } from "../types";
 
 interface EntityManagementPageProps {
   instance: HaInstance;
@@ -109,19 +110,21 @@ function entityName(e: EntityState): string {
 }
 
 /**
- * Format group_id for display in Accessory column.
- * device::xxx → "Device · xxx后6位"
- * via::root::area → "Via · root后6位"
- * name::hash → "Name · hash前6位"
- * null → "—"
+ * Format an {@link AccessoryGroup} for display in the Accessory column.
+ * Prefer the user-curated `display_name`; otherwise tag the auto-generated
+ * `natural_key` ("device::xxx", "via::xxx", "name::hash") with a short
+ * type prefix so multiple auto groups remain visually distinguishable.
  */
-function formatAccessory(groupId: string | null | undefined): string | null {
-  if (!groupId) return null;
-  const parts = groupId.split("::");
-  if (parts.length < 2) return groupId;
+function formatAccessory(group: AccessoryGroup | undefined): string | null {
+  if (!group) return null;
+  if (group.display_name) return group.display_name;
+
+  const key = group.natural_key;
+  const parts = key.split("::");
+  if (parts.length < 2) return key;
 
   const [type, ...rest] = parts;
-  const id = rest[0];
+  const id = rest.join("::");
   const suffix = id.length > 6 ? id.slice(-6) : id;
 
   switch (type) {
@@ -132,7 +135,7 @@ function formatAccessory(groupId: string | null | undefined): string | null {
     case "name":
       return `Name · ${suffix}`;
     default:
-      return groupId;
+      return key;
   }
 }
 
@@ -183,17 +186,31 @@ export function EntityManagementPage({
     };
   }, [instance.id]);
 
-  // Group counts of group_id occurrences across the (entire) entity list.
-  // Used to render "Group: N siblings" — counted on the unfiltered list so
-  // the badge stays stable when the user types a search.
+  // Per-instance accessory snapshot (M:N): provides primary identity and
+  // the entity → group_ids mapping needed for sibling counts + the
+  // "Accessory" column.
+  const {
+    groups: accessoryGroups,
+    membersByGroup,
+    entityToGroups,
+    primaryEntityIds,
+  } = useAccessories(instance.id);
+
+  // Lookup: group_id → AccessoryGroup, for `formatAccessory`.
+  const groupById = useMemo(() => {
+    const m = new Map<string, AccessoryGroup>();
+    for (const g of accessoryGroups) m.set(g.id, g);
+    return m;
+  }, [accessoryGroups]);
+
+  // Total sibling count across all groups an entity belongs to. Used to
+  // gate the "Not primary" badge — a singleton group (count=1) is just
+  // the entity itself and shouldn't trigger the badge.
   const groupSiblingCount = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const e of entities) {
-      if (!e.group_id) continue;
-      map.set(e.group_id, (map.get(e.group_id) ?? 0) + 1);
-    }
-    return map;
-  }, [entities]);
+    const m = new Map<string, number>();
+    for (const [gid, members] of membersByGroup) m.set(gid, members.length);
+    return m;
+  }, [membersByGroup]);
 
   const filtered = useMemo(
     () => entities.filter((e) => matchesSearch(e, query)),
@@ -322,24 +339,34 @@ export function EntityManagementPage({
                 {t(g.titleKey)}
               </h3>
               <ul className="flex flex-col gap-1">
-                {g.entities.map((e) => (
-                  <EntityRow
-                    key={e.entity_id}
-                    entity={e}
-                    busy={busy.has(e.entity_id)}
-                    siblingCount={
-                      e.group_id ? (groupSiblingCount.get(e.group_id) ?? 1) : 0
-                    }
-                    onToggleHidden={(next) =>
-                      void patchField(e.entity_id, "hidden", next)
-                    }
-                    onToggleCollapsed={(next) =>
-                      void patchField(e.entity_id, "collapsed", next)
-                    }
-                    onOpenSettings={() => openEntitySettings(e)}
-                    t={t}
-                  />
-                ))}
+                {g.entities.map((e) => {
+                  const gids = entityToGroups.get(e.entity_id) ?? [];
+                  const primaryGroupId = gids[0];
+                  const primaryGroup = primaryGroupId
+                    ? groupById.get(primaryGroupId)
+                    : undefined;
+                  const siblingCount = primaryGroupId
+                    ? (groupSiblingCount.get(primaryGroupId) ?? 1)
+                    : 0;
+                  return (
+                    <EntityRow
+                      key={e.entity_id}
+                      entity={e}
+                      busy={busy.has(e.entity_id)}
+                      siblingCount={siblingCount}
+                      accessoryGroup={primaryGroup}
+                      isPrimary={primaryEntityIds.has(e.entity_id)}
+                      onToggleHidden={(next) =>
+                        void patchField(e.entity_id, "hidden", next)
+                      }
+                      onToggleCollapsed={(next) =>
+                        void patchField(e.entity_id, "collapsed", next)
+                      }
+                      onOpenSettings={() => openEntitySettings(e)}
+                      t={t}
+                    />
+                  );
+                })}
               </ul>
             </section>
           ))}
@@ -351,8 +378,12 @@ export function EntityManagementPage({
 interface EntityRowProps {
   entity: EntityState;
   busy: boolean;
-  /** Total number of entities sharing `entity.group_id`. 0 = no group. */
+  /** Number of accessory members in this entity's primary group. 0 = no group. */
   siblingCount: number;
+  /** Primary {@link AccessoryGroup} this entity belongs to, if any. */
+  accessoryGroup: AccessoryGroup | undefined;
+  /** True when this entity is `is_primary` in any group. */
+  isPrimary: boolean;
   onToggleHidden: (next: boolean) => void;
   onToggleCollapsed: (next: boolean) => void;
   onOpenSettings: () => void;
@@ -363,6 +394,8 @@ function EntityRow({
   entity,
   busy,
   siblingCount,
+  accessoryGroup,
+  isPrimary,
   onToggleHidden,
   onToggleCollapsed,
   onOpenSettings,
@@ -372,10 +405,9 @@ function EntityRow({
   const domain = getDomain(entity.entity_id);
   const isHidden = entity.hidden === true;
   const isCollapsed = entity.collapsed === true;
-  const inGroup = !!entity.group_id && siblingCount >= 2;
-  const isNonPrimary = inGroup && entity.group_primary !== true;
-  const isPrimary = entity.group_primary === true;
-  const accessory = formatAccessory(entity.group_id);
+  const inGroup = !!accessoryGroup && siblingCount >= 2;
+  const isNonPrimary = inGroup && !isPrimary;
+  const accessory = formatAccessory(accessoryGroup);
 
   return (
     <li className="flex items-center gap-3 rounded-xl bg-black/[0.02] px-3 py-2.5 hover:bg-black/[0.04] dark:bg-white/[0.03] dark:hover:bg-white/[0.05]">

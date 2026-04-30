@@ -1,8 +1,9 @@
 import { cn, Modal } from "@tokimo/ui";
 import { Search } from "lucide-react";
 import { useMemo, useState, useSyncExternalStore } from "react";
-import { apiFetch } from "../../api/client";
+import * as accessoriesApi from "../../api/accessories";
 import { getEntitiesSnapshot, subscribeRender } from "../../state/entityStore";
+import { useAccessoriesSnapshot } from "../../state/useAccessories";
 import type { EntityState } from "../../types";
 
 interface AddMemberModalProps {
@@ -33,6 +34,8 @@ export function AddMemberModal({
     getEntitiesSnapshot,
   );
 
+  const { entityToGroups } = useAccessoriesSnapshot(instanceId);
+
   const allEntities = useMemo(() => Array.from(snapshot.values()), [snapshot]);
 
   const currentMemberIds = useMemo(
@@ -62,13 +65,7 @@ export function AddMemberModal({
   async function addMember(entityId: string) {
     setAdding(entityId);
     try {
-      await apiFetch(
-        `/instances/${instanceId}/accessories/${groupId}/members`,
-        {
-          method: "POST",
-          body: JSON.stringify({ entity_id: entityId }),
-        },
-      );
+      await accessoriesApi.addMember(groupId, { entity_id: entityId });
       onAdded();
       onClose();
     } catch (e) {
@@ -111,8 +108,12 @@ export function AddMemberModal({
           <div className="flex flex-col gap-1">
             {filtered.map((entity) => {
               const isAdding = adding === entity.entity_id;
-              const hasOtherGroup =
-                entity.group_id && entity.group_id !== groupId;
+              // M:N: an entity can belong to several groups simultaneously.
+              // Adding it here is *append*, not move — surface that the
+              // entity already lives in another accessory so the user knows
+              // they're creating a multi-membership.
+              const otherGroups = entityToGroups.get(entity.entity_id) ?? [];
+              const hasOtherGroup = otherGroups.some((g) => g !== groupId);
               return (
                 <button
                   key={entity.entity_id}
