@@ -36,8 +36,9 @@
 //! by the auto sync. Auto groups whose `natural_key` no longer appears in the
 //! current pass are deleted (cascading their members).
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
+use regex::Regex;
 use sha1::{Digest, Sha1};
 use sqlx::{PgPool, Row};
 use uuid::Uuid;
@@ -348,15 +349,78 @@ pub fn primary_sort_key<'a>(
 
 /// Per-entity decision baked at first import.
 ///
-/// `group_id` is the algorithmically derived **natural_key** of the tile
-/// (e.g. `device::xxx`). It is *not* the UUID `accessory_groups.id` — that
-/// only exists after the sync persistence step UPSERTs a row. Singletons
-/// (entities not joined to any tile) carry `group_id == None`.
+/// `group_ids` is the list of algorithmically derived **natural_key**s of
+/// the tiles this entity belongs to. Most entities belong to a single tile
+/// (single group_id), but shared sensors on multi-channel devices can belong
+/// to multiple tiles (e.g. `linkquality` sensor attached to all channels).
+/// Singletons (entities not joined to any tile) carry an empty `group_ids`.
 struct Decision {
     hidden: bool,
     collapsed: bool,
-    group_id: Option<String>,
+    group_ids: Vec<String>,
     group_primary: bool,
+}
+
+#[cfg(test)]
+impl Decision {
+    /// Test helper: returns the first group_id if present (most entities have
+    /// at most one). Don't use in production code — iterate `group_ids`.
+    fn group_id(&self) -> Option<&String> {
+        self.group_ids.first()
+    }
+}
+
+/// Index of multi-channel devices: device_id → set of channel numbers.
+/// A device is "multi-channel" if it has ≥2 different channel numbers.
+#[derive(Debug, Clone)]
+struct DeviceChannelIndex {
+    /// device_id → Set<channel_num>
+    channels: HashMap<String, HashSet<u32>>,
+}
+
+impl DeviceChannelIndex {
+    fn build(entries: &[HaEntityRegistryEntry]) -> Self {
+        let channel_regex = Regex::new(r"_channel_(\d+)$").unwrap();
+        let mut channels: HashMap<String, HashSet<u32>> = HashMap::new();
+
+        for entry in entries {
+            if let Some(device_id) = &entry.device_id
+                && let Some(captures) = channel_regex.captures(&entry.entity_id)
+                && let Some(num_str) = captures.get(1)
+                && let Ok(num) = num_str.as_str().parse::<u32>()
+            {
+                channels.entry(device_id.clone()).or_default().insert(num);
+            }
+        }
+
+        Self { channels }
+    }
+
+    /// Returns true if this device has ≥2 different channels.
+    fn is_multi_channel(&self, device_id: &str) -> bool {
+        self.channels.get(device_id).is_some_and(|set| set.len() >= 2)
+    }
+
+    /// Extract channel number from entity_id, if any.
+    fn extract_channel(entity_id: &str) -> Option<u32> {
+        let channel_regex = Regex::new(r"_channel_(\d+)$").unwrap();
+        channel_regex
+            .captures(entity_id)
+            .and_then(|c| c.get(1))
+            .and_then(|m| m.as_str().parse().ok())
+    }
+
+    /// Get all channel numbers for a device, sorted ascending.
+    fn get_channels(&self, device_id: &str) -> Vec<u32> {
+        self.channels
+            .get(device_id)
+            .map(|set| {
+                let mut v: Vec<u32> = set.iter().copied().collect();
+                v.sort();
+                v
+            })
+            .unwrap_or_default()
+    }
 }
 
 /// Union-Find data structure for clustering entities.
@@ -465,35 +529,57 @@ fn strip_area_prefix(friendly_name: &str, area_name: &str) -> String {
 /// 3. Same area + LCP clustering (cross-group merge) → name-based aggregation
 /// 4. None of above → singleton
 fn compute_decisions(entries: &[HaEntityRegistryEntry], area_names: &HashMap<String, String>) -> Vec<Decision> {
+    // Phase 0: Build device-channel index
+    let channel_index = DeviceChannelIndex::build(entries);
+
     let mut decisions: Vec<Decision> = entries
         .iter()
         .map(|e| Decision {
             hidden: e.default_hidden(),
             collapsed: e.default_collapsed(),
-            group_id: None,
+            group_ids: Vec::new(),
             group_primary: true,
         })
         .collect();
 
-    // Layer 1: Device-based grouping (no domain suffix)
+    // Layer 1: Device-based grouping with channel splitting
     let mut device_groups: HashMap<String, Vec<usize>> = HashMap::new();
     for (idx, e) in entries.iter().enumerate() {
         if let Some(device_id) = &e.device_id {
-            let group_id = format!("device::{}", device_id);
-            decisions[idx].group_id = Some(group_id.clone());
-            device_groups.entry(group_id).or_default().push(idx);
+            if channel_index.is_multi_channel(device_id) {
+                // Multi-channel device: split by channel
+                if let Some(ch_num) = DeviceChannelIndex::extract_channel(&e.entity_id) {
+                    // Entity has channel suffix → goes to single channel group
+                    let group_id = format!("device::{}::ch{}", device_id, ch_num);
+                    decisions[idx].group_ids.push(group_id.clone());
+                    device_groups.entry(group_id).or_default().push(idx);
+                } else {
+                    // Shared sensor (no channel suffix) → attach to ALL channels
+                    let channels = channel_index.get_channels(device_id);
+                    for ch_num in channels {
+                        let group_id = format!("device::{}::ch{}", device_id, ch_num);
+                        decisions[idx].group_ids.push(group_id.clone());
+                        device_groups.entry(group_id).or_default().push(idx);
+                    }
+                }
+            } else {
+                // Single-channel or non-channel device: original logic
+                let group_id = format!("device::{}", device_id);
+                decisions[idx].group_ids.push(group_id.clone());
+                device_groups.entry(group_id).or_default().push(idx);
+            }
         }
     }
 
     // Layer 2: Via-device grouping (hub-based, same area)
     let mut via_groups: HashMap<String, Vec<usize>> = HashMap::new();
     for (idx, e) in entries.iter().enumerate() {
-        if decisions[idx].group_id.is_some() {
+        if !decisions[idx].group_ids.is_empty() {
             continue; // Already grouped by device_id
         }
         if let (Some(via_device), Some(area)) = (&e.via_device_id, &e.area_id) {
             let group_id = format!("via::{}::{}", via_device, area);
-            decisions[idx].group_id = Some(group_id.clone());
+            decisions[idx].group_ids.push(group_id.clone());
             via_groups.entry(group_id).or_default().push(idx);
         }
     }
@@ -567,7 +653,7 @@ fn compute_decisions(entries: &[HaEntityRegistryEntry], area_names: &HashMap<Str
 
     // Add ungrouped entities as candidates
     for (idx, e) in entries.iter().enumerate() {
-        if decisions[idx].group_id.is_some() {
+        if !decisions[idx].group_ids.is_empty() {
             continue; // Already in a group
         }
         if let (Some(area), Some(name)) = (&e.area_id, &e.friendly_name)
@@ -664,7 +750,9 @@ fn compute_decisions(entries: &[HaEntityRegistryEntry], area_names: &HashMap<Str
             // Assign new group_id to all members of all candidates in this cluster
             for &local_idx in &cluster {
                 for &global_idx in &candidates[local_idx].member_idxs {
-                    decisions[global_idx].group_id = Some(new_group_id.clone());
+                    // Replace existing group_ids with the new LCP group
+                    decisions[global_idx].group_ids.clear();
+                    decisions[global_idx].group_ids.push(new_group_id.clone());
                 }
             }
         }
@@ -673,7 +761,7 @@ fn compute_decisions(entries: &[HaEntityRegistryEntry], area_names: &HashMap<Str
     // Final primary selection: rebuild groups from current decisions and re-elect primaries
     let mut final_groups: HashMap<String, Vec<usize>> = HashMap::new();
     for (idx, decision) in decisions.iter().enumerate() {
-        if let Some(group_id) = &decision.group_id {
+        for group_id in &decision.group_ids {
             final_groups.entry(group_id.clone()).or_default().push(idx);
         }
     }
@@ -750,7 +838,8 @@ pub async fn sync_default_visibility_and_grouping(
     }
 
     // Pass B: collect per-tile groupings. Group natural_keys → list of
-    // (entity_id, is_primary, sort_order). Singletons (no group_id) skipped.
+    // (entity_id, is_primary, sort_order). Singletons (no group_ids) skipped.
+    // Entities with multiple group_ids will appear in multiple tiles.
     #[derive(Clone)]
     struct PlannedMember {
         entity_id: String,
@@ -759,7 +848,7 @@ pub async fn sync_default_visibility_and_grouping(
     }
     let mut planned: HashMap<String, Vec<PlannedMember>> = HashMap::new();
     for (e, d) in entries.iter().zip(decisions.iter()) {
-        if let Some(natural_key) = &d.group_id {
+        for natural_key in &d.group_ids {
             let bucket = planned.entry(natural_key.clone()).or_default();
             let sort_order = bucket.len() as i32;
             bucket.push(PlannedMember {
@@ -1062,7 +1151,7 @@ mod tests {
         let decisions = compute_decisions(&entries, &HashMap::new());
 
         // All three should be grouped (LCP = "次卧吸顶灯", 5 chars, ≥50% threshold)
-        let group_ids: Vec<_> = decisions.iter().filter_map(|d| d.group_id.as_ref()).collect();
+        let group_ids: Vec<_> = decisions.iter().filter_map(|d| d.group_id()).collect();
         assert_eq!(group_ids.len(), 3);
         assert_eq!(group_ids[0], group_ids[1]);
         assert_eq!(group_ids[1], group_ids[2]);
@@ -1093,8 +1182,8 @@ mod tests {
         let decisions = compute_decisions(&entries, &HashMap::new());
 
         // Different areas should not group
-        assert!(decisions[0].group_id.is_none());
-        assert!(decisions[1].group_id.is_none());
+        assert!(decisions[0].group_ids.is_empty());
+        assert!(decisions[1].group_ids.is_empty());
     }
 
     #[test]
@@ -1117,8 +1206,8 @@ mod tests {
         let decisions = compute_decisions(&entries, &HashMap::new());
 
         // Different prefixes (客厅 vs 厨房), should not group
-        assert!(decisions[0].group_id.is_none());
-        assert!(decisions[1].group_id.is_none());
+        assert!(decisions[0].group_ids.is_empty());
+        assert!(decisions[1].group_ids.is_empty());
     }
 
     #[test]
@@ -1141,9 +1230,9 @@ mod tests {
         let decisions = compute_decisions(&entries, &HashMap::new());
 
         // Same via_device + area should group
-        assert!(decisions[0].group_id.is_some());
-        assert_eq!(decisions[0].group_id, decisions[1].group_id);
-        assert!(decisions[0].group_id.as_ref().unwrap().starts_with("via::hub1::"));
+        assert!(!decisions[0].group_ids.is_empty());
+        assert_eq!(decisions[0].group_ids, decisions[1].group_ids);
+        assert!(decisions[0].group_id().unwrap().starts_with("via::hub1::"));
     }
 
     #[test]
@@ -1159,7 +1248,7 @@ mod tests {
         let decisions = compute_decisions(&entries, &HashMap::new());
 
         // device_id should take priority over via_device_id
-        assert!(decisions[0].group_id.as_ref().unwrap().starts_with("device::dev1"));
+        assert!(decisions[0].group_id().unwrap().starts_with("device::dev1"));
     }
 
     #[test]
@@ -1268,7 +1357,7 @@ mod tests {
         let decisions = compute_decisions(&entries, &HashMap::new());
 
         // All 6 entities should be merged into one group via Layer-3 LCP
-        let group_ids: Vec<_> = decisions.iter().filter_map(|d| d.group_id.as_ref()).collect();
+        let group_ids: Vec<_> = decisions.iter().filter_map(|d| d.group_id()).collect();
         assert_eq!(group_ids.len(), 6, "all entities should have a group");
         assert!(
             group_ids.windows(2).all(|w| w[0] == w[1]),
@@ -1322,10 +1411,10 @@ mod tests {
         let decisions = compute_decisions(&entries, &HashMap::new());
 
         // All three should cluster (LCP = "客厅射灯", 4 Chinese chars ≥ threshold)
-        assert!(decisions[0].group_id.is_some());
-        assert_eq!(decisions[0].group_id, decisions[1].group_id);
-        assert_eq!(decisions[0].group_id, decisions[2].group_id);
-        assert!(decisions[0].group_id.as_ref().unwrap().starts_with("name::"));
+        assert!(!decisions[0].group_ids.is_empty());
+        assert_eq!(decisions[0].group_ids, decisions[1].group_ids);
+        assert_eq!(decisions[0].group_ids, decisions[2].group_ids);
+        assert!(decisions[0].group_id().unwrap().starts_with("name::"));
     }
 
     #[test]
@@ -1374,17 +1463,17 @@ mod tests {
         let decisions = compute_decisions(&entries, &HashMap::new());
 
         // First 4 entities should merge (3 device-grouped + 1 singleton, all "次卧灯")
-        assert!(decisions[0].group_id.is_some());
-        assert_eq!(decisions[0].group_id, decisions[1].group_id);
-        assert_eq!(decisions[0].group_id, decisions[2].group_id);
-        assert_eq!(decisions[0].group_id, decisions[3].group_id);
+        assert!(!decisions[0].group_ids.is_empty());
+        assert_eq!(decisions[0].group_ids, decisions[1].group_ids);
+        assert_eq!(decisions[0].group_ids, decisions[2].group_ids);
+        assert_eq!(decisions[0].group_ids, decisions[3].group_ids);
         assert!(
-            decisions[0].group_id.as_ref().unwrap().starts_with("name::"),
+            decisions[0].group_id().unwrap().starts_with("name::"),
             "should be name-based merge"
         );
 
         // Last entity ("主卧窗帘") should not merge with "次卧灯" cluster
-        assert_ne!(decisions[0].group_id, decisions[4].group_id);
+        assert_ne!(decisions[0].group_ids, decisions[4].group_ids);
 
         // Only one primary across all merged entities
         let primaries: Vec<usize> = decisions
@@ -1434,18 +1523,15 @@ mod tests {
         let decisions = compute_decisions(&entries, &area_names);
 
         // X and Y → cluster on stripped LCP "吸顶灯" (3 Chinese chars ✓)
-        let g_x = decisions[0].group_id.as_ref().expect("X has group");
-        let g_y = decisions[1].group_id.as_ref().expect("Y has group");
+        let g_x = decisions[0].group_id().expect("X has group");
+        let g_y = decisions[1].group_id().expect("Y has group");
         assert_eq!(g_x, g_y, "X and Y should cluster on '吸顶灯'");
         assert!(g_x.starts_with("name::"), "should be name-cluster, got {g_x}");
 
         // Z (床头灯) shares only "" with the cluster after stripping
         // (or "灯" = 1 char, well below threshold) — must NOT merge in.
         // Its only group is its own Layer-1 device::device_Z.
-        let g_z = decisions[2]
-            .group_id
-            .as_ref()
-            .expect("Z still has Layer-1 device group");
+        let g_z = decisions[2].group_id().expect("Z still has Layer-1 device group");
         assert_ne!(g_x, g_z, "Z must not transitively merge into the X/Y cluster");
         assert!(
             g_z.starts_with("device::device_Z"),
@@ -1479,8 +1565,8 @@ mod tests {
 
         let decisions = compute_decisions(&entries, &area_names);
 
-        assert!(decisions[0].group_id.is_none(), "no Layer-3 group expected");
-        assert!(decisions[1].group_id.is_none(), "no Layer-3 group expected");
+        assert!(decisions[0].group_ids.is_empty(), "no Layer-3 group expected");
+        assert!(decisions[1].group_ids.is_empty(), "no Layer-3 group expected");
     }
 
     #[test]
@@ -1774,5 +1860,120 @@ mod tests {
         .unwrap();
         assert_eq!(remaining_keys.len(), 1);
         assert_eq!(remaining_keys[0].0, "device::dev1");
+    }
+
+    #[test]
+    fn channel_split_basic() {
+        let entries = vec![
+            {
+                let mut e = entry("switch.x_channel_1");
+                e.device_id = Some("dev1".into());
+                e.friendly_name = Some("开关 左".into());
+                e
+            },
+            {
+                let mut e = entry("switch.x_channel_2");
+                e.device_id = Some("dev1".into());
+                e.friendly_name = Some("开关 右".into());
+                e
+            },
+        ];
+
+        let decisions = compute_decisions(&entries, &HashMap::new());
+
+        // Each channel should get its own group
+        assert_eq!(decisions[0].group_ids, vec!["device::dev1::ch1"]);
+        assert_eq!(decisions[1].group_ids, vec!["device::dev1::ch2"]);
+
+        // Both should be primary (each in their own group)
+        assert!(decisions[0].group_primary);
+        assert!(decisions[1].group_primary);
+    }
+
+    #[test]
+    fn shared_sensor_attaches_to_all_channels() {
+        let entries = vec![
+            {
+                let mut e = entry("switch.x_channel_1");
+                e.device_id = Some("dev1".into());
+                e.friendly_name = Some("开关 1".into());
+                e
+            },
+            {
+                let mut e = entry("switch.x_channel_2");
+                e.device_id = Some("dev1".into());
+                e.friendly_name = Some("开关 2".into());
+                e
+            },
+            {
+                let mut e = entry("sensor.x_linkquality");
+                e.device_id = Some("dev1".into());
+                e.friendly_name = Some("信号质量".into());
+                e
+            },
+        ];
+
+        let decisions = compute_decisions(&entries, &HashMap::new());
+
+        // Channels get their own groups
+        assert_eq!(decisions[0].group_ids, vec!["device::dev1::ch1"]);
+        assert_eq!(decisions[1].group_ids, vec!["device::dev1::ch2"]);
+
+        // Shared sensor appears in BOTH groups
+        let mut linkquality_groups = decisions[2].group_ids.clone();
+        linkquality_groups.sort();
+        assert_eq!(linkquality_groups, vec!["device::dev1::ch1", "device::dev1::ch2"]);
+
+        // Channels are primary in their groups, shared sensor is not
+        assert!(decisions[0].group_primary);
+        assert!(decisions[1].group_primary);
+        assert!(!decisions[2].group_primary);
+    }
+
+    #[test]
+    fn single_channel_device_unchanged() {
+        // Device with only one channel should NOT split (treated as regular device)
+        let entries = vec![{
+            let mut e = entry("switch.x_channel_1");
+            e.device_id = Some("dev1".into());
+            e.friendly_name = Some("开关".into());
+            e
+        }];
+
+        let decisions = compute_decisions(&entries, &HashMap::new());
+
+        // Single channel entity still gets normal device:: group (no ::ch1 suffix)
+        // because the device is not "multi-channel" (needs ≥2 channels)
+        assert_eq!(decisions[0].group_ids, vec!["device::dev1"]);
+        assert!(decisions[0].group_primary);
+    }
+
+    #[test]
+    fn non_channel_device_unchanged() {
+        // Device with multiple entities but no channel suffixes
+        let entries = vec![
+            {
+                let mut e = entry("switch.foo");
+                e.device_id = Some("dev1".into());
+                e.friendly_name = Some("开关".into());
+                e
+            },
+            {
+                let mut e = entry("sensor.foo_power");
+                e.device_id = Some("dev1".into());
+                e.friendly_name = Some("功率".into());
+                e
+            },
+        ];
+
+        let decisions = compute_decisions(&entries, &HashMap::new());
+
+        // Both entities should be in the same device:: group
+        assert_eq!(decisions[0].group_ids, vec!["device::dev1"]);
+        assert_eq!(decisions[1].group_ids, vec!["device::dev1"]);
+
+        // Switch is primary (domain priority)
+        assert!(decisions[0].group_primary);
+        assert!(!decisions[1].group_primary);
     }
 }
