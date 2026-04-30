@@ -223,11 +223,30 @@ export function HomePage({
   }, [editMode, selectedTileIds, accessoriesSnap, clearSelection]);
 
   const handleSplit = useCallback(() => {
-    // Implemented in P8.3.5 (separate commit).
-  }, []);
+    const { groupIds, memberEntityIds } = resolveSelectedGroups();
+    if (groupIds.length !== 1 || memberEntityIds.length < 2) return;
+    const groupId = groupIds[0]!;
+    ctx.shell.openModalWindow({
+      component: () => import("../edit/SplitTileModal"),
+      title: t("splitTileTitle"),
+      width: 600,
+      height: 720,
+      metadata: {
+        instanceId: instance.id,
+        locale: ctx.locale,
+        groupId,
+        memberEntityIds,
+      },
+    });
+  }, [ctx, instance.id, resolveSelectedGroups, t]);
 
-  // P8.3.5 split modal is wired in a follow-up commit.
-  const canSplitSelected = false;
+  // The bottom action bar shows "Split" iff exactly one tile is selected
+  // and it has ≥2 members.
+  const canSplitSelected = (() => {
+    if (selectedTileIds.size !== 1) return false;
+    const { groupIds, memberEntityIds } = resolveSelectedGroups();
+    return groupIds.length === 1 && memberEntityIds.length >= 2;
+  })();
 
   // ESC exits edit mode (Apple Home parity). Skipped while reorderSections
   // sub-mode is active so the picker doesn't double-handle the key.
