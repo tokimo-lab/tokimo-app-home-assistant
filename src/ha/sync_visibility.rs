@@ -496,6 +496,15 @@ fn trim_suffix(s: &str) -> String {
         .to_string()
 }
 
+/// Auxiliary domains that should not participate in Layer-3 LCP.
+///
+/// These are user-level entities (automations, scripts, scenes, OTA updates)
+/// rather than physical-device entities. Folding them into device tiles by
+/// friendly-name prefix matching produces unhelpful merges.
+fn is_aux_domain(e: &HaEntityRegistryEntry) -> bool {
+    matches!(e.domain.as_str(), "automation" | "script" | "scene" | "update")
+}
+
 /// Outcome of a single sync pass, useful for logging / tests.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct SyncStats {
@@ -601,165 +610,335 @@ fn compute_decisions(entries: &[HaEntityRegistryEntry], area_names: &HashMap<Str
         }
     }
 
-    // Layer 3: LCP clustering across groups per area
-    // Build candidates: each Layer-1/2 group represented by its primary, plus ungrouped entities
-    #[derive(Clone)]
-    struct Candidate {
-        #[allow(dead_code)]
-        representative_idx: usize,
-        #[allow(dead_code)]
-        area_id: String,
-        #[allow(dead_code)]
-        friendly_name: String,
-        /// Comparison key used for Layer-3 LCP: `friendly_name` with the
-        /// area's display name stripped from the start (plus separator
-        /// trim). The original `friendly_name` is kept for display only.
-        comparison_key: String,
-        member_idxs: Vec<usize>,
-        #[allow(dead_code)]
-        current_group_id: Option<String>,
+    // ----------------------------------------------------------------
+    // Layer 3 (P8.2 redesign): three-phase LCP clustering.
+    //
+    // Phase 3a — Device-level LCP (per area, stricter 60% ratio):
+    //   Cross-DEVICE merge only. Picks one representative friendly_name per
+    //   non-multi-channel device, runs Union-Find on those reps within each
+    //   area. Catches the legitimate "same physical device exposed via two
+    //   HA integration paths" case (different device_ids, identical names).
+    //   Multi-channel-split devices (`device::xxx::chN`) are excluded so L1
+    //   sub-device splits are never clobbered.
+    //
+    // Phase 3b — Orphan + Phase-3a-cluster LCP (50% ratio):
+    //   Candidates are entities with no device_id (template sensors, scripted
+    //   entities — the "orphans") plus one rep per Phase-3a cluster. Lets
+    //   orphans attach to existing device clusters when their friendly_name
+    //   shares a long prefix, and lets unrelated orphans cluster among
+    //   themselves. Single-device groups (Phase-1 device:: groups that did
+    //   not participate in any Phase-3a cluster) are intentionally excluded
+    //   — that's how cross-device over-merge (e.g. yeelight 餐桌灯 vs Aqara
+    //   餐桌灯开关 channels) is prevented.
+    //
+    // Phase 3c — Cluster secondary merge (per area, base-name cross-LCP):
+    //   For LCP groups in the same area, if their base_names share ≥2 chars
+    //   of cross-LCP, union them. Fixes transitive-union failures like the
+    //   客厅空调 5-sensor split into {电流,电能表,电压} + {功率,功率因素}.
+    //
+    // Auxiliary domains (automation/script/scene/update) are excluded from
+    // LCP candidacy in both Phase 3a and Phase 3b.
+    // ----------------------------------------------------------------
+
+    // (gid, base_name, area) for every name:: cluster emitted by 3a/3b.
+    // Used by Phase 3c. Each unique gid is appended at most once.
+    let mut emitted: Vec<(String, String, String)> = Vec::new();
+
+    // ----- Phase 3a: device-level LCP -----
+    struct DeviceRep {
+        comparison_key: String, // friendly_name after area prefix strip
+        member_entity_idxs: Vec<usize>,
     }
 
-    let mut area_candidates: HashMap<String, Vec<Candidate>> = HashMap::new();
-
-    // Add Layer-1/2 groups as candidates (represented by their primary)
-    for (group_id, member_idxs) in &all_groups {
+    let mut device_reps_per_area: HashMap<String, Vec<DeviceRep>> = HashMap::new();
+    for (group_id, member_idxs) in &device_groups {
         if member_idxs.is_empty() {
             continue;
         }
-        // L1 channel-split groups (device::xxx::chN) are intentional sub-device splits
-        // and must not be re-clustered by Layer-3 LCP, otherwise channel groups get
-        // clobbered (decisions[*].group_ids.clear() at the end of L3) and lost.
-        // P8.1.4 fix.
+        // Skip channel-split groups: their entities live in `device::xxx::chN`
+        // and must not participate in cross-device LCP.
         if group_id.contains("::ch") {
             continue;
         }
-        let primary_idx = *member_idxs
-            .iter()
-            .find(|&&idx| decisions[idx].group_primary)
-            .unwrap_or(&member_idxs[0]);
-        let e = &entries[primary_idx];
-        if let (Some(area), Some(name)) = (&e.area_id, &e.friendly_name)
-            && !name.is_empty()
-        {
-            let area_name = area_names.get(area).map(String::as_str).unwrap_or("");
-            let comparison_key = strip_area_prefix(name, area_name);
-            if comparison_key.is_empty() {
-                continue;
-            }
-            area_candidates.entry(area.clone()).or_default().push(Candidate {
-                representative_idx: primary_idx,
-                area_id: area.clone(),
-                friendly_name: name.clone(),
-                comparison_key,
-                member_idxs: member_idxs.clone(),
-                current_group_id: Some(group_id.clone()),
-            });
-        }
-    }
-
-    // Add ungrouped entities as candidates
-    for (idx, e) in entries.iter().enumerate() {
-        if !decisions[idx].group_ids.is_empty() {
-            continue; // Already in a group
-        }
-        if let (Some(area), Some(name)) = (&e.area_id, &e.friendly_name)
-            && !name.is_empty()
-        {
-            let area_name = area_names.get(area).map(String::as_str).unwrap_or("");
-            let comparison_key = strip_area_prefix(name, area_name);
-            if comparison_key.is_empty() {
-                continue;
-            }
-            area_candidates.entry(area.clone()).or_default().push(Candidate {
-                representative_idx: idx,
-                area_id: area.clone(),
-                friendly_name: name.clone(),
-                comparison_key,
-                member_idxs: vec![idx],
-                current_group_id: None,
-            });
-        }
-    }
-
-    // Run Union-Find LCP on candidates per area
-    for (area, candidates) in &area_candidates {
-        if candidates.len() < 2 {
+        if !group_id.starts_with("device::") {
             continue;
         }
 
-        let mut uf = UnionFind::new(candidates.len());
+        // Pick best representative entity (skip aux domains, prefer primary
+        // by domain priority etc).
+        let rep_idx = member_idxs
+            .iter()
+            .filter(|&&i| !is_aux_domain(&entries[i]))
+            .filter(|&&i| entries[i].friendly_name.is_some() && entries[i].area_id.is_some())
+            .min_by_key(|&&i| entries[i].primary_sort_key())
+            .copied();
+        let Some(rep_idx) = rep_idx else { continue };
+        let e = &entries[rep_idx];
+        let area = match &e.area_id {
+            Some(a) => a.clone(),
+            None => continue,
+        };
+        let name = match &e.friendly_name {
+            Some(n) if !n.is_empty() => n.clone(),
+            _ => continue,
+        };
+        let area_name = area_names.get(&area).map(String::as_str).unwrap_or("");
+        let comparison_key = strip_area_prefix(&name, area_name);
+        if comparison_key.is_empty() {
+            continue;
+        }
 
-        // Compare all pairs for LCP (using comparison_key, which has the
-        // area display-name prefix stripped — see strip_area_prefix).
-        for i in 0..candidates.len() {
-            for j in (i + 1)..candidates.len() {
-                let name_a = &candidates[i].comparison_key;
-                let name_b = &candidates[j].comparison_key;
+        device_reps_per_area.entry(area).or_default().push(DeviceRep {
+            comparison_key,
+            member_entity_idxs: member_idxs.clone(),
+        });
+    }
 
-                let lcp = longest_common_prefix(name_a, name_b);
+    // For each Phase-3a-emitted gid, a representative comparison_key (we use
+    // the cluster's base_name) so Phase 3b can pairwise-compare against it.
+    // Stored alongside `emitted` and re-used in Phase 3b candidate construction.
+
+    for (area, reps) in &device_reps_per_area {
+        if reps.len() < 2 {
+            continue;
+        }
+        let mut uf = UnionFind::new(reps.len());
+        for i in 0..reps.len() {
+            for j in (i + 1)..reps.len() {
+                let a = &reps[i].comparison_key;
+                let b = &reps[j].comparison_key;
+                let lcp = longest_common_prefix(a, b);
                 let lcp_len = char_count(&lcp);
-                let shorter_len = char_count(name_a).min(char_count(name_b));
-
-                if shorter_len == 0 {
+                let shorter = char_count(a).min(char_count(b));
+                if shorter == 0 {
                     continue;
                 }
-                let ratio = (lcp_len * 100) / shorter_len;
-
-                // Minimum length check: ≥3 chars (Chinese or Latin).
-                // Two Chinese chars (e.g. "主卧", "客厅") is just an area
-                // name and is information-free, so it no longer qualifies.
-                let min_len = 3;
-
-                if lcp_len >= min_len && ratio >= 50 {
+                let ratio = (lcp_len * 100) / shorter;
+                // Phase-3a stricter: 3 chars + 60% ratio.
+                if lcp_len >= 3 && ratio >= 60 {
                     uf.union(i, j);
                 }
             }
         }
 
-        // Extract clusters (size ≥ 2)
-        let clusters = uf.clusters();
-        for (_, cluster) in clusters {
+        for (_, cluster) in uf.clusters() {
             if cluster.len() < 2 {
                 continue;
             }
-
-            // Compute base name: LCP of all candidate comparison_keys in
-            // cluster (same key as pairwise comparison above).
-            let mut base_name = candidates[cluster[0]].comparison_key.clone();
-            for &local_idx in cluster.iter().skip(1) {
-                let name = &candidates[local_idx].comparison_key;
-                base_name = longest_common_prefix(&base_name, name);
+            let mut base_name = reps[cluster[0]].comparison_key.clone();
+            for &li in cluster.iter().skip(1) {
+                base_name = longest_common_prefix(&base_name, &reps[li].comparison_key);
             }
             base_name = trim_suffix(&base_name);
-
             if base_name.is_empty() {
                 continue;
             }
-
-            // Safety net: reject final clusters whose base_name is too
-            // generic. Even if pairwise LCP slipped through (e.g. via
-            // transitive union), a base_name of <3 Chinese chars (or <5
-            // Latin chars for ASCII) is not specific enough to justify
-            // merging across multiple devices.
-            let chinese_count = base_name.chars().filter(|c| is_chinese_char(*c)).count();
-            let total_count = base_name.chars().count();
-            if chinese_count < 3 && total_count < 5 {
+            let chinese = base_name.chars().filter(|c| is_chinese_char(*c)).count();
+            let total = base_name.chars().count();
+            if chinese < 3 && total < 5 {
                 continue;
             }
 
-            // Generate new group_id: sha1(base_name::area_id).truncate(16)
             let input = format!("{}::{}", base_name, area);
             let hash = Sha1::digest(input.as_bytes());
             let hash_hex = format!("{:x}", hash);
             let new_group_id = format!("name::{}", &hash_hex[..16.min(hash_hex.len())]);
 
-            // Assign new group_id to all members of all candidates in this cluster
-            for &local_idx in &cluster {
-                for &global_idx in &candidates[local_idx].member_idxs {
-                    // Replace existing group_ids with the new LCP group
-                    decisions[global_idx].group_ids.clear();
-                    decisions[global_idx].group_ids.push(new_group_id.clone());
+            for &li in &cluster {
+                for &eidx in &reps[li].member_entity_idxs {
+                    decisions[eidx].group_ids.clear();
+                    decisions[eidx].group_ids.push(new_group_id.clone());
+                }
+            }
+            emitted.push((new_group_id, base_name, area.clone()));
+        }
+    }
+
+    // ----- Phase 3b: orphan + Phase-3a-cluster LCP -----
+    enum P3bCand {
+        // An entity with no device_id.
+        Orphan { entity_idx: usize },
+        // A Phase-3a cluster, identified by its name:: group_id. All
+        // entities currently mapped to this gid will be re-pointed if the
+        // cluster is unioned into a different canonical gid.
+        LcpCluster { gid: String },
+    }
+
+    let mut p3b_per_area: HashMap<String, Vec<(P3bCand, String /* comparison_key */)>> = HashMap::new();
+
+    // Phase-3a clusters as fixed candidates.
+    for (gid, base, area) in &emitted {
+        p3b_per_area
+            .entry(area.clone())
+            .or_default()
+            .push((P3bCand::LcpCluster { gid: gid.clone() }, base.clone()));
+    }
+
+    // Orphan entities (no device_id, not aux, has area + friendly_name).
+    for (idx, e) in entries.iter().enumerate() {
+        if e.device_id.is_some() {
+            continue;
+        }
+        if !decisions[idx].group_ids.is_empty() {
+            continue;
+        }
+        if is_aux_domain(e) {
+            continue;
+        }
+        let Some(area) = e.area_id.as_ref() else { continue };
+        let Some(name) = e.friendly_name.as_ref() else { continue };
+        if name.is_empty() {
+            continue;
+        }
+        let area_name = area_names.get(area).map(String::as_str).unwrap_or("");
+        let key = strip_area_prefix(name, area_name);
+        if key.is_empty() {
+            continue;
+        }
+        p3b_per_area
+            .entry(area.clone())
+            .or_default()
+            .push((P3bCand::Orphan { entity_idx: idx }, key));
+    }
+
+    for (area, cands) in &p3b_per_area {
+        if cands.len() < 2 {
+            continue;
+        }
+        let mut uf = UnionFind::new(cands.len());
+        for i in 0..cands.len() {
+            for j in (i + 1)..cands.len() {
+                let a = &cands[i].1;
+                let b = &cands[j].1;
+                let lcp = longest_common_prefix(a, b);
+                let lcp_len = char_count(&lcp);
+                let shorter = char_count(a).min(char_count(b));
+                if shorter == 0 {
+                    continue;
+                }
+                let ratio = (lcp_len * 100) / shorter;
+                if lcp_len >= 3 && ratio >= 50 {
+                    uf.union(i, j);
+                }
+            }
+        }
+
+        for (_, cluster) in uf.clusters() {
+            if cluster.len() < 2 {
+                continue;
+            }
+            let mut base_name = cands[cluster[0]].1.clone();
+            for &li in cluster.iter().skip(1) {
+                base_name = longest_common_prefix(&base_name, &cands[li].1);
+            }
+            base_name = trim_suffix(&base_name);
+            if base_name.is_empty() {
+                continue;
+            }
+            let chinese = base_name.chars().filter(|c| is_chinese_char(*c)).count();
+            let total = base_name.chars().count();
+            if chinese < 3 && total < 5 {
+                continue;
+            }
+
+            // Canonical group_id: prefer an existing Phase-3a gid in this
+            // cluster (so orphans attach to the device cluster). If multiple
+            // Phase-3a gids ended up in the same Phase-3b cluster, we pick
+            // the first and re-point the rest.
+            let existing_gids: Vec<String> = cluster
+                .iter()
+                .filter_map(|&li| match &cands[li].0 {
+                    P3bCand::LcpCluster { gid } => Some(gid.clone()),
+                    _ => None,
+                })
+                .collect();
+
+            let canonical_gid = if let Some(g) = existing_gids.first() {
+                g.clone()
+            } else {
+                let input = format!("{}::{}", base_name, area);
+                let hash = Sha1::digest(input.as_bytes());
+                let hash_hex = format!("{:x}", hash);
+                let g = format!("name::{}", &hash_hex[..16.min(hash_hex.len())]);
+                emitted.push((g.clone(), base_name.clone(), area.clone()));
+                g
+            };
+
+            // Re-point entities for non-canonical Phase-3a gids in this cluster.
+            let to_repoint: Vec<String> = existing_gids.iter().filter(|g| **g != canonical_gid).cloned().collect();
+            if !to_repoint.is_empty() {
+                let to_repoint_set: HashSet<String> = to_repoint.into_iter().collect();
+                for d in decisions.iter_mut() {
+                    for g in d.group_ids.iter_mut() {
+                        if to_repoint_set.contains(g) {
+                            *g = canonical_gid.clone();
+                        }
+                    }
+                }
+            }
+
+            // Assign orphans to canonical gid.
+            for &li in &cluster {
+                if let P3bCand::Orphan { entity_idx } = &cands[li].0 {
+                    decisions[*entity_idx].group_ids.clear();
+                    decisions[*entity_idx].group_ids.push(canonical_gid.clone());
+                }
+            }
+        }
+    }
+
+    // ----- Phase 3c: cluster secondary merge (per area, cross-LCP of base_names) -----
+    // De-duplicate emitted by gid (Phase 3a/3b never emit duplicate gids,
+    // but be defensive).
+    let mut emitted_by_area: HashMap<String, Vec<(String, String)>> = HashMap::new();
+    {
+        let mut seen: HashSet<String> = HashSet::new();
+        for (gid, base, area) in &emitted {
+            if seen.insert(gid.clone()) {
+                emitted_by_area
+                    .entry(area.clone())
+                    .or_default()
+                    .push((gid.clone(), base.clone()));
+            }
+        }
+    }
+
+    let mut canonical_map: HashMap<String, String> = HashMap::new();
+    for groups in emitted_by_area.values() {
+        if groups.len() < 2 {
+            continue;
+        }
+        let mut uf = UnionFind::new(groups.len());
+        for i in 0..groups.len() {
+            for j in (i + 1)..groups.len() {
+                let cross = longest_common_prefix(&groups[i].1, &groups[j].1);
+                let cross = trim_suffix(&cross);
+                let chinese = cross.chars().filter(|c| is_chinese_char(*c)).count();
+                let total = char_count(&cross);
+                // ≥2 chars cross-LCP, biased toward Chinese (≥2 CJK chars
+                // is a meaningful concept like "空调"). Pure-ASCII clusters
+                // need ≥3 chars to avoid spurious 2-letter overlaps.
+                if total >= 2 && (chinese >= 2 || total >= 3) {
+                    uf.union(i, j);
+                }
+            }
+        }
+        for (_, cluster) in uf.clusters() {
+            if cluster.len() < 2 {
+                continue;
+            }
+            let canonical = groups[cluster[0]].0.clone();
+            for &li in cluster.iter().skip(1) {
+                canonical_map.insert(groups[li].0.clone(), canonical.clone());
+            }
+        }
+    }
+
+    if !canonical_map.is_empty() {
+        for d in decisions.iter_mut() {
+            for g in d.group_ids.iter_mut() {
+                if let Some(canon) = canonical_map.get(g) {
+                    *g = canon.clone();
                 }
             }
         }
@@ -2039,5 +2218,212 @@ mod tests {
         // Switch is primary (domain priority)
         assert!(decisions[0].group_primary);
         assert!(!decisions[1].group_primary);
+    }
+
+    // ---------------- P8.2 L3 LCP redesign regression tests ----------------
+
+    #[test]
+    fn test_l3_cross_device_no_overmerge() {
+        // P8.2 regression: yeelight light "餐桌灯" (single device) and Aqara
+        // dual-channel switch "餐桌灯开关" (multi-channel) in the same area
+        // must NOT be merged into a single LCP cluster — they are different
+        // physical devices that only happen to share a 3-char Chinese
+        // friendly_name prefix.
+        let entries = vec![
+            // yeelight 餐桌灯 — single physical device
+            {
+                let mut e = entry("light.yeelight_color8");
+                e.device_id = Some("dev_y".into());
+                e.area_id = Some("living".into());
+                e.friendly_name = Some("餐桌灯".into());
+                e
+            },
+            // Aqara dual-channel switch — different physical device
+            {
+                let mut e = entry("switch.aqara_channel_1");
+                e.device_id = Some("dev_a".into());
+                e.area_id = Some("living".into());
+                e.friendly_name = Some("餐桌灯开关".into());
+                e
+            },
+            {
+                let mut e = entry("switch.aqara_channel_2");
+                e.device_id = Some("dev_a".into());
+                e.area_id = Some("living".into());
+                e.friendly_name = Some("餐桌灯开关".into());
+                e
+            },
+        ];
+
+        let decisions = compute_decisions(&entries, &HashMap::new());
+
+        // yeelight stays in its own device:: group (no Phase-3a merge — only
+        // one non-multi-channel device in this area).
+        assert_eq!(
+            decisions[0].group_ids,
+            vec!["device::dev_y"],
+            "yeelight 餐桌灯 must stay in device::dev_y, got {:?}",
+            decisions[0].group_ids
+        );
+
+        // Aqara channels stay in their channel-split groups (multi-channel
+        // devices are excluded from Phase-3a entirely).
+        assert!(
+            decisions[1].group_ids.contains(&"device::dev_a::ch1".to_string()),
+            "aqara ch1 must be in device::dev_a::ch1, got {:?}",
+            decisions[1].group_ids
+        );
+        assert!(
+            decisions[2].group_ids.contains(&"device::dev_a::ch2".to_string()),
+            "aqara ch2 must be in device::dev_a::ch2, got {:?}",
+            decisions[2].group_ids
+        );
+
+        // Critically: yeelight and Aqara entities must NOT share any group.
+        let yeelight_gids: HashSet<&String> = decisions[0].group_ids.iter().collect();
+        let aqara_gids: HashSet<&String> = decisions[1]
+            .group_ids
+            .iter()
+            .chain(decisions[2].group_ids.iter())
+            .collect();
+        let intersection: Vec<&&String> = yeelight_gids.intersection(&aqara_gids).collect();
+        assert!(
+            intersection.is_empty(),
+            "yeelight and Aqara must not share any group, but they share: {:?}",
+            intersection
+        );
+    }
+
+    #[test]
+    fn test_l3_multi_integration_merged() {
+        // Same physical device exposed via two HA integration paths (e.g.
+        // miot legacy + miot cloud cn) yields two distinct device_ids whose
+        // friendly_names are identical (or near-identical) in the same
+        // area. Phase-3a's device-level cross-device LCP must merge them.
+        let entries = vec![
+            // Integration path A — device dev_a
+            {
+                let mut e = entry("media_player.xiaomi_sound_legacy");
+                e.device_id = Some("dev_a".into());
+                e.area_id = Some("living".into());
+                e.friendly_name = Some("客厅 Xiaomi Sound".into());
+                e
+            },
+            {
+                let mut e = entry("sensor.xiaomi_sound_volume_legacy");
+                e.device_id = Some("dev_a".into());
+                e.area_id = Some("living".into());
+                e.friendly_name = Some("客厅 Xiaomi Sound 音量".into());
+                e
+            },
+            // Integration path B — device dev_b (same physical speaker)
+            {
+                let mut e = entry("sensor.xiaomi_sound_info_cloud");
+                e.device_id = Some("dev_b".into());
+                e.area_id = Some("living".into());
+                e.friendly_name = Some("客厅 Xiaomi Sound 信息".into());
+                e
+            },
+            {
+                let mut e = entry("button.xiaomi_sound_play_cloud");
+                e.device_id = Some("dev_b".into());
+                e.area_id = Some("living".into());
+                e.friendly_name = Some("客厅 Xiaomi Sound 播放".into());
+                e
+            },
+        ];
+
+        let decisions = compute_decisions(&entries, &HashMap::new());
+
+        // All four entities (across two device_ids) merge into one name:: cluster.
+        let g0 = decisions[0].group_id().expect("entity 0 has a group");
+        assert!(g0.starts_with("name::"), "expected name:: merge, got {g0}");
+        for d in decisions.iter().take(4).skip(1) {
+            assert_eq!(
+                d.group_id().unwrap(),
+                g0,
+                "all entities must be in same cluster as entity 0"
+            );
+        }
+    }
+
+    #[test]
+    fn test_l3_cluster_secondary_merge() {
+        // 客厅空调 5 power-monitoring template sensors (no device_id).
+        // After area-strip, pairwise LCP gives 2 separate clusters
+        // ({电流,电能表,电压} sharing "空调电"; {功率,功率因素} sharing
+        // "空调功率"). Phase-3c secondary merge unions them via cross-LCP
+        // of the two base_names → "空调" (2 Chinese chars) ≥ threshold.
+        let mut area_names = HashMap::new();
+        area_names.insert("living".to_string(), "客厅".to_string());
+
+        let names = [
+            "客厅空调电流",
+            "客厅空调电能表",
+            "客厅空调电压",
+            "客厅空调功率",
+            "客厅空调功率因素",
+        ];
+        let entries: Vec<_> = names
+            .iter()
+            .enumerate()
+            .map(|(i, name)| {
+                let mut e = entry(&format!("sensor.living_room_air_conditioner_{i}"));
+                e.area_id = Some("living".into());
+                e.friendly_name = Some((*name).to_string());
+                e
+            })
+            .collect();
+
+        let decisions = compute_decisions(&entries, &area_names);
+
+        let g0 = decisions[0].group_id().expect("sensor 0 has a group");
+        assert!(g0.starts_with("name::"), "expected name:: cluster, got {g0}");
+        for (i, d) in decisions.iter().enumerate().take(5).skip(1) {
+            assert_eq!(
+                d.group_id().unwrap(),
+                g0,
+                "客厅空调 sensor {i} ({}) must merge into the same cluster as sensor 0 ({})",
+                names[i],
+                names[0]
+            );
+        }
+    }
+
+    #[test]
+    fn test_l3_aux_domain_excluded() {
+        // automation entities with shared friendly_name prefix must NOT be
+        // merged into an LCP cluster — auto/script/scene/update are user-
+        // level entities, not physical devices.
+        let entries = vec![
+            {
+                let mut e = entry("automation.zhe_guang_chuang_lian_ban_kai");
+                e.area_id = Some("living".into());
+                e.friendly_name = Some("遮光窗帘半开".into());
+                e
+            },
+            {
+                let mut e = entry("automation.zhe_guang_chuang_lian_guan_bi");
+                e.area_id = Some("living".into());
+                e.friendly_name = Some("遮光窗帘关闭".into());
+                e
+            },
+            {
+                let mut e = entry("automation.zhe_guang_chuang_lian_quan_kai");
+                e.area_id = Some("living".into());
+                e.friendly_name = Some("遮光窗帘全开".into());
+                e
+            },
+        ];
+
+        let decisions = compute_decisions(&entries, &HashMap::new());
+
+        for (i, d) in decisions.iter().enumerate() {
+            assert!(
+                d.group_ids.is_empty(),
+                "automation {i} must remain a singleton (no LCP group), got {:?}",
+                d.group_ids
+            );
+        }
     }
 }
