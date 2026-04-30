@@ -627,6 +627,13 @@ fn compute_decisions(entries: &[HaEntityRegistryEntry], area_names: &HashMap<Str
         if member_idxs.is_empty() {
             continue;
         }
+        // L1 channel-split groups (device::xxx::chN) are intentional sub-device splits
+        // and must not be re-clustered by Layer-3 LCP, otherwise channel groups get
+        // clobbered (decisions[*].group_ids.clear() at the end of L3) and lost.
+        // P8.1.4 fix.
+        if group_id.contains("::ch") {
+            continue;
+        }
         let primary_idx = *member_idxs
             .iter()
             .find(|&&idx| decisions[idx].group_primary)
@@ -1928,6 +1935,63 @@ mod tests {
         assert!(decisions[0].group_primary);
         assert!(decisions[1].group_primary);
         assert!(!decisions[2].group_primary);
+    }
+
+    #[test]
+    fn test_l3_lcp_does_not_clobber_channel_split() {
+        // P8.1.4 regression: yeelight light "餐桌灯" in 客厅 must not union via
+        // Layer-3 LCP with an Aqara dual-channel switch ch1 friendly="餐桌灯开关"
+        // (also in 客厅), which would clobber decisions[ch1].group_ids and lose
+        // the device::dev_a::ch1 split.
+        let entries = vec![
+            {
+                let mut e = entry("light.yeelight_dining");
+                e.device_id = Some("dev_y".into());
+                e.area_id = Some("living".into());
+                e.friendly_name = Some("餐桌灯".into());
+                e
+            },
+            {
+                let mut e = entry("switch.aqara_channel_1");
+                e.device_id = Some("dev_a".into());
+                e.area_id = Some("living".into());
+                e.friendly_name = Some("餐桌灯开关".into());
+                e
+            },
+            {
+                let mut e = entry("switch.aqara_channel_2");
+                e.device_id = Some("dev_a".into());
+                e.area_id = Some("living".into());
+                e.friendly_name = Some("餐桌灯开关".into());
+                e
+            },
+        ];
+
+        let decisions = compute_decisions(&entries, &HashMap::new());
+
+        // ch1 must still be in its channel-split group, not name::xxx
+        assert!(
+            decisions[1].group_ids.contains(&"device::dev_a::ch1".to_string()),
+            "aqara ch1 should be in device::dev_a::ch1, got {:?}",
+            decisions[1].group_ids
+        );
+        assert!(
+            !decisions[1].group_ids.iter().any(|g| g.starts_with("name::")),
+            "aqara ch1 must not be clobbered by L3 LCP name:: group, got {:?}",
+            decisions[1].group_ids
+        );
+
+        // ch2 unchanged
+        assert!(
+            decisions[2].group_ids.contains(&"device::dev_a::ch2".to_string()),
+            "aqara ch2 should be in device::dev_a::ch2, got {:?}",
+            decisions[2].group_ids
+        );
+        assert!(
+            !decisions[2].group_ids.iter().any(|g| g.starts_with("name::")),
+            "aqara ch2 must not be clobbered by L3 LCP name:: group, got {:?}",
+            decisions[2].group_ids
+        );
     }
 
     #[test]
