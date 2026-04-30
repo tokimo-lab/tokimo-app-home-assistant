@@ -32,6 +32,7 @@ export interface EntityAttributes {
   // Light
   brightness?: number;
   color_temp?: number;
+  color_temp_kelvin?: number;
   min_color_temp_kelvin?: number;
   max_color_temp_kelvin?: number;
   rgb_color?: [number, number, number];

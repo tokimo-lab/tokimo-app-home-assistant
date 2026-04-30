@@ -77,9 +77,12 @@ export function LightDetail({ entity, onCall, t }: DomainDetailProps) {
 
   const minK = attributes.min_color_temp_kelvin ?? 2000;
   const maxK = attributes.max_color_temp_kelvin ?? 6500;
-  const currentK = attributes.color_temp
-    ? Math.round(1_000_000 / attributes.color_temp)
-    : Math.round((minK + maxK) / 2);
+  const currentK =
+    attributes.color_temp_kelvin != null
+      ? Math.round(attributes.color_temp_kelvin)
+      : attributes.color_temp
+        ? Math.round(1_000_000 / attributes.color_temp)
+        : Math.round((minK + maxK) / 2);
 
   const setColorTemp = (kelvin: number) => {
     onCall({
@@ -89,6 +92,7 @@ export function LightDetail({ entity, onCall, t }: DomainDetailProps) {
       target: { entity_id },
       data: { color_temp_kelvin: kelvin },
       optimisticState: "on",
+      optimisticAttributes: { color_temp_kelvin: kelvin },
     });
   };
 
