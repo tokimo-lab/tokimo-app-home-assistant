@@ -82,6 +82,20 @@ export function getAccessoriesSnapshot(
   return cache.get(instanceId) ?? EMPTY_SNAPSHOT;
 }
 
+/**
+ * Reload the accessories cache for an instance and notify all subscribers.
+ * Modules outside the React tree (e.g. modal-window children that mutate
+ * server state then close) should call this so the parent home page auto-
+ * re-renders without needing an explicit prop callback.
+ */
+export async function refreshAccessoriesCache(
+  instanceId: string,
+): Promise<void> {
+  const next = await loadAccessories(instanceId);
+  cache.set(instanceId, next);
+  notify(instanceId);
+}
+
 async function loadAccessories(
   instanceId: string,
 ): Promise<AccessoriesSnapshot> {

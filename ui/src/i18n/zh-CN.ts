@@ -516,4 +516,48 @@ export const zhCN: Record<string, string> = {
   syncCancel: "取消",
   syncStartedToast: "同步已开始",
   syncFailedToast: "同步失败",
+
+  // Edit-mode bottom action bar (P8.3.4 / 3.5)
+  bottomBarSelected: "已选 {n} 个 tile",
+  bottomBarMerge: "合并",
+  bottomBarSplit: "拆分",
+
+  // Create tile modal (P8.3.2)
+  createTile: "创建 tile",
+  createTileTitle: "创建 tile",
+  createTileNameLabel: "名称（可选）",
+  createTileNamePlaceholder: "留空则使用主实体名称",
+  createTileRoomLabel: "房间（可选）",
+  createTileRoomNone: "不指定房间",
+  createTilePrimaryHint: "请先选 1 个主实体",
+  createTilePrimaryColumn: "主",
+  createTileEntitiesLabel: "实体",
+  createTileSearchPlaceholder: "搜索实体…",
+  createTileSubmit: "创建",
+  createTileEmpty: "至少勾选 1 个实体",
+  createTileNoMatch: "没有匹配的实体",
+  createTileFailed: "创建失败",
+
+  // Merge tiles modal (P8.3.4)
+  mergeTilesTitle: "合并 tile",
+  mergeTilesIntro: "将选中的 {n} 个 tile 合并为一个新 tile。",
+  mergeTilesPickPrimary: "选择新 tile 的主实体",
+  mergeTilesNameLabel: "名称（可选）",
+  mergeTilesSubmit: "合并",
+  mergeTilesFailed: "合并失败",
+
+  // Split tile modal (P8.3.5)
+  splitTileTitle: "拆分 tile",
+  splitTileStep1Title: "选择要拆出去的实体",
+  splitTileStep2Title: "新 tile 信息",
+  splitTileNext: "下一步",
+  splitTilePrev: "上一步",
+  splitTileSubmit: "拆分",
+  splitTileMustKeepOne: "至少保留 1 个实体在原 tile",
+  splitTileMustSplitOne: "至少选 1 个实体拆出去",
+  splitTilePickOldPrimary: "原 tile 的新主实体",
+  splitTilePickNewPrimary: "新 tile 的主实体",
+  splitTileNewNameLabel: "新 tile 名称（可选）",
+  splitTileNewRoomLabel: "新 tile 房间（可选）",
+  splitTileFailed: "拆分失败",
 };

@@ -28,6 +28,7 @@ export interface HomePageHeaderProps {
   onOpenSettings: () => void;
   onAddRoom: () => void;
   onAddNewHome: () => void;
+  onCreateTile: () => void;
   onEnterEditMode: () => void;
   onEnterReorderSections: () => void;
   onOpenRoom: (id: string) => void;
@@ -52,6 +53,7 @@ export function HomePageHeader({
   onOpenSettings,
   onAddRoom,
   onAddNewHome,
+  onCreateTile,
   onEnterEditMode,
   onEnterReorderSections,
   onOpenRoom,
@@ -72,6 +74,7 @@ export function HomePageHeader({
           t={t}
           onAddRoom={onAddRoom}
           onAddNewHome={onAddNewHome}
+          onCreateTile={onCreateTile}
         />
         <HomeMenu
           instanceId={instanceId}

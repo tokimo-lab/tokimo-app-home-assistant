@@ -521,4 +521,48 @@ export const enUS: Record<string, string> = {
   syncCancel: "Cancel",
   syncStartedToast: "Sync started",
   syncFailedToast: "Sync failed",
+
+  // Edit-mode bottom action bar (P8.3.4 / 3.5)
+  bottomBarSelected: "{n} tile{plural} selected",
+  bottomBarMerge: "Merge",
+  bottomBarSplit: "Split",
+
+  // Create tile modal (P8.3.2)
+  createTile: "Create tile",
+  createTileTitle: "Create tile",
+  createTileNameLabel: "Name (optional)",
+  createTileNamePlaceholder: "Defaults to primary entity name",
+  createTileRoomLabel: "Room (optional)",
+  createTileRoomNone: "No room",
+  createTilePrimaryHint: "Pick 1 primary entity first",
+  createTilePrimaryColumn: "Primary",
+  createTileEntitiesLabel: "Entities",
+  createTileSearchPlaceholder: "Search entities…",
+  createTileSubmit: "Create",
+  createTileEmpty: "Pick at least 1 entity",
+  createTileNoMatch: "No matching entities",
+  createTileFailed: "Create failed",
+
+  // Merge tiles modal (P8.3.4)
+  mergeTilesTitle: "Merge tiles",
+  mergeTilesIntro: "Merge the {n} selected tiles into a single new tile.",
+  mergeTilesPickPrimary: "Pick the new tile's primary entity",
+  mergeTilesNameLabel: "Name (optional)",
+  mergeTilesSubmit: "Merge",
+  mergeTilesFailed: "Merge failed",
+
+  // Split tile modal (P8.3.5)
+  splitTileTitle: "Split tile",
+  splitTileStep1Title: "Pick entities to split out",
+  splitTileStep2Title: "New tile details",
+  splitTileNext: "Next",
+  splitTilePrev: "Back",
+  splitTileSubmit: "Split",
+  splitTileMustKeepOne: "Keep at least 1 entity in the original tile",
+  splitTileMustSplitOne: "Pick at least 1 entity to split out",
+  splitTilePickOldPrimary: "New primary for the original tile",
+  splitTilePickNewPrimary: "Primary entity for the new tile",
+  splitTileNewNameLabel: "New tile name (optional)",
+  splitTileNewRoomLabel: "New tile room (optional)",
+  splitTileFailed: "Split failed",
 };

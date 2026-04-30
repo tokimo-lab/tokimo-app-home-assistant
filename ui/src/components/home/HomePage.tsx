@@ -138,6 +138,16 @@ export function HomePage({
     [patch],
   );
 
+  const handleCreateTile = useCallback(() => {
+    ctx.shell.openModalWindow({
+      component: () => import("./CreateTileModal"),
+      title: t("createTileTitle"),
+      width: 560,
+      height: 680,
+      metadata: { instanceId: instance.id, locale: ctx.locale },
+    });
+  }, [ctx, instance.id, t]);
+
   // ESC exits edit mode (Apple Home parity). Skipped while reorderSections
   // sub-mode is active so the picker doesn't double-handle the key.
   useEffect(() => {
@@ -200,6 +210,7 @@ export function HomePage({
       onOpenSettings={onOpenSettings}
       onAddRoom={onAddRoom}
       onAddNewHome={onAddNewHome}
+      onCreateTile={handleCreateTile}
       onEnterEditMode={enterEditMode}
       onEnterReorderSections={enterReorderSections}
       onOpenRoom={onOpenRoom}

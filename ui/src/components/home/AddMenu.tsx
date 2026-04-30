@@ -18,6 +18,7 @@ import {
   Lightbulb,
   Moon,
   Plus,
+  Squircle,
   Users,
 } from "lucide-react";
 import { useState } from "react";
@@ -28,21 +29,26 @@ interface AddMenuProps {
   t: (k: string) => string;
   onAddRoom: () => void;
   onAddNewHome: () => void;
+  onCreateTile: () => void;
 }
 
 /**
  * Apple-Home-style "+" menu in the home page header. Replaces the
- * single "Add Accessory" button with a 6-item add dropdown:
- * accessory / scene / automation / room / people (soon) / new home.
+ * single "Add Accessory" button with a 7-item add dropdown:
+ * accessory / scene / automation / tile / room / people (soon) / new home.
  *
- * The first three open the corresponding HA web-config dashboard in a
- * new tab. The last three are tokimo-side flows wired by the parent.
+ * - accessory / scene / automation open the corresponding HA web-config
+ *   dashboard in a new tab.
+ * - tile (P8.3.2) opens a tokimo-side modal to build a manual accessory
+ *   group from arbitrary entities.
+ * - room / new home are tokimo-side flows wired by the parent.
  */
 export function AddMenu({
   instanceBaseUrl,
   t,
   onAddRoom,
   onAddNewHome,
+  onCreateTile,
 }: AddMenuProps) {
   const [open, setOpen] = useState(false);
 
@@ -119,6 +125,11 @@ export function AddMenu({
               label={t("addAutomation")}
               disabled={!baseUrl}
               onClick={handle(() => openHaPath("/config/automation/dashboard"))}
+            />
+            <AddMenuItem
+              icon={Squircle}
+              label={t("createTile")}
+              onClick={handle(onCreateTile)}
             />
             <AddMenuItem
               icon={LayoutGrid}
