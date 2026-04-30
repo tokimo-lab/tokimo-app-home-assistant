@@ -48,8 +48,68 @@ jobs:
       - name: cargo build
         run: cargo build --bins --tests
 
-      - name: cargo test
-        run: cargo test --bins
+      - name: cargo test (skip db-backed tests)
+        shell: bash
+        run: |
+          cargo test --bins -- \
+            --skip ha::sync_visibility::tests::m_n_membership_allows_entity_in_multiple_groups \
+            --skip ha::sync_visibility::tests::partial_unique_one_primary_per_group \
+            --skip ha::sync_visibility::tests::sync_deletes_stale_auto_groups \
+            --skip ha::sync_visibility::tests::sync_idempotent_natural_key_upsert \
+            --skip ha::sync_visibility::tests::sync_keeps_manual_groups
+
+  db-test:
+    name: cargo test (postgres-backed)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Build UI
+        working-directory: ui
+        run: |
+          pnpm install --no-frozen-lockfile
+          pnpm build
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: cargo test (db-backed only)
+        run: |
+          cargo test --bins -- \
+            ha::sync_visibility::tests::m_n_membership_allows_entity_in_multiple_groups \
+            ha::sync_visibility::tests::partial_unique_one_primary_per_group \
+            ha::sync_visibility::tests::sync_deletes_stale_auto_groups \
+            ha::sync_visibility::tests::sync_idempotent_natural_key_upsert \
+            ha::sync_visibility::tests::sync_keeps_manual_groups
 
   lint:
     name: fmt & clippy
