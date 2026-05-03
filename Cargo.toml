@@ -9,7 +9,7 @@ repository  = "https://github.com/tokimo-lab/tokimo-app-home-assistant"
 
 [dependencies]
 tokimo-bus-client   = { git = "https://github.com/tokimo-lab/tokimo-bus.git", rev = "8b4fbac4ab2657cdeead0e74c6caa443a0980f4f" }
-tokimo-bus-protocol = { git = "https://github.com/tokimo-lab/tokimo-bus.git", rev = "8b4fbac4ab2657cdeead0e74c6caa443a0980f4f" }
+tokimo-bus-protocol = { git = "https://github.com/tokimo-lab/tokimo-bus.git", rev = "8b4fbac4ab2657cdeead0e74c6caa443a0980f4f", features = ["axum"] }
 
 tokio              = { version = "1", features = ["rt-multi-thread", "macros", "time", "signal", "sync"] }
 tokio-stream       = { version = "0.1", features = ["sync"] }

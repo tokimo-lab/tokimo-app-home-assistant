@@ -1,9 +1,9 @@
-//! Home Assistant app — axum + UDS multi-process app (方案 3).
+//! Home Assistant app — axum + bus data-plane multi-process app.
 //!
 //! Boot flow:
 //! 1. Connect PostgreSQL, run migrations.
 //! 2. Build ConnectionPool, load all instances from DB, spawn a supervisor per instance.
-//! 3. Bind axum router on UDS; report the socket to broker via `data_plane_socket`.
+//! 3. Bind axum router on bus data-plane socket; report the socket to broker via `data_plane_socket`.
 //! 4. BusClient keeps the app alive (supervisor health-check ping).
 //!
 //! TODO: enforce admin role at server proxy layer (central server must verify admin claim
@@ -23,13 +23,6 @@ use std::sync::{Arc, OnceLock};
 use tokimo_bus_client::{BusClient, ClientConfig};
 use tracing::{error, info};
 
-#[cfg(not(unix))]
-fn main() {
-    eprintln!("home-assistant app is Unix-only (depends on UDS); not supported on this platform");
-    std::process::exit(1);
-}
-
-#[cfg(unix)]
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt()
@@ -45,7 +38,6 @@ async fn main() {
     }
 }
 
-#[cfg(unix)]
 async fn run() -> anyhow::Result<()> {
     let cfg = ClientConfig::from_env().map_err(|e| anyhow::anyhow!("ClientConfig: {e}"))?;
     info!(endpoint = ?cfg.endpoint, "home-assistant: connecting to broker");

@@ -1,5 +1,4 @@
-//! axum HTTP server on a Unix Domain Socket.
-#![cfg(unix)]
+//! axum HTTP server on a cross-platform bus data-plane socket.
 //!
 //! Routes (proxied under `/api/apps/home-assistant/<rest>` by the central server):
 //!
@@ -45,35 +44,20 @@
 //! Data plane (SSE):
 //!   GET    /instances/:id/events
 
-use std::{path::PathBuf, sync::Arc};
+use std::sync::Arc;
 
 use axum::{
     Router,
     routing::{delete, get, patch, post},
 };
-use tokimo_bus_protocol::DataPlaneSocket;
-use tokio::net::UnixListener;
+use tokimo_bus_protocol::{BusListener, DataPlaneSocket};
 use tracing::{error, info};
 
 use crate::{assets, handlers, handlers::AppCtx};
 
-/// 根据 broker socket 路径推出 app 自己的 sock 路径。
-fn default_socket_path(service: &str) -> anyhow::Result<PathBuf> {
-    let bus = std::env::var("TOKIMO_BUS_SOCKET").map_err(|_| anyhow::anyhow!("TOKIMO_BUS_SOCKET not set"))?;
-    let parent = PathBuf::from(&bus)
-        .parent()
-        .ok_or_else(|| anyhow::anyhow!("TOKIMO_BUS_SOCKET has no parent"))?
-        .to_path_buf();
-    let apps_dir = parent.join("apps");
-    std::fs::create_dir_all(&apps_dir)?;
-    Ok(apps_dir.join(format!("{service}.sock")))
-}
-
 pub async fn spawn(service: &str, ctx: Arc<AppCtx>) -> anyhow::Result<DataPlaneSocket> {
-    let path = default_socket_path(service)?;
-    let _ = std::fs::remove_file(&path);
-    let listener = UnixListener::bind(&path)?;
-    info!(path = %path.display(), "home-assistant: app server listening");
+    let (listener, socket) = BusListener::bind_for_app(service)?;
+    info!(?socket, "home-assistant: app server listening");
 
     let router = build_router(ctx);
 
@@ -83,9 +67,7 @@ pub async fn spawn(service: &str, ctx: Arc<AppCtx>) -> anyhow::Result<DataPlaneS
         }
     });
 
-    Ok(DataPlaneSocket::Unix {
-        path: path.to_string_lossy().into_owned(),
-    })
+    Ok(socket)
 }
 
 fn build_router(ctx: Arc<AppCtx>) -> Router {
@@ -111,9 +93,6 @@ fn build_router(ctx: Arc<AppCtx>) -> Router {
         .route("/instances/{id}/entities", get(entities::list))
         .route("/instances/{id}/entities/{entity_id}", get(entities::get))
         // ── Accessories (M:N tile membership) ────────────────────────────
-        // Accessory tile UUIDs are globally unique, so member sub-resources
-        // sit outside `/instances/:id`. Manual tile creation is per-instance
-        // because `natural_key` uniqueness is scoped to instance_id.
         .route(
             "/instances/{id}/accessories",
             get(accessories::list_groups).post(accessories::create_manual_group),
