@@ -46,7 +46,7 @@ export function FavoritesSection({
 
   const grid = (
     <TileGrid
-      entities={favorites}
+      entityIds={favorites.map((e) => e.entity_id)}
       instanceId={instanceId}
       getPending={getPending}
       onCall={onCall}

@@ -63,7 +63,7 @@ export function RoomDomainSection({
       )}
       {entities.length > 0 && (
         <TileGrid
-          entities={entities}
+          entityIds={entities.map((e) => e.entity_id)}
           instanceId={instanceId}
           getPending={getPending}
           onCall={onCall}
@@ -73,7 +73,7 @@ export function RoomDomainSection({
       {expanded && collapsedCount > 0 && (
         <div className="mt-2 opacity-80">
           <TileGrid
-            entities={collapsed}
+            entityIds={collapsed.map((e) => e.entity_id)}
             instanceId={instanceId}
             getPending={getPending}
             onCall={onCall}

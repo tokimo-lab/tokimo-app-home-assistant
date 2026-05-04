@@ -1,7 +1,13 @@
 import { cn } from "@tokimo/ui";
 import { LayoutGroup, motion } from "framer-motion";
-import type { CSSProperties, MouseEvent as ReactMouseEvent } from "react";
+import {
+  type CSSProperties,
+  memo,
+  type MouseEvent as ReactMouseEvent,
+  useCallback,
+} from "react";
 import { useEditHomeView } from "../../state/useEditHomeView";
+import { useEntity } from "../../state/useEntity";
 import type {
   CallParams,
   EntitySize,
@@ -13,7 +19,8 @@ import { resolveTile } from "../tiles";
 import { effectiveSizeForEntity } from "./_helpers";
 
 interface TileGridProps {
-  entities: EntityState[];
+  /** Ordered list of entity ids to render. Each row subscribes per-id. */
+  entityIds: string[];
   instanceId: string;
   getPending: (entityId: string) => PendingOp | undefined;
   onCall: (params: CallParams) => void;
@@ -69,18 +76,12 @@ function jiggleDelayMs(entityId: string): number {
  * Responsive tile grid using Tailwind v4 CSS container queries
  * (named container `tiles`).
  *
- * Breakpoints are relative to the grid container width, not the viewport —
- * so the grid adapts correctly when rendered inside a narrow sidebar or
- * a wide full-screen pane.
- *
- * Column strategy:
- *   <  640 px → 4 cols
- *   ≥  640 px → 6 cols
- *   ≥ 1024 px → 8 cols
- *   ≥ 1440 px → 10 cols (ultra-wide)
+ * P11: each tile renders inside a `TileSlot` that subscribes only to its
+ * own entity, so a single HA WS update repaints just that tile instead of
+ * the whole grid.
  */
 export function TileGrid({
-  entities,
+  entityIds,
   instanceId,
   getPending,
   onCall,
@@ -96,7 +97,7 @@ export function TileGrid({
   // selected tile changes (EditableTileWrapper renders the resize handle
   // based on this same store).
   useEditHomeView();
-  if (entities.length === 0) return null;
+  if (entityIds.length === 0) return null;
 
   return (
     <div data-tile-grid-container className="@container/tiles w-full">
@@ -111,77 +112,121 @@ export function TileGrid({
         )}
       >
         <LayoutGroup>
-          {entities.map((entity) => {
-            const Tile = resolveTile(entity);
-            const size = forceSize ?? effectiveSizeForEntity(entity);
-
-            const tile = (
-              <Tile
-                entity={entity}
-                instanceId={instanceId}
-                pending={getPending(entity.entity_id)}
-                onCall={onCall}
-                t={t}
-                size={size}
-              />
-            );
-
-            if (editMode) {
-              const jiggleStyle: CSSProperties = {
-                animationDelay: `${jiggleDelayMs(entity.entity_id)}ms`,
-              };
-              return (
-                <motion.div
-                  key={entity.entity_id}
-                  layout="position"
-                  layoutId={entity.entity_id}
-                  transition={LAYOUT_SPRING}
-                  data-size={size}
-                  data-entity-id={entity.entity_id}
-                  className={cn(SIZE_SPAN[size], "relative")}
-                >
-                  <div
-                    className="tile-jiggle h-full w-full"
-                    style={jiggleStyle}
-                  >
-                    <EditableTileWrapper
-                      entity={entity}
-                      sortableContainerId={sortableContainerId}
-                      onRemove={onRemoveTile}
-                      removeLabel={removeLabel}
-                    >
-                      {tile}
-                    </EditableTileWrapper>
-                  </div>
-                </motion.div>
-              );
-            }
-
-            return (
-              // biome-ignore lint/a11y/noStaticElementInteractions: contextmenu is a passive enhancement
-              <motion.div
-                key={entity.entity_id}
-                layout="position"
-                layoutId={entity.entity_id}
-                transition={LAYOUT_SPRING}
-                data-size={size}
-                data-entity-id={entity.entity_id}
-                className={SIZE_SPAN[size]}
-                onContextMenu={
-                  onContextMenu
-                    ? (e) => {
-                        e.preventDefault();
-                        onContextMenu(entity, e);
-                      }
-                    : undefined
-                }
-              >
-                {tile}
-              </motion.div>
-            );
-          })}
+          {entityIds.map((entityId) => (
+            <TileSlot
+              key={entityId}
+              entityId={entityId}
+              instanceId={instanceId}
+              getPending={getPending}
+              onCall={onCall}
+              onContextMenu={onContextMenu}
+              forceSize={forceSize}
+              editMode={editMode}
+              sortableContainerId={sortableContainerId}
+              onRemoveTile={onRemoveTile}
+              removeLabel={removeLabel}
+              t={t}
+            />
+          ))}
         </LayoutGroup>
       </div>
     </div>
   );
 }
+
+interface TileSlotProps {
+  entityId: string;
+  instanceId: string;
+  getPending: (entityId: string) => PendingOp | undefined;
+  onCall: (params: CallParams) => void;
+  onContextMenu?: (entity: EntityState, e: ReactMouseEvent) => void;
+  forceSize?: EntitySize;
+  editMode?: boolean;
+  sortableContainerId?: string;
+  onRemoveTile?: (entityId: string) => void;
+  removeLabel?: string;
+  t: (k: string) => string;
+}
+
+const TileSlot = memo(function TileSlot({
+  entityId,
+  instanceId,
+  getPending,
+  onCall,
+  onContextMenu,
+  forceSize,
+  editMode,
+  sortableContainerId,
+  onRemoveTile,
+  removeLabel,
+  t,
+}: TileSlotProps) {
+  const entity = useEntity(entityId);
+
+  const handleContextMenu = useCallback(
+    (e: ReactMouseEvent) => {
+      if (!onContextMenu || !entity) return;
+      e.preventDefault();
+      onContextMenu(entity, e);
+    },
+    [onContextMenu, entity],
+  );
+
+  if (!entity) return null;
+
+  const Tile = resolveTile(entity);
+  const size = forceSize ?? effectiveSizeForEntity(entity);
+
+  const tile = (
+    <Tile
+      entity={entity}
+      instanceId={instanceId}
+      pending={getPending(entityId)}
+      onCall={onCall}
+      t={t}
+      size={size}
+    />
+  );
+
+  if (editMode) {
+    const jiggleStyle: CSSProperties = {
+      animationDelay: `${jiggleDelayMs(entityId)}ms`,
+    };
+    return (
+      <motion.div
+        layout="position"
+        layoutId={entityId}
+        transition={LAYOUT_SPRING}
+        data-size={size}
+        data-entity-id={entityId}
+        className={cn(SIZE_SPAN[size], "relative")}
+      >
+        <div className="tile-jiggle h-full w-full" style={jiggleStyle}>
+          <EditableTileWrapper
+            entity={entity}
+            sortableContainerId={sortableContainerId}
+            onRemove={onRemoveTile}
+            removeLabel={removeLabel}
+          >
+            {tile}
+          </EditableTileWrapper>
+        </div>
+      </motion.div>
+    );
+  }
+
+  return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: contextmenu is a passive enhancement
+    <motion.div
+      layout="position"
+      layoutId={entityId}
+      transition={LAYOUT_SPRING}
+      data-size={size}
+      data-entity-id={entityId}
+      className={SIZE_SPAN[size]}
+      onContextMenu={onContextMenu ? handleContextMenu : undefined}
+    >
+      {tile}
+    </motion.div>
+  );
+});
