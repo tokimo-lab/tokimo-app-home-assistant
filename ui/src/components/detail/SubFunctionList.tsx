@@ -1,9 +1,15 @@
 /**
- * Sub-functions list for DetailOverlay (P7.4).
- * Displays inline controls for accessory sub-members.
+ * Sub-functions list for DetailOverlay (P7.4 / P11).
+ *
+ * Each row subscribes to its own entity via `useEntity(entityId)` so a
+ * single HA WS update only re-renders the affected row, not the whole
+ * overlay. The list itself is driven by ids (not joined live state) so
+ * the parent overlay doesn't subscribe to render-listeners.
  */
 import { ChevronRight } from "lucide-react";
 import { getFriendlyName } from "../../lib/format";
+import type { AccessoryMemberId } from "../../state/useAccessories";
+import { useEntity } from "../../state/useEntity";
 import type { CallParams, EntityState } from "../../types";
 import { EntityIcon, hasEntityIcon } from "../EntityIcon";
 import { SubFunctionBinarySensor } from "./subfunctions/SubFunctionBinarySensor";
@@ -14,7 +20,7 @@ import { SubFunctionSensor } from "./subfunctions/SubFunctionSensor";
 import { SubFunctionToggle } from "./subfunctions/SubFunctionToggle";
 
 interface SubFunctionListProps {
-  subMembers: EntityState[];
+  subMembers: AccessoryMemberId[];
   onCall: (params: CallParams) => void;
   onNavigate: (entityId: string) => void;
   t: (k: string) => string;
@@ -33,10 +39,10 @@ export function SubFunctionList({
   return (
     <div className="mt-6 border-t border-zinc-100 pt-2 dark:border-zinc-800/60">
       <div className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
-        {subMembers.map((entity) => (
+        {subMembers.map((m) => (
           <SubFunctionRow
-            key={entity.entity_id}
-            entity={entity}
+            key={m.entity_id}
+            entityId={m.entity_id}
             onCall={onCall}
             onNavigate={onNavigate}
             t={t}
@@ -48,18 +54,21 @@ export function SubFunctionList({
 }
 
 interface SubFunctionRowProps {
-  entity: EntityState;
+  entityId: string;
   onCall: (params: CallParams) => void;
   onNavigate: (entityId: string) => void;
   t: (k: string) => string;
 }
 
 function SubFunctionRow({
-  entity,
+  entityId,
   onCall,
   onNavigate,
   t,
 }: SubFunctionRowProps) {
+  const entity = useEntity(entityId);
+  if (!entity) return null;
+
   const { entity_id, state } = entity;
   const domain = entity_id.split(".")[0] ?? "";
   const name = getFriendlyName(entity);

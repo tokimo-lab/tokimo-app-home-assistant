@@ -225,6 +225,66 @@ export function useAccessoriesSnapshot(
 }
 
 /**
+ * Lightweight per-entity accessory view that returns just member ids —
+ * does NOT subscribe to the live entity store. Use this from components
+ * that only need to know "which sub-member ids hang under this primary"
+ * and then re-subscribe per row via {@link useEntity}. Re-renders only
+ * when the accessories cache for the current instance changes.
+ */
+export interface AccessoryMemberId {
+  entity_id: string;
+  is_primary: boolean;
+  sub_function_role: "hidden_in_aggregate" | "promoted_to_tile" | null;
+  sort_order: number;
+}
+
+export interface AccessoryIdView {
+  groupId: string;
+  group: AccessoryGroup;
+  primaryEntityId: string;
+  members: AccessoryMemberId[];
+  /** non-primary, not hidden_in_aggregate. Sorted by member sort_order. */
+  subMemberIds: AccessoryMemberId[];
+}
+
+export function useAccessoryMemberIds(
+  entityId: string,
+): AccessoryIdView | undefined {
+  const { id: instanceId } = useActiveInstance();
+  const data = useAccessoriesSnapshot(instanceId);
+
+  return useMemo(() => {
+    if (!entityId) return undefined;
+    const groupIds = data.entityToGroups.get(entityId);
+    if (!groupIds || groupIds.length === 0) return undefined;
+    const groupId = groupIds[0];
+    const group = data.groups.find((g) => g.id === groupId);
+    if (!group) return undefined;
+    const members = data.membersByGroup.get(groupId) ?? [];
+    if (members.length === 0) return undefined;
+
+    const memberIds: AccessoryMemberId[] = members.map((m) => ({
+      entity_id: m.entity_id,
+      is_primary: m.is_primary,
+      sub_function_role: m.sub_function_role,
+      sort_order: m.sort_order,
+    }));
+    const primary = memberIds.find((m) => m.is_primary);
+    if (!primary) return undefined;
+    const subMemberIds = memberIds.filter(
+      (m) => !m.is_primary && m.sub_function_role !== "hidden_in_aggregate",
+    );
+    return {
+      groupId,
+      group,
+      primaryEntityId: primary.entity_id,
+      members: memberIds,
+      subMemberIds,
+    };
+  }, [data, entityId]);
+}
+
+/**
  * Resolve the (first) accessory containing the given entity, joined with
  * the live entity store. Returns undefined when the entity belongs to no
  * group, or the resolved primary entity isn't yet in the live snapshot.

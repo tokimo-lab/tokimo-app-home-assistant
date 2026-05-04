@@ -306,7 +306,6 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
             />
             <EntityManagementHost instance={activeInstance} ctx={ctx} t={t} />
             <DetailOverlay
-              getEntity={(id) => entities.get(id)}
               onCall={onCall}
               getPending={getPending}
               onOpenSettings={(eid) => {

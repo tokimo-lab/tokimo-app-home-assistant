@@ -2,9 +2,10 @@ import { Settings } from "lucide-react";
 import { type ComponentType, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { formatState, getFriendlyName } from "../../lib/format";
-import { useEntityAccessory } from "../../state/useAccessories";
+import { useAccessoryMemberIds } from "../../state/useAccessories";
 import { useDetailOverlay } from "../../state/useDetailOverlay";
-import type { CallParams, EntityState, PendingOp } from "../../types";
+import { useEntity } from "../../state/useEntity";
+import type { CallParams, PendingOp } from "../../types";
 import type { DomainDetailProps } from "./_types";
 import { BinarySensorDetail } from "./BinarySensorDetail";
 import { CameraDetail } from "./CameraDetail";
@@ -23,7 +24,6 @@ import { UnsupportedDetail } from "./UnsupportedDetail";
 import { VacuumDetail } from "./VacuumDetail";
 
 interface DetailOverlayProps {
-  getEntity: (entityId: string) => EntityState | undefined;
   onCall: (params: CallParams) => void;
   getPending: (entityId: string) => PendingOp | undefined;
   onOpenSettings: (entityId: string) => void;
@@ -54,16 +54,19 @@ const DOMAIN_DETAILS: Record<string, ComponentType<DomainDetailProps>> = {
 };
 
 export function DetailOverlay({
-  getEntity,
   onCall,
   getPending,
   onOpenSettings,
   t,
 }: DetailOverlayProps) {
   const { currentEntity, closeDetail, openDetail } = useDetailOverlay();
+  const entityId = currentEntity?.entityId ?? "";
 
-  // P7.4: Fetch accessory sub-functions (must call hook before early return)
-  const accessory = useEntityAccessory(currentEntity?.entityId ?? "");
+  // P11: subscribe only to this entity's live state; sibling sub-members
+  // re-subscribe themselves inside SubFunctionRow.
+  const entity = useEntity(entityId);
+  // Id-only accessory view — does not subscribe to the live store.
+  const accessory = useAccessoryMemberIds(entityId);
 
   useEffect(() => {
     if (!currentEntity) return;
@@ -76,24 +79,21 @@ export function DetailOverlay({
 
   if (!currentEntity) return null;
 
-  const entity = getEntity(currentEntity.entityId);
   const domain = currentEntity.entityId.split(".")[0] ?? "";
   const DomainComponent = DOMAIN_DETAILS[domain] ?? UnsupportedDetail;
   const pending = getPending(currentEntity.entityId);
   const name = entity ? getFriendlyName(entity) : currentEntity.entityId;
   const subtitle = entity ? formatState(entity, t) : "";
 
-  // `useEntityAccessory` returns the accessory only when the entity is
-  // present as a member; `subMembers` is filtered to non-primary, non-hidden.
-  // When the current entity isn't the primary, the accessory join still
-  // surfaces siblings, so guard explicitly on primary identity.
+  // Only show sub-functions when the currently focused entity is the
+  // accessory's primary (siblings opened directly shouldn't surface peers).
   const showSubFunctions =
     accessory != null &&
-    accessory.primary.entity_id === currentEntity?.entityId &&
-    accessory.subMembers.length > 0;
+    accessory.primaryEntityId === currentEntity.entityId &&
+    accessory.subMemberIds.length > 0;
 
-  const handleNavigateToSubFunction = (entityId: string) => {
-    openDetail(entityId, currentEntity.instanceId);
+  const handleNavigateToSubFunction = (id: string) => {
+    openDetail(id, currentEntity.instanceId);
   };
 
   return createPortal(
@@ -130,7 +130,7 @@ export function DetailOverlay({
               />
               {showSubFunctions && accessory && (
                 <SubFunctionList
-                  subMembers={accessory.subMembers}
+                  subMembers={accessory.subMemberIds}
                   onCall={onCall}
                   onNavigate={handleNavigateToSubFunction}
                   t={t}
