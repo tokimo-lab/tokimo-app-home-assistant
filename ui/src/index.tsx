@@ -40,6 +40,10 @@ import { closeEntityMgmt } from "./state/useEntityMgmtNav";
 import { useInstances } from "./state/useInstances";
 import { clearRoomStack, pushRoom } from "./state/useRoomNav";
 import { useRooms } from "./state/useRooms";
+import {
+  ShellWindowDragDegradeProvider,
+  useShellWindowDragDegrade,
+} from "./state/shellWindowDragDegrade";
 import type { ParsedRoute } from "./types";
 
 const ACTIVE_INSTANCE_LS_KEY = "ha:active_instance_id";
@@ -87,6 +91,7 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
   );
 
   const nav = useShellWindowNav(ctx);
+  const shellWindowDragActive = useShellWindowDragDegrade(ctx);
   const { route } = nav;
   const parsed = useMemo(() => parseRoute(route), [route]);
 
@@ -277,84 +282,86 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
       t={t}
       reloadInstances={reloadInstances}
     >
-      <div className="relative h-full w-full overflow-hidden">
-        {parsed.page === "home" && activeInstance && (
-          <>
-            <HomePage
-              instance={activeInstance}
-              rooms={rooms}
-              instances={instances}
-              onSwitchInstance={handleSwitchInstance}
-              ctx={ctx}
-              getPending={getPending}
-              onCall={onCall}
-              onOpenRoom={(roomId) => {
-                pushRoom(roomId);
-              }}
-              onOpenSettings={() => openSettings({ tab: "family" })}
-              onAddRoom={() => openHomeSettings(activeInstance.id)}
-              onAddNewHome={() => navigateTo("/setup")}
-              t={t}
-            />
-            <RoomPageHost
-              instance={activeInstance}
-              rooms={rooms}
-              ctx={ctx}
-              getPending={getPending}
-              onCall={onCall}
-              t={t}
-            />
-            <EntityManagementHost instance={activeInstance} ctx={ctx} t={t} />
-            <DetailOverlay
-              onCall={onCall}
-              getPending={getPending}
-              onOpenSettings={(eid) => {
-                if (!activeInstance) return;
-                openInNewWindow(eid, activeInstance.id);
-                closeDetail();
-              }}
-              t={t}
-            />
-          </>
-        )}
+      <ShellWindowDragDegradeProvider active={shellWindowDragActive}>
+        <div className="relative h-full w-full overflow-hidden">
+          {parsed.page === "home" && activeInstance && (
+            <>
+              <HomePage
+                instance={activeInstance}
+                rooms={rooms}
+                instances={instances}
+                onSwitchInstance={handleSwitchInstance}
+                ctx={ctx}
+                getPending={getPending}
+                onCall={onCall}
+                onOpenRoom={(roomId) => {
+                  pushRoom(roomId);
+                }}
+                onOpenSettings={() => openSettings({ tab: "family" })}
+                onAddRoom={() => openHomeSettings(activeInstance.id)}
+                onAddNewHome={() => navigateTo("/setup")}
+                t={t}
+              />
+              <RoomPageHost
+                instance={activeInstance}
+                rooms={rooms}
+                ctx={ctx}
+                getPending={getPending}
+                onCall={onCall}
+                t={t}
+              />
+              <EntityManagementHost instance={activeInstance} ctx={ctx} t={t} />
+              <DetailOverlay
+                onCall={onCall}
+                getPending={getPending}
+                onOpenSettings={(eid) => {
+                  if (!activeInstance) return;
+                  openInNewWindow(eid, activeInstance.id);
+                  closeDetail();
+                }}
+                t={t}
+              />
+            </>
+          )}
 
-        <AnimatedSettingsPane open={settingsTab !== null}>
-          {settingsTab !== null && (
-            <SettingsPane
-              instance={
-                settingsTargetId
-                  ? (instances.find((i) => i.id === settingsTargetId) ?? null)
-                  : null
-              }
-              onClose={closeSettings}
-              onInstanceUpdated={() => void reloadInstances()}
-              onInstanceDeleted={() => {
-                const deletedId = settingsTargetId;
-                closeSettings();
-                void reloadInstances();
-                const remaining = instances.filter((i) => i.id !== deletedId);
-                if (remaining.length > 0) {
-                  navigateTo(`/instance/${remaining[0].id}/home`);
-                } else {
-                  nav.replace("/welcome", "Home Assistant");
+          <AnimatedSettingsPane open={settingsTab !== null}>
+            {settingsTab !== null && (
+              <SettingsPane
+                instance={
+                  settingsTargetId
+                    ? (instances.find((i) => i.id === settingsTargetId) ?? null)
+                    : null
                 }
-              }}
-              t={t}
-            />
-          )}
-        </AnimatedSettingsPane>
+                onClose={closeSettings}
+                onInstanceUpdated={() => void reloadInstances()}
+                onInstanceDeleted={() => {
+                  const deletedId = settingsTargetId;
+                  closeSettings();
+                  void reloadInstances();
+                  const remaining = instances.filter((i) => i.id !== deletedId);
+                  if (remaining.length > 0) {
+                    navigateTo(`/instance/${remaining[0].id}/home`);
+                  } else {
+                    nav.replace("/welcome", "Home Assistant");
+                  }
+                }}
+                t={t}
+              />
+            )}
+          </AnimatedSettingsPane>
 
-        <AnimatedSettingsPane open={homeSettingsInstanceId !== null}>
-          {homeSettingsInstanceId !== null && (
-            <HomeSettingsPage
-              instanceId={homeSettingsInstanceId}
-              onClose={closeHomeSettings}
-              onBack={closeHomeSettings}
-              t={t}
-            />
-          )}
-        </AnimatedSettingsPane>
-      </div>
+          <AnimatedSettingsPane open={homeSettingsInstanceId !== null}>
+            {homeSettingsInstanceId !== null && (
+              <HomeSettingsPage
+                instanceId={homeSettingsInstanceId}
+                onClose={closeHomeSettings}
+                onBack={closeHomeSettings}
+                t={t}
+              />
+            )}
+          </AnimatedSettingsPane>
+        </div>
+      </ShellWindowDragDegradeProvider>
     </HomeAssistantMenuBar>
   );
 }

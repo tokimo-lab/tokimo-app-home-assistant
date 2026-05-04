@@ -8,6 +8,7 @@ import {
 } from "react";
 import { useEditHomeView } from "../../state/useEditHomeView";
 import { useEntity } from "../../state/useEntity";
+import { useShellWindowDragDegraded } from "../../state/shellWindowDragDegrade";
 import type {
   CallParams,
   EntitySize,
@@ -97,7 +98,26 @@ export function TileGrid({
   // selected tile changes (EditableTileWrapper renders the resize handle
   // based on this same store).
   useEditHomeView();
+  const shellWindowDragActive = useShellWindowDragDegraded();
   if (entityIds.length === 0) return null;
+
+  const tiles = entityIds.map((entityId) => (
+    <TileSlot
+      key={entityId}
+      entityId={entityId}
+      instanceId={instanceId}
+      getPending={getPending}
+      onCall={onCall}
+      onContextMenu={onContextMenu}
+      forceSize={forceSize}
+      editMode={editMode}
+      sortableContainerId={sortableContainerId}
+      onRemoveTile={onRemoveTile}
+      removeLabel={removeLabel}
+      t={t}
+      shellWindowDragActive={shellWindowDragActive}
+    />
+  ));
 
   return (
     <div data-tile-grid-container className="@container/tiles w-full">
@@ -111,24 +131,7 @@ export function TileGrid({
           "@[1440px]/tiles:grid-cols-10",
         )}
       >
-        <LayoutGroup>
-          {entityIds.map((entityId) => (
-            <TileSlot
-              key={entityId}
-              entityId={entityId}
-              instanceId={instanceId}
-              getPending={getPending}
-              onCall={onCall}
-              onContextMenu={onContextMenu}
-              forceSize={forceSize}
-              editMode={editMode}
-              sortableContainerId={sortableContainerId}
-              onRemoveTile={onRemoveTile}
-              removeLabel={removeLabel}
-              t={t}
-            />
-          ))}
-        </LayoutGroup>
+        {shellWindowDragActive ? tiles : <LayoutGroup>{tiles}</LayoutGroup>}
       </div>
     </div>
   );
@@ -145,6 +148,7 @@ interface TileSlotProps {
   sortableContainerId?: string;
   onRemoveTile?: (entityId: string) => void;
   removeLabel?: string;
+  shellWindowDragActive: boolean;
   t: (k: string) => string;
 }
 
@@ -159,6 +163,7 @@ const TileSlot = memo(function TileSlot({
   sortableContainerId,
   onRemoveTile,
   removeLabel,
+  shellWindowDragActive,
   t,
 }: TileSlotProps) {
   const entity = useEntity(entityId);
@@ -176,6 +181,10 @@ const TileSlot = memo(function TileSlot({
 
   const Tile = resolveTile(entity);
   const size = forceSize ?? effectiveSizeForEntity(entity);
+  // Disable Framer Motion projection during shell window drag so rAF layout
+  // work does not compete with the shell drag loop.
+  const layout = shellWindowDragActive ? false : "position";
+  const layoutId = shellWindowDragActive ? undefined : entityId;
 
   const tile = (
     <Tile
@@ -194,8 +203,8 @@ const TileSlot = memo(function TileSlot({
     };
     return (
       <motion.div
-        layout="position"
-        layoutId={entityId}
+        layout={layout}
+        layoutId={layoutId}
         transition={LAYOUT_SPRING}
         data-size={size}
         data-entity-id={entityId}
@@ -218,8 +227,8 @@ const TileSlot = memo(function TileSlot({
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: contextmenu is a passive enhancement
     <motion.div
-      layout="position"
-      layoutId={entityId}
+      layout={layout}
+      layoutId={layoutId}
       transition={LAYOUT_SPRING}
       data-size={size}
       data-entity-id={entityId}

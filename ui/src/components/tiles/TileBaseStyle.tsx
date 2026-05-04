@@ -9,6 +9,7 @@ import {
   useEffect,
   useRef,
 } from "react";
+import { useShellWindowDragDegraded } from "../../state/shellWindowDragDegrade";
 
 const INNER_LAYOUT_TRANSITION = {
   type: "spring",
@@ -117,6 +118,10 @@ export function TileBaseStyle({
   const accent = resolveAccent(domain, accentColor);
   const active = isOn && accent !== undefined;
   const isLarge = size === "large";
+  const shellWindowDragActive = useShellWindowDragDegraded();
+  // Disable Framer Motion projection during shell window drag so rAF layout
+  // work does not compete with the shell drag loop.
+  const layout = shellWindowDragActive ? false : "position";
 
   const style: CSSProperties | undefined = accent
     ? ({ "--ha-tile-accent": accent } as CSSProperties)
@@ -232,7 +237,7 @@ export function TileBaseStyle({
 
       {/* biome-ignore lint/a11y/noStaticElementInteractions: conditional role=button + onKeyDown applied below. */}
       <motion.div
-        layout="position"
+        layout={layout}
         transition={INNER_LAYOUT_TRANSITION}
         data-tile-icon
         onClick={
@@ -268,7 +273,7 @@ export function TileBaseStyle({
       </motion.div>
 
       <motion.div
-        layout="position"
+        layout={layout}
         transition={INNER_LAYOUT_TRANSITION}
         data-tile-labels
         className={cn(
