@@ -35,10 +35,6 @@ url                = "2"
 sha1               = "0.10"
 regex              = "1"
 
-[patch."https://github.com/tokimo-lab/tokimo-bus.git"]
-tokimo-bus-protocol = { path = "../../packages/tokimo-bus/crates/protocol" }
-tokimo-bus-client   = { path = "../../packages/tokimo-bus/crates/client" }
-
 [profile.release]
 lto       = "thin"
 opt-level = 3
