@@ -87,7 +87,6 @@ export function HomePage({
     headerTitle,
   } = useHomePageData({
     instance,
-    entities,
     rooms,
     selectedChip,
     t,

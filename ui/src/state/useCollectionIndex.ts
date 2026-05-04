@@ -1,41 +1,43 @@
-import { useCallback, useRef, useSyncExternalStore } from "react";
+import { useMemo, useRef, useSyncExternalStore } from "react";
 import { getCollectionVersion, subscribeCollection } from "./entityStore";
 
 /**
- * Generic selector that recomputes only when `collectionVersion` bumps.
+ * Generic selector that recomputes when `collectionVersion` bumps OR when
+ * the selector closure identity changes (i.e. one of its captured deps
+ * changed).
  *
  * Pattern:
  *   const groups = useCollectionIndex(
- *     () => buildHomePageGroups(rooms, displays),
+ *     useCallback(() => buildHomePageGroups(rooms, displays), [rooms, displays]),
  *     shallowGroupsEqual,
  *   );
  *
- * The selector should read from the `entityStore` directly (or any other
- * input that is captured by reference identity in the caller's closure). It
- * MUST be redefined whenever the inputs change, otherwise the cached value
- * sticks. Use `useCallback` / inline-with-deps as appropriate.
+ * The selector should read from the `entityStore` directly (via
+ * `getEntitiesSnapshot` / `getEntitySnapshot`) for collection-derived data.
+ * Wrap with `useCallback` so its identity tracks its non-store deps —
+ * otherwise the cache will recompute every render but still produce a
+ * stable ref via `isEqual`.
  *
- * `isEqual` (default `Object.is`) is used to keep the previous reference
- * stable when the recomputed value is structurally identical, which keeps
- * downstream `React.memo` boundaries from re-rendering.
+ * `isEqual` (default `Object.is`) keeps the previous reference stable when
+ * the recomputed value is structurally identical, so downstream
+ * `React.memo` boundaries don't tear.
  */
 export function useCollectionIndex<T>(
   selector: () => T,
   isEqual: (a: T, b: T) => boolean = Object.is,
 ): T {
-  const ref = useRef<{ version: number; value: T } | null>(null);
-
-  const getSnapshot = useCallback((): T => {
-    const v = getCollectionVersion();
-    if (ref.current && ref.current.version === v) return ref.current.value;
-    const value = selector();
-    if (ref.current && isEqual(ref.current.value, value)) {
-      ref.current = { version: v, value: ref.current.value };
-      return ref.current.value;
-    }
-    ref.current = { version: v, value };
-    return value;
-  }, [selector, isEqual]);
-
-  return useSyncExternalStore(subscribeCollection, getSnapshot, getSnapshot);
+  const version = useSyncExternalStore(
+    subscribeCollection,
+    getCollectionVersion,
+    getCollectionVersion,
+  );
+  const ref = useRef<{ value: T } | null>(null);
+  return useMemo(() => {
+    const next = selector();
+    if (ref.current && isEqual(ref.current.value, next)) return ref.current.value;
+    ref.current = { value: next };
+    return next;
+    // version is part of the dep set so this re-runs on collection bumps
+    // even when the selector identity is stable.
+  }, [version, selector, isEqual]);
 }

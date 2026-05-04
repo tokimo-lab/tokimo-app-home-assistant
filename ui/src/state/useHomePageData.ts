@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import {
   bySortOrder,
   CHIP_LABEL_KEY,
@@ -8,12 +8,13 @@ import {
 } from "../components/home/_helpers";
 import { getDomain } from "../lib/domain";
 import type { EntityState, HaInstance, HaRoom } from "../types";
+import { getEntitiesSnapshot } from "./entityStore";
 import { useAccessoriesSnapshot } from "./useAccessories";
+import { useCollectionIndex } from "./useCollectionIndex";
 import { type ChipId, domainsForChip } from "./useFilterChip";
 
 export interface UseHomePageDataParams {
   instance: HaInstance;
-  entities: ReadonlyMap<string, EntityState>;
   rooms: HaRoom[];
   selectedChip: ChipId | null;
   t: (k: string) => string;
@@ -40,106 +41,106 @@ export interface HomePageData {
   headerTitle: string;
 }
 
+interface DerivedGroups {
+  allEntities: EntityState[];
+  visibleEntities: EntityState[];
+  entitiesByRoom: ReadonlyMap<string, EntityState[]>;
+  collapsedByRoom: ReadonlyMap<string, EntityState[]>;
+  cameras: EntityState[];
+  favorites: EntityState[];
+}
+
 /**
- * Derives every memoized list HomePage needs for layout from the raw
- * entity / room snapshot plus the active chip. Pure data layer — no
- * effects, no DOM, no event handlers.
+ * Derives every memoized list HomePage needs for layout from the live
+ * entity store snapshot plus the active chip + room layout. Pure data
+ * layer — no effects, no DOM, no event handlers.
+ *
+ * The grouping selector is wrapped in {@link useCollectionIndex} so it
+ * recomputes only when (a) `collectionVersion` bumps (entities added /
+ * removed / hidden / reordered / favorited / re-roomed / resized), or (b)
+ * one of `rooms`, `selectedChip`, `secondaryEntityIds` changes. Per-tick
+ * state-only updates from the WS stream do NOT invalidate this cache, so
+ * downstream consumers receive stable refs across ~22 Hz state churn.
  */
 export function useHomePageData({
   instance,
-  entities,
   rooms,
   selectedChip,
   t,
 }: UseHomePageDataParams): HomePageData {
-  const allEntities = useMemo(
-    () => Array.from(entities.values()).filter(isRenderable),
-    [entities],
-  );
-
   const { secondaryEntityIds } = useAccessoriesSnapshot(instance.id);
 
-  const chipDomains = useMemo<ReadonlySet<string> | null>(
-    () => (selectedChip ? new Set(domainsForChip(selectedChip)) : null),
-    [selectedChip],
-  );
-
-  const visibleEntities = useMemo(() => {
-    if (selectedChip && chipDomains) {
-      return allEntities.filter((e) =>
-        passesChip(e, selectedChip, chipDomains),
-      );
-    }
-    return allEntities.filter((e) => isHomeVisible(e, secondaryEntityIds));
-  }, [allEntities, selectedChip, chipDomains, secondaryEntityIds]);
-
-  const collapsedEntities = useMemo(() => {
-    // Only meaningful in the default (no-chip) view; chip view shows
-    // everything matching the chip and ignores the collapsed concept.
-    if (selectedChip) return [] as EntityState[];
-    return allEntities.filter(
-      (e) =>
-        !e.hidden &&
-        (e.collapsed === true || secondaryEntityIds.has(e.entity_id)),
+  const selector = useCallback((): DerivedGroups => {
+    const chipDomains = selectedChip
+      ? new Set(domainsForChip(selectedChip))
+      : null;
+    const allEntities = Array.from(getEntitiesSnapshot().values()).filter(
+      isRenderable,
     );
-  }, [allEntities, selectedChip, secondaryEntityIds]);
 
-  const entityRoomId = useMemo(() => {
-    const map = new Map<string, string>();
+    const visibleEntities =
+      selectedChip && chipDomains
+        ? allEntities.filter((e) => passesChip(e, selectedChip, chipDomains))
+        : allEntities.filter((e) => isHomeVisible(e, secondaryEntityIds));
+
+    const collapsedEntities = selectedChip
+      ? ([] as EntityState[])
+      : allEntities.filter(
+          (e) =>
+            !e.hidden &&
+            (e.collapsed === true || secondaryEntityIds.has(e.entity_id)),
+        );
+
+    const entityRoomId = new Map<string, string>();
     for (const e of allEntities) {
-      if (e.area_id) map.set(e.entity_id, e.area_id);
+      if (e.area_id) entityRoomId.set(e.entity_id, e.area_id);
     }
     for (const room of rooms) {
       for (const re of room.entities) {
-        if (!map.has(re.entity_id)) map.set(re.entity_id, room.id);
+        if (!entityRoomId.has(re.entity_id))
+          entityRoomId.set(re.entity_id, room.id);
       }
     }
-    return map;
-  }, [allEntities, rooms]);
 
-  const entitiesByRoom = useMemo(() => {
-    const map = new Map<string, EntityState[]>();
+    const entitiesByRoom = new Map<string, EntityState[]>();
     for (const e of visibleEntities) {
       const rid = entityRoomId.get(e.entity_id);
       if (!rid) continue;
-      const arr = map.get(rid) ?? [];
+      const arr = entitiesByRoom.get(rid) ?? [];
       arr.push(e);
-      map.set(rid, arr);
+      entitiesByRoom.set(rid, arr);
     }
-    // Backend curates sort_order via entity_overrides; render order is the
-    // same for chip and default views — purely user-curated.
-    for (const arr of map.values()) arr.sort(bySortOrder);
-    return map;
-  }, [visibleEntities, entityRoomId]);
+    for (const arr of entitiesByRoom.values()) arr.sort(bySortOrder);
 
-  const collapsedByRoom = useMemo(() => {
-    const map = new Map<string, EntityState[]>();
+    const collapsedByRoom = new Map<string, EntityState[]>();
     for (const e of collapsedEntities) {
       const rid = entityRoomId.get(e.entity_id);
       if (!rid) continue;
-      const arr = map.get(rid) ?? [];
+      const arr = collapsedByRoom.get(rid) ?? [];
       arr.push(e);
-      map.set(rid, arr);
+      collapsedByRoom.set(rid, arr);
     }
-    for (const arr of map.values()) arr.sort(bySortOrder);
-    return map;
-  }, [collapsedEntities, entityRoomId]);
+    for (const arr of collapsedByRoom.values()) arr.sort(bySortOrder);
 
-  const cameras = useMemo(
-    () =>
-      allEntities
-        .filter((e) => getDomain(e.entity_id) === "camera")
-        .sort(bySortOrder),
-    [allEntities],
-  );
+    const cameras = allEntities
+      .filter((e) => getDomain(e.entity_id) === "camera")
+      .sort(bySortOrder);
 
-  const favorites = useMemo(
-    () =>
-      allEntities
-        .filter((e) => e.is_favorite)
-        .sort((a, b) => (a.favorite_order ?? 0) - (b.favorite_order ?? 0)),
-    [allEntities],
-  );
+    const favorites = allEntities
+      .filter((e) => e.is_favorite)
+      .sort((a, b) => (a.favorite_order ?? 0) - (b.favorite_order ?? 0));
+
+    return {
+      allEntities,
+      visibleEntities,
+      entitiesByRoom,
+      collapsedByRoom,
+      cameras,
+      favorites,
+    };
+  }, [rooms, selectedChip, secondaryEntityIds]);
+
+  const groups = useCollectionIndex(selector);
 
   const headerTitle = useMemo(
     () => (selectedChip ? t(CHIP_LABEL_KEY[selectedChip]) : instance.name),
@@ -147,12 +148,7 @@ export function useHomePageData({
   );
 
   return {
-    allEntities,
-    visibleEntities,
-    entitiesByRoom,
-    collapsedByRoom,
-    cameras,
-    favorites,
+    ...groups,
     headerTitle,
   };
 }
