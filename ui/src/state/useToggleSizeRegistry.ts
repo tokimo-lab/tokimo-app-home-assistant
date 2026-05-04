@@ -1,21 +1,22 @@
 import { useEffect } from "react";
 import { cycleSizeFor } from "../components/edit/EditableTileWrapper";
 import { effectiveSizeForEntity } from "../components/home/_helpers";
-import type { EntitySize, EntityState, UpdateEntityDisplayDto } from "../types";
+import type { EntitySize, UpdateEntityDisplayDto } from "../types";
+import { getEntitySnapshot } from "./entityStore";
 import { registerToggleSize } from "./useEditHomeView";
 
 /**
  * Wires the global toggle-size registry (consumed by EditableTileWrapper) to
- * the live entity snapshot + display patch fn. Cycles size on each call and
- * cleans up on unmount.
+ * the live entity store + display patch fn. Cycles size on each call and
+ * cleans up on unmount. Reads the current entity snapshot at invocation
+ * time so the registered callback identity is stable across WS ticks.
  */
 export function useToggleSizeRegistry(
-  entities: ReadonlyMap<string, EntityState>,
   patch: (entityId: string, dto: UpdateEntityDisplayDto) => Promise<unknown>,
 ): void {
   useEffect(() => {
     registerToggleSize(async (entityId: string) => {
-      const entity = entities.get(entityId);
+      const entity = getEntitySnapshot(entityId);
       if (!entity) return;
       const current: EntitySize = effectiveSizeForEntity(entity);
       const next = cycleSizeFor(entity, current);
@@ -25,5 +26,5 @@ export function useToggleSizeRegistry(
     return () => {
       registerToggleSize(null);
     };
-  }, [entities, patch]);
+  }, [patch]);
 }

@@ -1,7 +1,3 @@
-/**
- * Extracts the tile-level and section-level DnD drag handlers from HomePage,
- * keeping the orchestration layer lean.
- */
 import {
   type DragEndEvent,
   PointerSensor,
@@ -13,6 +9,7 @@ import { reorderRooms } from "../api/display";
 import { bySortOrder } from "../components/home/_helpers";
 import { FAVORITES_CONTAINER_ID } from "../components/home/FavoritesSection";
 import type { EntityState, HaRoom, UpdateEntityDisplayDto } from "../types";
+import { getEntitySnapshot } from "./entityStore";
 
 type PatchFn = (
   entityId: string,
@@ -27,7 +24,6 @@ type ReorderRoomEntsFn = (
 
 export interface UseDragHandlersArgs {
   instanceId: string;
-  entities: ReadonlyMap<string, EntityState>;
   favorites: EntityState[];
   entitiesByRoom: ReadonlyMap<string, EntityState[]>;
   rooms: HaRoom[];
@@ -38,7 +34,6 @@ export interface UseDragHandlersArgs {
 
 export function useDragHandlers({
   instanceId,
-  entities,
   favorites,
   entitiesByRoom,
   rooms,
@@ -60,7 +55,7 @@ export function useDragHandlers({
         (active.data.current?.containerId as string | undefined) ?? null;
       const dst =
         (over.data.current?.containerId as string | undefined) ?? overId;
-      if (!src || !dst || !entities.get(activeId)) return;
+      if (!src || !dst || !getEntitySnapshot(activeId)) return;
 
       if (src === dst) {
         if (activeId === overId) return;
@@ -106,7 +101,6 @@ export function useDragHandlers({
       }
     },
     [
-      entities,
       favorites,
       entitiesByRoom,
       patch,

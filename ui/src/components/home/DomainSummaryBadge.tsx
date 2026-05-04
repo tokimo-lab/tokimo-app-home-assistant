@@ -9,12 +9,12 @@ import {
 } from "lucide-react";
 import type { FC, ReactNode } from "react";
 import { getDomain } from "../../lib/domain";
+import { useEntitiesMap } from "../../state/useEntities";
 import type { ChipId } from "../../state/useFilterChip";
 import type { EntityState } from "../../types";
 
 interface DomainSummaryBadgeProps {
   chipId: ChipId;
-  entities: ReadonlyMap<string, EntityState>;
   t: (k: string) => string;
 }
 
@@ -216,9 +216,9 @@ function computeBadges(
 
 export function DomainSummaryBadge({
   chipId,
-  entities,
   t,
 }: DomainSummaryBadgeProps): ReactNode {
+  const entities = useEntitiesMap();
   const badges = computeBadges(chipId, entities, t);
   if (badges.length === 0) return null;
   return (

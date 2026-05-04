@@ -19,7 +19,6 @@ import { HomePageFiltered } from "./HomePageFiltered";
 
 interface HomePageSectionsProps {
   instance: HaInstance;
-  entities: ReadonlyMap<string, EntityState>;
   rooms: HaRoom[];
   cameras: EntityState[];
   favorites: EntityState[];
@@ -50,7 +49,6 @@ interface HomePageSectionsProps {
 export function HomePageSections(props: HomePageSectionsProps) {
   const {
     instance,
-    entities,
     rooms,
     cameras,
     favorites,
@@ -84,7 +82,6 @@ export function HomePageSections(props: HomePageSectionsProps) {
   };
   const filteredProps = {
     ...sharedSectionProps,
-    entities,
     cameras,
     rooms,
     entitiesByRoom,

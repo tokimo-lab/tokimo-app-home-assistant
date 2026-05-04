@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { type FC, useCallback, useEffect, useRef, useState } from "react";
 import { getDomain } from "../../lib/domain";
+import { useEntitiesMap } from "../../state/useEntities";
 import {
   CHIP_ORDER,
   type ChipId,
@@ -21,7 +22,6 @@ interface FilterChipBarProps {
   availableChips: ChipId[];
   selectedChip: ChipId | null;
   onSelectChip: (chip: ChipId) => void;
-  entities: ReadonlyMap<string, EntityState>;
   t: (k: string) => string;
 }
 
@@ -132,9 +132,9 @@ export function FilterChipBar({
   availableChips,
   selectedChip,
   onSelectChip,
-  entities,
   t,
 }: FilterChipBarProps) {
+  const entities = useEntitiesMap();
   const containerRef = useRef<HTMLDivElement>(null);
   const [scrollState, setScrollState] = useState({
     left: false,

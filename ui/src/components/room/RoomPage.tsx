@@ -15,6 +15,7 @@ import { ChevronLeft, Eye, MoreHorizontal } from "lucide-react";
 import { useMemo, useState } from "react";
 import { getDomain } from "../../lib/domain";
 import { useAccessories } from "../../state/useAccessories";
+import { useEntitiesMap } from "../../state/useEntities";
 import type {
   CallParams,
   EntityState,
@@ -28,7 +29,6 @@ import { RoomEnvBadges } from "./RoomEnvBadges";
 interface RoomPageProps {
   roomId: string;
   instance: HaInstance;
-  entities: ReadonlyMap<string, EntityState>;
   rooms: HaRoom[];
   ctx: AppRuntimeCtx;
   getPending: (entityId: string) => PendingOp | undefined;
@@ -190,7 +190,6 @@ function groupByDomain(
 export function RoomPage({
   roomId,
   instance,
-  entities,
   rooms,
   ctx: _ctx,
   getPending,
@@ -199,6 +198,7 @@ export function RoomPage({
   t,
 }: RoomPageProps) {
   const room = rooms.find((r) => r.id === roomId);
+  const entities = useEntitiesMap();
   const [forceExpandAll, setForceExpandAll] = useState(false);
   const { secondaryEntityIds } = useAccessories(instance.id);
 

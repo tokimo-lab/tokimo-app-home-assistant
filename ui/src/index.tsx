@@ -103,7 +103,9 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
   const effectiveInstanceId = instanceId ?? instances[0]?.id ?? null;
 
   // ── Live entity stream ───────────────────────────────────────────────────
-  const { entities } = useEntities(instanceId);
+  // Drives the SSE lifecycle; entity reads use fine-grained hooks
+  // (useEntity / useCollectionIndex / useEntitiesMap) further down.
+  useEntities(instanceId);
 
   // ── Service calls (optimistic-UI) ────────────────────────────────────────
   const { call: onCall, getPending } = useCallService(instanceId, ctx);
@@ -280,7 +282,6 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
           <>
             <HomePage
               instance={activeInstance}
-              entities={entities}
               rooms={rooms}
               instances={instances}
               onSwitchInstance={handleSwitchInstance}
@@ -297,7 +298,6 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
             />
             <RoomPageHost
               instance={activeInstance}
-              entities={entities}
               rooms={rooms}
               ctx={ctx}
               getPending={getPending}

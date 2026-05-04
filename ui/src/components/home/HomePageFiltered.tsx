@@ -14,8 +14,6 @@ import { RoomSection } from "./RoomSection";
 
 export interface HomePageFilteredProps {
   instance: HaInstance;
-  /** All renderable entities (unfiltered); DomainSummaryBadge uses the full map. */
-  entities: ReadonlyMap<string, EntityState>;
   /** All renderable cameras (unfiltered); rendered as a top section under Security chip. */
   cameras: EntityState[];
   rooms: HaRoom[];
@@ -40,7 +38,6 @@ export interface HomePageFilteredProps {
  */
 export function HomePageFiltered({
   instance,
-  entities,
   cameras,
   rooms,
   entitiesByRoom,
@@ -55,7 +52,7 @@ export function HomePageFiltered({
 }: HomePageFilteredProps) {
   return (
     <>
-      <DomainSummaryBadge chipId={selectedChip} entities={entities} t={t} />
+      <DomainSummaryBadge chipId={selectedChip} t={t} />
 
       {selectedChip === "security" && cameras.length > 0 && (
         <CamerasSection

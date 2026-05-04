@@ -13,7 +13,6 @@ import { useTileContextMenu } from "../../state/useTileContextMenu";
 import { useToggleSizeRegistry } from "../../state/useToggleSizeRegistry";
 import type {
   CallParams,
-  EntityState,
   HaInstance,
   HaRoom,
   PendingOp,
@@ -30,7 +29,6 @@ import { useAccessories, useEntityAccessory } from "../../state/useAccessories";
 
 interface HomePageProps {
   instance: HaInstance;
-  entities: ReadonlyMap<string, EntityState>;
   rooms: HaRoom[];
   instances: HaInstance[];
   onSwitchInstance: (id: string) => void;
@@ -52,7 +50,6 @@ interface HomePageProps {
  */
 export function HomePage({
   instance,
-  entities,
   rooms,
   instances,
   onSwitchInstance,
@@ -103,7 +100,7 @@ export function HomePage({
     onHide,
   } = useTileContextMenu(patch, openDetail, instance.id);
 
-  useToggleSizeRegistry(entities, patch);
+  useToggleSizeRegistry(patch);
 
   // Drives the per-instance accessory cache; downstream hooks
   // (useEntityAccessory, useHomePageData) read from the snapshot.
@@ -279,7 +276,6 @@ export function HomePage({
 
   const { sensors, handleDragEnd, handleSectionDragEnd } = useDragHandlers({
     instanceId: instance.id,
-    entities,
     favorites,
     entitiesByRoom,
     rooms,
@@ -353,7 +349,6 @@ export function HomePage({
               availableChips={availableChips}
               selectedChip={selectedChip}
               onSelectChip={selectChip}
-              entities={entities}
               t={t}
             />
           </div>
@@ -361,7 +356,6 @@ export function HomePage({
         <div className="flex flex-col gap-5 px-6 pb-6">
           <HomePageSections
             instance={instance}
-            entities={entities}
             rooms={rooms}
             cameras={cameras}
             favorites={favorites}

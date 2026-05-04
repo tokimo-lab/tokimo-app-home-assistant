@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createInstanceEventStream } from "../api/events";
-import type { ConnStatus } from "../types";
+import type { ConnStatus, EntityState } from "../types";
 import {
   applyBatch,
   applySSEUpdate,
@@ -11,18 +11,41 @@ import {
 } from "./entityStore";
 
 /**
- * Opens an SSE stream for the given instance, feeds events into entityStore,
- * and returns the live entity map + connection status.
+ * Live full entity map. Resubscribes on every render-tier notification
+ * (~22 Hz under HA WS load).
+ *
+ * Prefer fine-grained alternatives where possible:
+ *   - {@link useEntity} for a single entity_id.
+ *   - {@link useEntityIds} or {@link useCollectionIndex} when only the
+ *     collection / shape matters (hidden / favorite / area / etc.).
+ *
+ * Use this hook only when a component genuinely needs to scan every
+ * entity's live state (e.g. summary chips, domain badges).
  */
-export function useEntities(instanceId: string | null) {
-  const [connStatus, setConnStatus] = useState<ConnStatus>("disconnected");
-  const disposeRef = useRef<(() => void) | null>(null);
-
-  const entities = useSyncExternalStore(
+export function useEntitiesMap(): ReadonlyMap<string, EntityState> {
+  return useSyncExternalStore(
     subscribeRender,
     getEntitiesSnapshot,
     getEntitiesSnapshot,
   );
+}
+
+/**
+ * Opens the SSE stream for the given instance, feeds events into the
+ * entity store, and exposes the connection status.
+ *
+ * Components that also need to read entity state should use the
+ * fine-grained hooks ({@link useEntity}, {@link useEntityIds},
+ * {@link useCollectionIndex}, {@link useEntitiesMap}) — this hook
+ * intentionally does NOT return the entity map so it can be called near
+ * the app root without dragging the whole tree into the WS-tick render
+ * loop.
+ */
+export function useEntities(instanceId: string | null): {
+  connStatus: ConnStatus;
+} {
+  const [connStatus, setConnStatus] = useState<ConnStatus>("disconnected");
+  const disposeRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     // Clean up previous stream and clear stale entities
@@ -74,5 +97,5 @@ export function useEntities(instanceId: string | null) {
     };
   }, [instanceId]);
 
-  return { entities, connStatus };
+  return { connStatus };
 }

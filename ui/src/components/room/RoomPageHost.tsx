@@ -3,7 +3,6 @@ import { useEffect, useRef, useState } from "react";
 import { useRoomNav } from "../../state/useRoomNav";
 import type {
   CallParams,
-  EntityState,
   HaInstance,
   HaRoom,
   PendingOp,
@@ -12,7 +11,6 @@ import { RoomPage } from "./RoomPage";
 
 interface RoomPageHostProps {
   instance: HaInstance;
-  entities: ReadonlyMap<string, EntityState>;
   rooms: HaRoom[];
   ctx: AppRuntimeCtx;
   getPending: (entityId: string) => PendingOp | undefined;
@@ -90,7 +88,6 @@ export function RoomPageHost(props: RoomPageHostProps) {
       <RoomPage
         roomId={renderedRoomId}
         instance={props.instance}
-        entities={props.entities}
         rooms={props.rooms}
         ctx={props.ctx}
         getPending={props.getPending}
