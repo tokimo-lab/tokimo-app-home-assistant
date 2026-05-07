@@ -6,11 +6,13 @@ import {
 } from "@tokimo/sdk";
 import { useShellWindowNav } from "@tokimo/sdk/react";
 import {
+  AppSetupGuide,
   ConfigProvider,
   ToastProvider,
   enUS as uiEnUS,
   zhCN as uiZhCN,
 } from "@tokimo/ui";
+import { Home, Lock, Sparkles, Users } from "lucide-react";
 import { StrictMode, useCallback, useEffect, useMemo, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { DetailOverlay } from "./components/detail/DetailOverlay";
@@ -28,8 +30,11 @@ import { enUS, zhCN } from "./i18n";
 import "./index.css";
 import { EntityManagementHost } from "./pages/EntityManagementHost";
 import { SetupPage } from "./pages/SetupPage";
-import { WelcomePage } from "./pages/WelcomePage";
 import { setActiveInstance } from "./state/activeInstanceStore";
+import {
+  ShellWindowDragDegradeProvider,
+  useShellWindowDragDegrade,
+} from "./state/shellWindowDragDegrade";
 import { useCallService } from "./state/useCallService";
 import {
   registerOpenInNewWindow,
@@ -40,10 +45,6 @@ import { closeEntityMgmt } from "./state/useEntityMgmtNav";
 import { useInstances } from "./state/useInstances";
 import { clearRoomStack, pushRoom } from "./state/useRoomNav";
 import { useRooms } from "./state/useRooms";
-import {
-  ShellWindowDragDegradeProvider,
-  useShellWindowDragDegrade,
-} from "./state/shellWindowDragDegrade";
 import type { ParsedRoute } from "./types";
 
 const ACTIVE_INSTANCE_LS_KEY = "ha:active_instance_id";
@@ -246,7 +247,22 @@ function HomeAssistantApp({ ctx }: { ctx: AppRuntimeCtx }) {
   }
 
   if (parsed.page === "welcome") {
-    return <WelcomePage t={t} onGetStarted={() => navigateTo("/setup")} />;
+    return (
+      <AppSetupGuide
+        accentColor="indigo"
+        icon={Home}
+        gradientClassName="from-indigo-400 via-purple-500 to-pink-500"
+        title={t("welcomeTitle")}
+        description={t("welcomeSlogan")}
+        features={[
+          { icon: Sparkles, label: t("welcomeFeatureControl") },
+          { icon: Lock, label: t("welcomeFeatureLocal") },
+          { icon: Users, label: t("welcomeFeatureMulti") },
+        ]}
+        actionLabel={t("welcomeCta")}
+        onAction={() => navigateTo("/setup")}
+      />
+    );
   }
 
   if (parsed.page === "setup") {
