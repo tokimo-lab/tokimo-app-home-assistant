@@ -159,7 +159,7 @@ migrations/
 | 变量 | 默认 | 用途 |
 |---|---|---|
 | `DATABASE_URL` | **required** | PostgreSQL 连接串（与主 server 共用一个库） |
-| `DB_SCHEMA` | `home_assistant` | 本 app 私有 schema 名 |
+| App schema | `home_assistant` | 由 binary 硬编码，不通过环境变量配置 |
 | `TOKIMO_BUS_SOCKET` | **required** | broker 的 UDS 路径；UDS 兄弟目录 `apps/<service>.sock` 是本 app 自己的 sock |
 | `TOKIMO_APP_ASSETS_DIR` | _unset_ | 仅 dev：指向 `ui/dist`，资源 handler 改走文件系统而非 embed |
 | `RUST_LOG` | `info,tokimo_bus_client=info,tokimo_app_home_assistant=debug` | tracing-subscriber filter |

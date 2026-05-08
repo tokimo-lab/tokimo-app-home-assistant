@@ -11,6 +11,7 @@
 
 mod app_server;
 mod assets;
+mod cli;
 mod db;
 mod error;
 mod ha;
@@ -20,25 +21,65 @@ mod tls;
 
 use std::sync::{Arc, OnceLock};
 
+use clap::{Parser, Subcommand};
+use tokimo_bus_cli::TokimoAuthArgs;
 use tokimo_bus_client::{BusClient, ClientConfig};
 use tracing::{error, info};
 
+#[derive(Parser, Debug)]
+#[command(
+    name = "tokimo-app-home-assistant",
+    about = "Home Assistant — Tokimo 子 app CLI",
+    long_about = "Home Assistant CLI — 通过 Tokimo 主 server 调用 home-assistant app。\n\n前置条件：\n1. 启动 Tokimo 主 server (默认 http://localhost:5678)\n2. 浏览器登录后，去「设置 → API Keys」创建一个 token (mm_xxx)\n3. 把 token 通过 --tokimo-token 或 TOKIMO_TOKEN env 传入",
+    term_width = 100
+)]
+struct Cli {
+    #[command(flatten)]
+    auth: TokimoAuthArgs,
+    #[command(subcommand)]
+    command: Option<Command>,
+}
+
+#[derive(Subcommand, Debug)]
+pub(crate) enum Command {
+    /// 检查 Home Assistant CLI 状态。
+    Status,
+}
+
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "info,tokimo_bus_client=info,tokimo_app_home_assistant=debug".into()),
-        )
-        .init();
+    let Cli { auth, command } = Cli::parse();
 
-    if let Err(e) = run().await {
-        error!(error = %e, "home-assistant: fatal");
-        std::process::exit(1);
+    match command {
+        None if std::env::var_os("TOKIMO_BUS_SOCKET").is_some() => {
+            tracing_subscriber::fmt()
+                .with_env_filter(
+                    tracing_subscriber::EnvFilter::try_from_default_env()
+                        .unwrap_or_else(|_| "info,tokimo_bus_client=info,tokimo_app_home_assistant=debug".into()),
+                )
+                .init();
+
+            if let Err(error) = run_server().await {
+                error!(%error, "home-assistant: fatal");
+                std::process::exit(1);
+            }
+        }
+        None => {
+            use clap::CommandFactory;
+            let mut cmd = Cli::command();
+            tokimo_bus_cli::print_help_unified(&mut cmd);
+            std::process::exit(0);
+        }
+        Some(cmd) => {
+            if let Err(error) = cli::run(auth, cmd).await {
+                eprintln!("Error: {error:#}");
+                std::process::exit(1);
+            }
+        }
     }
 }
 
-async fn run() -> anyhow::Result<()> {
+async fn run_server() -> anyhow::Result<()> {
     let cfg = ClientConfig::from_env().map_err(|e| anyhow::anyhow!("ClientConfig: {e}"))?;
     info!(endpoint = ?cfg.endpoint, "home-assistant: connecting to broker");
 
