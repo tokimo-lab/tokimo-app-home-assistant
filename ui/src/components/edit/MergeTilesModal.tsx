@@ -12,10 +12,7 @@ import { cn } from "@tokimo/ui";
 import { useMemo, useState, useSyncExternalStore } from "react";
 import * as accessoriesApi from "../../api/accessories";
 import { enUS, zhCN } from "../../i18n";
-import {
-  getEntitiesSnapshot,
-  subscribeRender,
-} from "../../state/entityStore";
+import { getEntitiesSnapshot, subscribeRender } from "../../state/entityStore";
 import { refreshAccessoriesCache } from "../../state/useAccessories";
 
 interface MergeTilesMeta {
@@ -59,9 +56,7 @@ export default function MergeTilesModalWindow({
       instanceId={meta.instanceId}
       groupIds={meta.groupIds}
       memberEntityIds={meta.memberEntityIds}
-      suggestedPrimaryId={
-        meta.suggestedPrimaryId ?? meta.memberEntityIds[0]!
-      }
+      suggestedPrimaryId={meta.suggestedPrimaryId ?? meta.memberEntityIds[0]!}
       onClose={() => win.close()}
       t={t}
     />
@@ -105,8 +100,7 @@ function MergeTilesModal({
   );
 
   const primaryEntity = snapshot.get(primaryId);
-  const fallbackName =
-    primaryEntity?.attributes.friendly_name ?? primaryId;
+  const fallbackName = primaryEntity?.attributes.friendly_name ?? primaryId;
 
   async function submit() {
     if (submitting) return;
@@ -136,10 +130,7 @@ function MergeTilesModal({
         try {
           await accessoriesApi.deleteAccessoryGroup(createdGroupId);
         } catch (rollbackErr) {
-          console.error(
-            "[MergeTilesModal] rollback also failed",
-            rollbackErr,
-          );
+          console.error("[MergeTilesModal] rollback also failed", rollbackErr);
         }
       }
       setError(e instanceof Error ? e.message : String(e));

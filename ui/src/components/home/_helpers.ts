@@ -111,9 +111,7 @@ export function isHomeVisible(
   secondaryIds: ReadonlySet<string>,
 ): boolean {
   return (
-    !entity.hidden &&
-    !entity.collapsed &&
-    !secondaryIds.has(entity.entity_id)
+    !entity.hidden && !entity.collapsed && !secondaryIds.has(entity.entity_id)
   );
 }
 

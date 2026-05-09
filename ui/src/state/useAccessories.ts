@@ -8,13 +8,15 @@
  * fetch lifecycle. Mutations (add/remove/patch member) call `refresh()`
  * to reload and broadcast to all subscribers.
  */
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { getAccessoryMembers, listAccessories } from "../api/accessories";
-import type {
-  AccessoryGroup,
-  AccessoryMember,
-  EntityState,
-} from "../types";
+import type { AccessoryGroup, AccessoryMember, EntityState } from "../types";
 import { useActiveInstance } from "./activeInstanceStore";
 import { getEntitiesSnapshot, subscribeRender } from "./entityStore";
 

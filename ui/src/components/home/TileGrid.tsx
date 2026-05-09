@@ -6,9 +6,9 @@ import {
   type MouseEvent as ReactMouseEvent,
   useCallback,
 } from "react";
+import { useShellWindowDragDegraded } from "../../state/shellWindowDragDegrade";
 import { useEditHomeView } from "../../state/useEditHomeView";
 import { useEntity } from "../../state/useEntity";
-import { useShellWindowDragDegraded } from "../../state/shellWindowDragDegrade";
 import type {
   CallParams,
   EntitySize,
@@ -225,7 +225,6 @@ const TileSlot = memo(function TileSlot({
   }
 
   return (
-    // biome-ignore lint/a11y/noStaticElementInteractions: contextmenu is a passive enhancement
     <motion.div
       layout={layout}
       layoutId={layoutId}

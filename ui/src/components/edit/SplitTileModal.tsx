@@ -25,10 +25,7 @@ import * as accessoriesApi from "../../api/accessories";
 import { updateEntityDisplay } from "../../api/display";
 import { listRooms } from "../../api/rooms";
 import { enUS, zhCN } from "../../i18n";
-import {
-  getEntitiesSnapshot,
-  subscribeRender,
-} from "../../state/entityStore";
+import { getEntitiesSnapshot, subscribeRender } from "../../state/entityStore";
 import { refreshAccessoriesCache } from "../../state/useAccessories";
 import type { HaRoom } from "../../types";
 
@@ -98,9 +95,7 @@ function SplitTileModal({
   );
 
   // Resolve current primary + default area from server-side membership.
-  const [currentPrimaryId, setCurrentPrimaryId] = useState<string | null>(
-    null,
-  );
+  const [currentPrimaryId, setCurrentPrimaryId] = useState<string | null>(null);
   const [defaultAreaId, setDefaultAreaId] = useState<string | null>(null);
   useEffect(() => {
     let cancelled = false;
@@ -151,7 +146,7 @@ function SplitTileModal({
   useEffect(() => {
     if (defaultAreaId && roomId === null) setRoomId(defaultAreaId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [defaultAreaId]);
+  }, [defaultAreaId, roomId]);
 
   const splitOutList = useMemo(
     () => memberEntityIds.filter((id) => splitOut.has(id)),
@@ -200,11 +195,9 @@ function SplitTileModal({
     try {
       // 1. Re-primary the old group if needed.
       if (oldPrimaryMovingOut && effectiveNewOldPrimary) {
-        await accessoriesApi.updateMember(
-          groupId,
-          effectiveNewOldPrimary,
-          { is_primary: true },
-        );
+        await accessoriesApi.updateMember(groupId, effectiveNewOldPrimary, {
+          is_primary: true,
+        });
       }
 
       // 2. Remove split-out members from the old group.

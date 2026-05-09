@@ -46,10 +46,9 @@ export function BottomActionBar({
         )}
       >
         <span className="text-xs font-medium text-white/70">
-          {t("bottomBarSelected").replace("{n}", String(count)).replace(
-            "{plural}",
-            count === 1 ? "" : "s",
-          )}
+          {t("bottomBarSelected")
+            .replace("{n}", String(count))
+            .replace("{plural}", count === 1 ? "" : "s")}
         </span>
         {count === 1 && canSplit && (
           <Action icon={<Scissors size={16} />} onClick={onSplit}>

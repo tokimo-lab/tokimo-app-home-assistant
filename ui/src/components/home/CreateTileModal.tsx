@@ -18,10 +18,7 @@ import * as accessoriesApi from "../../api/accessories";
 import { updateEntityDisplay } from "../../api/display";
 import { listRooms } from "../../api/rooms";
 import { enUS, zhCN } from "../../i18n";
-import {
-  getEntitiesSnapshot,
-  subscribeRender,
-} from "../../state/entityStore";
+import { getEntitiesSnapshot, subscribeRender } from "../../state/entityStore";
 import { refreshAccessoriesCache } from "../../state/useAccessories";
 import type { EntityState, HaRoom } from "../../types";
 
@@ -87,10 +84,7 @@ function CreateTileModal({
     getEntitiesSnapshot,
     getEntitiesSnapshot,
   );
-  const allEntities = useMemo(
-    () => Array.from(snapshot.values()),
-    [snapshot],
-  );
+  const allEntities = useMemo(() => Array.from(snapshot.values()), [snapshot]);
 
   useEffect(() => {
     let cancelled = false;
@@ -140,8 +134,7 @@ function CreateTileModal({
     });
   }
 
-  const canSubmit =
-    selectedIds.size >= 1 && primaryId !== null && !submitting;
+  const canSubmit = selectedIds.size >= 1 && primaryId !== null && !submitting;
 
   async function submit() {
     if (!canSubmit || !primaryId) return;
@@ -167,10 +160,7 @@ function CreateTileModal({
             area_id: roomId,
           });
         } catch (e) {
-          console.warn(
-            "[CreateTileModal] failed to set area_id on primary",
-            e,
-          );
+          console.warn("[CreateTileModal] failed to set area_id on primary", e);
         }
       }
       await refreshAccessoriesCache(instanceId);
@@ -283,14 +273,9 @@ function CreateTileModal({
   );
 }
 
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: ReactNode;
-}) {
+function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
+    // biome-ignore lint/a11y/noLabelWithoutControl: children is always a form control rendered by callers
     <label className="flex flex-col gap-1.5 text-sm">
       <span className="text-xs font-medium uppercase tracking-wide text-white/50">
         {label}

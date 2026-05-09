@@ -1,12 +1,7 @@
 import type { AppRuntimeCtx } from "@tokimo/sdk";
 import { useEffect, useRef, useState } from "react";
 import { useRoomNav } from "../../state/useRoomNav";
-import type {
-  CallParams,
-  HaInstance,
-  HaRoom,
-  PendingOp,
-} from "../../types";
+import type { CallParams, HaInstance, HaRoom, PendingOp } from "../../types";
 import { RoomPage } from "./RoomPage";
 
 interface RoomPageHostProps {

@@ -3,6 +3,7 @@ import { cn } from "@tokimo/ui";
 import { useCallback, useEffect, useState } from "react";
 import { rescanInstance } from "../../api/client";
 import { clearEntities } from "../../state/entityStore";
+import { useAccessories, useEntityAccessory } from "../../state/useAccessories";
 import { useDetailOverlay } from "../../state/useDetailOverlay";
 import { useDisplayPatch } from "../../state/useDisplayPatch";
 import { useDragHandlers } from "../../state/useDragHandlers";
@@ -11,12 +12,7 @@ import { useFilterChip } from "../../state/useFilterChip";
 import { useHomePageData } from "../../state/useHomePageData";
 import { useTileContextMenu } from "../../state/useTileContextMenu";
 import { useToggleSizeRegistry } from "../../state/useToggleSizeRegistry";
-import type {
-  CallParams,
-  HaInstance,
-  HaRoom,
-  PendingOp,
-} from "../../types";
+import type { CallParams, HaInstance, HaRoom, PendingOp } from "../../types";
 import { EmptyState } from "../EmptyState";
 import { BottomActionBar } from "../edit/BottomActionBar";
 import { EditModeToolbar } from "../edit/EditModeToolbar";
@@ -25,7 +21,6 @@ import { HomePageHeader } from "./HomePageHeader";
 import { HomePageSections } from "./HomePageSections";
 import { RescanModal } from "./RescanModal";
 import { TileContextMenu } from "./TileContextMenu";
-import { useAccessories, useEntityAccessory } from "../../state/useAccessories";
 
 interface HomePageProps {
   instance: HaInstance;
@@ -180,9 +175,8 @@ export function HomePage({
     const { groupIds, memberEntityIds } = resolveSelectedGroups();
     if (groupIds.length < 2 || memberEntityIds.length === 0) return;
     const suggestedPrimaryId =
-      Array.from(selectedTileIds).find((id) =>
-        memberEntityIds.includes(id),
-      ) ?? memberEntityIds[0];
+      Array.from(selectedTileIds).find((id) => memberEntityIds.includes(id)) ??
+      memberEntityIds[0];
     ctx.shell.openModalWindow({
       component: () => import("../edit/MergeTilesModal"),
       title: t("mergeTilesTitle"),

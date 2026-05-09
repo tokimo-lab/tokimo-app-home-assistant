@@ -26,7 +26,7 @@ export function useCollectionIndex<T>(
   selector: () => T,
   isEqual: (a: T, b: T) => boolean = Object.is,
 ): T {
-  const version = useSyncExternalStore(
+  const _version = useSyncExternalStore(
     subscribeCollection,
     getCollectionVersion,
     getCollectionVersion,
@@ -34,10 +34,11 @@ export function useCollectionIndex<T>(
   const ref = useRef<{ value: T } | null>(null);
   return useMemo(() => {
     const next = selector();
-    if (ref.current && isEqual(ref.current.value, next)) return ref.current.value;
+    if (ref.current && isEqual(ref.current.value, next))
+      return ref.current.value;
     ref.current = { value: next };
     return next;
     // version is part of the dep set so this re-runs on collection bumps
     // even when the selector identity is stable.
-  }, [version, selector, isEqual]);
+  }, [selector, isEqual]);
 }

@@ -235,7 +235,6 @@ export function TileBaseStyle({
     >
       {children}
 
-      {/* biome-ignore lint/a11y/noStaticElementInteractions: conditional role=button + onKeyDown applied below. */}
       <motion.div
         layout={layout}
         transition={INNER_LAYOUT_TRANSITION}
