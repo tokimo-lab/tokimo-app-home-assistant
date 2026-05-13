@@ -21,7 +21,7 @@ use tokio_tungstenite::Connector;
 fn ensure_crypto_provider() {
     static PROVIDER_INIT: OnceLock<()> = OnceLock::new();
     PROVIDER_INIT.get_or_init(|| {
-        let _ = rustls::crypto::ring::default_provider().install_default();
+        let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
     });
 }
 
