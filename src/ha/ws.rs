@@ -81,7 +81,7 @@ pub async fn run_connection(instance: Arc<InstanceCtx>, pool: sqlx::PgPool) -> a
     // Send: {"type":"auth","access_token":"..."}
     info!(instance_id = %instance.id, "HA WS: sending auth");
     stream
-        .send(Message::Text(
+        .send(Message::text(
             json!({"type":"auth","access_token": access_token}).to_string(),
         ))
         .await
@@ -103,7 +103,7 @@ pub async fn run_connection(instance: Arc<InstanceCtx>, pool: sqlx::PgPool) -> a
     let id_get_states: u64 = 1;
     info!(instance_id = %instance.id, "HA WS: sending get_states");
     stream
-        .send(Message::Text(
+        .send(Message::text(
             json!({"id": id_get_states, "type": "get_states"}).to_string(),
         ))
         .await
@@ -137,7 +137,7 @@ pub async fn run_connection(instance: Arc<InstanceCtx>, pool: sqlx::PgPool) -> a
     let id_subscribe: u64 = 2;
     info!(instance_id = %instance.id, "HA WS: sending subscribe_events");
     stream
-        .send(Message::Text(
+        .send(Message::text(
             json!({"id": id_subscribe, "type": "subscribe_events", "event_type": "state_changed"}).to_string(),
         ))
         .await
@@ -205,7 +205,7 @@ pub async fn run_connection(instance: Arc<InstanceCtx>, pool: sqlx::PgPool) -> a
                 let ping_id = next_id;
                 next_id += 1;
                 stream
-                    .send(Message::Text(
+                    .send(Message::text(
                         json!({"id": ping_id, "type": "ping"}).to_string(),
                     ))
                     .await
@@ -357,7 +357,7 @@ async fn ws_command(
 
         // auth
         stream
-            .send(Message::Text(
+            .send(Message::text(
                 json!({"type":"auth","access_token": access_token}).to_string(),
             ))
             .await
@@ -379,7 +379,7 @@ async fn ws_command(
         // command
         let cmd_id: u64 = 1;
         stream
-            .send(Message::Text(json!({"id": cmd_id, "type": command_type}).to_string()))
+            .send(Message::text(json!({"id": cmd_id, "type": command_type}).to_string()))
             .await
             .map_err(|e| AppError::bad_gateway(format!("HA WS send {command_type}: {e}")))?;
 
