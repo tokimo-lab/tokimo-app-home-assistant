@@ -1,7 +1,7 @@
 //! Home Assistant app — axum + bus data-plane multi-process app.
 //!
 //! Boot flow:
-//! 1. Connect PostgreSQL, run migrations.
+//! 1. Connect PostgreSQL (schema + migrations already applied by the host migrator).
 //! 2. Build ConnectionPool, load all instances from DB, spawn a supervisor per instance.
 //! 3. Bind axum router on bus data-plane socket; report the socket to broker via `data_plane_socket`.
 //! 4. BusClient keeps the app alive (supervisor health-check ping).
@@ -84,8 +84,7 @@ async fn run_server() -> anyhow::Result<()> {
     info!(endpoint = ?cfg.endpoint, "home-assistant: connecting to broker");
 
     let pool = db::init_pool().await?;
-    db::run_migrations(&pool).await?;
-    info!("home-assistant: db ready");
+    info!("home-assistant: db connected (schema managed by host)");
 
     let client_slot: Arc<OnceLock<Arc<BusClient>>> = Arc::new(OnceLock::new());
 

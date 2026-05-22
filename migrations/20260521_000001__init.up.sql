@@ -1,4 +1,4 @@
--- HA app schema. Single-file init. CREATE … IF NOT EXISTS for idempotency.
+-- HA app schema. Initial migration. Host migrator tracks applied versions in a ledger.
 --
 -- Dev-stage rewrite (P8.0.1): tile / group attributes were previously stored
 -- on `entity_overrides` (group_id, group_primary, sub_function_role) which
@@ -6,7 +6,7 @@
 -- tables (`accessory_groups` + `accessory_group_members`) so a single entity
 -- can participate in multiple tiles (M:N).
 
-CREATE TABLE IF NOT EXISTS instances (
+CREATE TABLE instances (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name            TEXT NOT NULL DEFAULT 'My Home Assistant',
     base_url        TEXT NOT NULL,
@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS instances (
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS rooms (
+CREATE TABLE rooms (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     instance_id     UUID NOT NULL REFERENCES instances(id) ON DELETE CASCADE,
     name            TEXT NOT NULL,
@@ -29,17 +29,17 @@ CREATE TABLE IF NOT EXISTS rooms (
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (instance_id, ha_area_id)
 );
-CREATE INDEX IF NOT EXISTS rooms_instance_sort_idx ON rooms (instance_id, sort_order);
+CREATE INDEX rooms_instance_sort_idx ON rooms (instance_id, sort_order);
 
-CREATE TABLE IF NOT EXISTS room_entities (
+CREATE TABLE room_entities (
     room_id         UUID NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
     entity_id       TEXT NOT NULL,
     sort_order      INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (room_id, entity_id)
 );
-CREATE INDEX IF NOT EXISTS room_entities_entity_id_idx ON room_entities (entity_id);
+CREATE INDEX room_entities_entity_id_idx ON room_entities (entity_id);
 
-CREATE TABLE IF NOT EXISTS entity_overrides (
+CREATE TABLE entity_overrides (
     instance_id     UUID NOT NULL REFERENCES instances(id) ON DELETE CASCADE,
     entity_id       TEXT NOT NULL,
     display_name    TEXT,
@@ -57,13 +57,13 @@ CREATE TABLE IF NOT EXISTS entity_overrides (
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     PRIMARY KEY (instance_id, entity_id)
 );
-CREATE INDEX IF NOT EXISTS entity_overrides_favorites_idx
+CREATE INDEX entity_overrides_favorites_idx
     ON entity_overrides (instance_id, is_favorite, favorite_order)
     WHERE is_favorite = TRUE;
-CREATE INDEX IF NOT EXISTS entity_overrides_area_idx
+CREATE INDEX entity_overrides_area_idx
     ON entity_overrides (instance_id, area_id, sort_order)
     WHERE area_id IS NOT NULL;
-CREATE INDEX IF NOT EXISTS entity_overrides_category_idx
+CREATE INDEX entity_overrides_category_idx
     ON entity_overrides (instance_id, entity_category)
     WHERE entity_category IS NOT NULL;
 
@@ -81,7 +81,7 @@ CREATE INDEX IF NOT EXISTS entity_overrides_category_idx
 -- `display_name` / `custom_icon` are optional overrides; NULL means "fall
 -- back to the primary entity's defaults" so a freshly synced tile renders
 -- without requiring per-tile display state.
-CREATE TABLE IF NOT EXISTS accessory_groups (
+CREATE TABLE accessory_groups (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     instance_id     UUID NOT NULL REFERENCES instances(id) ON DELETE CASCADE,
     natural_key     TEXT NOT NULL,
@@ -94,7 +94,7 @@ CREATE TABLE IF NOT EXISTS accessory_groups (
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (instance_id, natural_key)
 );
-CREATE INDEX IF NOT EXISTS accessory_groups_instance_idx
+CREATE INDEX accessory_groups_instance_idx
     ON accessory_groups (instance_id, sort_order);
 
 -- M:N membership.
@@ -104,7 +104,7 @@ CREATE INDEX IF NOT EXISTS accessory_groups_instance_idx
 -- The composite PK enforces "one link per (group, entity)" while the partial
 -- unique index `accessory_group_members_one_primary_idx` makes "≥2 primaries
 -- per group" a hard DB-level error rather than a soft handler invariant.
-CREATE TABLE IF NOT EXISTS accessory_group_members (
+CREATE TABLE accessory_group_members (
     group_id          UUID NOT NULL REFERENCES accessory_groups(id) ON DELETE CASCADE,
     entity_id         TEXT NOT NULL,
     instance_id       UUID NOT NULL REFERENCES instances(id) ON DELETE CASCADE,
@@ -115,7 +115,7 @@ CREATE TABLE IF NOT EXISTS accessory_group_members (
     sort_order        INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (group_id, entity_id)
 );
-CREATE INDEX IF NOT EXISTS accessory_group_members_entity_idx
+CREATE INDEX accessory_group_members_entity_idx
     ON accessory_group_members (instance_id, entity_id);
-CREATE UNIQUE INDEX IF NOT EXISTS accessory_group_members_one_primary_idx
+CREATE UNIQUE INDEX accessory_group_members_one_primary_idx
     ON accessory_group_members (group_id) WHERE is_primary = TRUE;
