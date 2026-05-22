@@ -1,9 +1,8 @@
 //! PostgreSQL pool for the Home Assistant app.
 //!
-//! Connects with `DATABASE_URL`; reads the per-app schema name from the
-//! `TOKIMO_APP_SCHEMA` env var injected by the host (falls back to
-//! `home_assistant` for standalone dev runs). Schema creation and migration
-//! application are owned by the host migrator — this process never issues DDL.
+//! Connects with `DATABASE_URL`; reads the per-app schema name from the compile-time
+//! embedded `tokimo-app.toml` manifest. Schema creation and migration application are
+//! owned by the host migrator — this process never issues DDL.
 //!
 //! `search_path` is set on every new connection so business code can reference
 //! tables unqualified.
@@ -17,7 +16,8 @@ use tracing::info;
 
 pub async fn init_pool() -> anyhow::Result<PgPool> {
     let url = std::env::var("DATABASE_URL").map_err(|_| anyhow::anyhow!("DATABASE_URL is required"))?;
-    let schema = std::env::var("TOKIMO_APP_SCHEMA").unwrap_or_else(|_| "home_assistant".to_string());
+    let schema = tokimo_bus_cli::manifest::parse_app_schema(crate::MANIFEST)?
+        .ok_or_else(|| anyhow::anyhow!("manifest missing [database] schema"))?;
 
     info!(schema = %schema, "home-assistant: connecting to postgres");
 

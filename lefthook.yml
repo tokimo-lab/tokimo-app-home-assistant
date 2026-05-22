@@ -31,4 +31,4 @@ pre-push:
     fmt-check:
       run: cargo fmt -p tokimo-app-home-assistant -- --check
     clippy:
-      run: cargo clippy -p tokimo-app-home-assistant --lib --bins --tests -- -D warnings
+      run: cargo clippy -p tokimo-app-home-assistant --bins --tests -- -D warnings
