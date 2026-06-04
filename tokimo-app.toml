@@ -15,6 +15,10 @@ schema         = "home_assistant"
 migrations_dir = "migrations"
 driver         = "postgres"
 
+[cli]
+name        = "tokimo-app-home-assistant"
+description = "Manage Home Assistant devices: search entities, view device info and status, call services (turn on lights, lock doors, adjust climate, etc.)."
+
 [ui]
 entry        = "assets/index.js"
 window_type  = "home-assistant"

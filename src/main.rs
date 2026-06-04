@@ -45,8 +45,70 @@ struct Cli {
 
 #[derive(Subcommand, Debug)]
 pub(crate) enum Command {
-    /// 检查 Home Assistant CLI 状态。
+    /// 检查连接状态，列出实例及域统计。
     Status,
+    /// 列出所有 Home Assistant 实例。
+    Instances,
+    /// 测试指定实例的连通性。
+    Test {
+        /// 实例 ID
+        id: uuid::Uuid,
+    },
+    /// 按 entity_id 或 friendly_name 搜索实体。
+    Search {
+        /// 实例 ID
+        instance_id: uuid::Uuid,
+        /// 搜索关键词（匹配 entity_id 和 friendly_name）
+        query: String,
+        /// 按域过滤（逗号分隔，如 "light,switch"）
+        #[arg(short, long)]
+        domain: Option<String>,
+        /// 按状态过滤（逗号分隔，如 "on,off"）
+        #[arg(short, long)]
+        state: Option<String>,
+        /// 包含隐藏实体
+        #[arg(long)]
+        include_hidden: bool,
+        /// 返回结果数量上限
+        #[arg(short, long, default_value_t = 50)]
+        limit: u32,
+        /// 输出原始 JSON
+        #[arg(long)]
+        raw: bool,
+    },
+    /// 查看单个实体的详细信息（含设备元数据）。
+    Entity {
+        /// 实例 ID
+        instance_id: uuid::Uuid,
+        /// 实体 ID（如 "light.kitchen"）
+        entity_id: String,
+        /// 输出原始 JSON
+        #[arg(long)]
+        raw: bool,
+    },
+    /// 调用 Home Assistant service（如 light.turn_on, lock.lock）。
+    Call {
+        /// 实例 ID
+        instance_id: uuid::Uuid,
+        /// 域名（如 "light", "switch", "climate"）
+        domain: String,
+        /// 服务名（如 "turn_on", "turn_off", "toggle"）
+        service: String,
+        /// 目标实体 ID（如 "light.kitchen"）
+        #[arg(long = "entity-id")]
+        entity_id: String,
+        /// 额外参数（JSON 格式，如 '{"brightness":128}'）
+        #[arg(long)]
+        data: Option<String>,
+    },
+    /// 查看实例摘要（不可用实体、域分布统计）。
+    Summary {
+        /// 实例 ID
+        instance_id: uuid::Uuid,
+        /// 输出原始 JSON
+        #[arg(long)]
+        raw: bool,
+    },
 }
 
 #[tokio::main]
