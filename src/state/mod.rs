@@ -18,7 +18,7 @@ use dashmap::DashMap;
 use serde::ser::SerializeMap;
 use serde::{Deserialize, Serialize, Serializer};
 use sqlx::PgPool;
-use tokio::sync::{Notify, RwLock, broadcast};
+use tokio::sync::{Notify, RwLock, broadcast, mpsc, oneshot};
 use tracing::{info, warn};
 use uuid::Uuid;
 
@@ -200,6 +200,19 @@ impl Serialize for ConnStatus {
     }
 }
 
+// ─── WS command channel ──────────────────────────────────────────────────────
+
+/// A service-call command sent through the persistent HA WebSocket connection.
+/// The WS supervisor receives these and forwards them as `call_service` WS
+/// messages, returning the result via the oneshot channel.
+pub struct WsCmd {
+    pub domain: String,
+    pub service: String,
+    pub entity_id: String,
+    pub data: serde_json::Value,
+    pub reply: oneshot::Sender<Result<serde_json::Value, String>>,
+}
+
 // ─── Instance config (read-locked, cheap Arc clone on hot path) ───────────────
 
 #[derive(Debug, Clone)]
@@ -245,6 +258,10 @@ pub struct InstanceCtx {
     pub store: EntityStore,
     /// Last-known connection status.
     pub status: RwLock<Arc<ConnStatus>>,
+    /// Sender half of the WS command channel. Handlers send `WsCmd`s here;
+    /// the WS supervisor receives and executes them over the persistent HA
+    /// WebSocket connection, returning results via oneshot.
+    pub ws_cmd_tx: mpsc::Sender<WsCmd>,
     /// Cached entity overrides (entity_id → OverrideSnapshot) to eliminate
     /// per-event DB queries. Populated on boot and updated by writers.
     pub override_cache: DashMap<String, OverrideSnapshot>,
@@ -264,9 +281,13 @@ pub struct InstanceCtx {
 }
 
 impl InstanceCtx {
-    pub fn new(id: Uuid, config: InstanceConfig) -> Arc<Self> {
+    /// Create a new instance context. Returns `(Arc<Self>, ws_cmd_rx)` where
+    /// the receiver half of the WS command channel should be passed to
+    /// `ws::run_connection`.
+    pub fn new(id: Uuid, config: InstanceConfig) -> (Arc<Self>, mpsc::Receiver<WsCmd>) {
         let http = crate::tls::build_http_client(config.verify_tls);
-        Arc::new(Self {
+        let (ws_cmd_tx, ws_cmd_rx) = mpsc::channel(32);
+        let ctx = Arc::new(Self {
             id,
             config: RwLock::new(Arc::new(config)),
             http,
@@ -274,11 +295,13 @@ impl InstanceCtx {
             cancel: CancelToken::new(),
             store: EntityStore::new(),
             status: RwLock::new(Arc::new(ConnStatus::Connecting)),
+            ws_cmd_tx,
             override_cache: DashMap::new(),
             group_membership_cache: DashMap::new(),
             device_registry: RwLock::new(Arc::new(HashMap::new())),
             entity_to_device: RwLock::new(Arc::new(HashMap::new())),
-        })
+        });
+        (ctx, ws_cmd_rx)
     }
 
     /// Lookup device metadata for an entity, traversing the cached
@@ -324,7 +347,7 @@ impl ConnectionPool {
                 access_token,
                 verify_tls,
             };
-            let ctx = InstanceCtx::new(id, config);
+            let (ctx, ws_cmd_rx) = InstanceCtx::new(id, config);
 
             // Populate override cache before inserting (errors logged, don't fail boot).
             if let Err(e) = crate::handlers::entities::populate_override_cache(&pool, &ctx, id).await {
@@ -332,7 +355,7 @@ impl ConnectionPool {
             }
 
             cp.instances.insert(id, Arc::clone(&ctx));
-            spawn_supervisor(Arc::clone(&ctx), pool.clone());
+            spawn_supervisor(Arc::clone(&ctx), pool.clone(), ws_cmd_rx);
         }
 
         Ok(cp)
@@ -343,7 +366,7 @@ impl ConnectionPool {
     }
 
     /// Insert a new instance and start its supervisor.
-    pub fn add_instance(&self, ctx: Arc<InstanceCtx>) {
+    pub fn add_instance(&self, ctx: Arc<InstanceCtx>, ws_cmd_rx: mpsc::Receiver<WsCmd>) {
         let pool = self.pool.clone();
         let pool_for_cache = self.pool.clone();
         let ctx_clone = Arc::clone(&ctx);
@@ -360,7 +383,7 @@ impl ConnectionPool {
         });
 
         self.instances.insert(ctx.id, ctx);
-        spawn_supervisor(ctx_clone, pool);
+        spawn_supervisor(ctx_clone, pool, ws_cmd_rx);
     }
 
     /// Cancel the supervisor for `id` and remove from the map.
@@ -378,7 +401,7 @@ impl ConnectionPool {
         }
 
         // Create fresh InstanceCtx (new CancelToken + empty store).
-        let new_ctx = InstanceCtx::new(id, new_config);
+        let (new_ctx, ws_cmd_rx) = InstanceCtx::new(id, new_config);
 
         // Populate override cache (errors logged, don't fail restart).
         if let Err(e) = crate::handlers::entities::populate_override_cache(&self.pool, &new_ctx, id).await {
@@ -386,7 +409,7 @@ impl ConnectionPool {
         }
 
         self.instances.insert(id, Arc::clone(&new_ctx));
-        spawn_supervisor(new_ctx, self.pool.clone());
+        spawn_supervisor(new_ctx, self.pool.clone(), ws_cmd_rx);
     }
 }
 
@@ -394,13 +417,14 @@ impl ConnectionPool {
 
 /// Spawn a fully detached supervisor task for `instance`.
 /// Errors are logged; the app process continues regardless.
-pub fn spawn_supervisor(instance: Arc<InstanceCtx>, pool: PgPool) {
+pub fn spawn_supervisor(instance: Arc<InstanceCtx>, pool: PgPool, ws_cmd_rx: mpsc::Receiver<WsCmd>) {
     tokio::spawn(async move {
         let id = instance.id;
         let current_gen = instance.generation.load(Ordering::SeqCst);
         info!(instance_id = %id, gen = current_gen, "supervisor: starting");
 
         let mut backoff = Duration::from_secs(1);
+        let mut ws_cmd_rx = ws_cmd_rx;
 
         loop {
             if instance.cancel.is_cancelled() {
@@ -423,7 +447,7 @@ pub fn spawn_supervisor(instance: Arc<InstanceCtx>, pool: PgPool) {
                 .tx
                 .send(EntityEvent::Status(Arc::new(ConnStatus::Connecting)));
 
-            match ws::run_connection(Arc::clone(&instance), pool.clone()).await {
+            match ws::run_connection(Arc::clone(&instance), pool.clone(), &mut ws_cmd_rx).await {
                 Ok(()) => {
                     // Clean cancellation — exit.
                     info!(instance_id = %id, "supervisor: clean exit");

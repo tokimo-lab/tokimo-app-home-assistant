@@ -102,7 +102,7 @@ pub async fn create(State(ctx): State<Arc<AppCtx>>, Json(req): Json<CreateReq>) 
     let id: Uuid = r.get("id");
     info!(%id, "instance: created");
 
-    let instance_ctx = InstanceCtx::new(
+    let (instance_ctx, ws_cmd_rx) = InstanceCtx::new(
         id,
         InstanceConfig {
             base_url: req.base_url.clone(),
@@ -110,7 +110,7 @@ pub async fn create(State(ctx): State<Arc<AppCtx>>, Json(req): Json<CreateReq>) 
             verify_tls,
         },
     );
-    ctx.conn_pool.add_instance(instance_ctx);
+    ctx.conn_pool.add_instance(instance_ctx, ws_cmd_rx);
 
     Ok(Json(InstanceDto {
         id,

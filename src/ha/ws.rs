@@ -10,13 +10,14 @@ use std::time::Duration;
 use futures_util::{SinkExt, StreamExt};
 use serde::Deserialize;
 use serde_json::json;
+use tokio::sync::mpsc;
 use tokio::time::timeout;
 use tokio_tungstenite::{connect_async_tls_with_config, tungstenite::Message};
 use tracing::{debug, info, warn};
 
 use crate::error::AppError;
 use crate::ha::sync_visibility;
-use crate::state::{ConnStatus, EntityEvent, EntityState, InstanceCtx};
+use crate::state::{ConnStatus, EntityEvent, EntityState, InstanceCtx, WsCmd};
 
 // ─── WS message shapes ───────────────────────────────────────────────────────
 
@@ -43,7 +44,7 @@ struct StateChangedData {
 /// Run one connection attempt: connect, authenticate, bootstrap, subscribe,
 /// then loop reading events.  Returns an error on connection failure / auth
 /// failure / protocol violation. The caller handles backoff and cancellation.
-pub async fn run_connection(instance: Arc<InstanceCtx>, pool: sqlx::PgPool) -> anyhow::Result<()> {
+pub async fn run_connection(instance: Arc<InstanceCtx>, pool: sqlx::PgPool, ws_cmd_rx: &mut mpsc::Receiver<WsCmd>) -> anyhow::Result<()> {
     // Build WS URL from base_url.
     let (base_url, access_token, verify_tls) = {
         let cfg = instance.config.read().await;
@@ -199,6 +200,68 @@ pub async fn run_connection(instance: Arc<InstanceCtx>, pool: sqlx::PgPool) -> a
             _ = instance.cancel.cancelled() => {
                 info!(instance_id = %instance.id, "HA WS: cancelled");
                 return Ok(());
+            }
+
+            Some(cmd) = ws_cmd_rx.recv() => {
+                let cmd_id = next_id;
+                next_id += 1;
+
+                // Build the HA WS call_service message.
+                let mut msg = json!({
+                    "id": cmd_id,
+                    "type": "call_service",
+                    "domain": cmd.domain,
+                    "service": cmd.service,
+                });
+                // Attach target and/or data fields.
+                if !cmd.entity_id.is_empty() {
+                    msg["target"] = json!({"entity_id": cmd.entity_id});
+                }
+                if !cmd.data.is_null() && cmd.data != json!({}) {
+                    msg["data"] = cmd.data;
+                }
+
+                let send_result = stream
+                    .send(Message::text(msg.to_string()))
+                    .await;
+
+                if let Err(e) = send_result {
+                    let _ = cmd.reply.send(Err(format!("WS send failed: {e}")));
+                    anyhow::bail!("WS send call_service: {e}");
+                }
+
+                // Wait for the result message (id-matched).
+                let result: Result<Result<WsMsg, anyhow::Error>, _> = timeout(Duration::from_secs(30), async {
+                    loop {
+                        let m: WsMsg = read_msg(&mut stream).await?;
+                        if m.id == Some(cmd_id) {
+                            return Ok(m);
+                        }
+                        // Not our response — handle as event and keep waiting.
+                        handle_event_msg(&instance, m);
+                    }
+                })
+                .await;
+
+                match result {
+                    Ok(Ok(m)) if m.success == Some(true) => {
+                        let val = m.result.unwrap_or(serde_json::Value::Null);
+                        let _ = cmd.reply.send(Ok(val));
+                    }
+                    Ok(Ok(m)) => {
+                        let err_msg = format!("HA call_service failed: {:?}", m.error);
+                        let _ = cmd.reply.send(Err(err_msg.clone()));
+                        warn!(instance_id = %instance.id, error = err_msg, "HA WS: call_service error response");
+                    }
+                    Ok(Err(e)) => {
+                        let _ = cmd.reply.send(Err(format!("WS read error: {e}")));
+                        anyhow::bail!("WS read during call_service: {e}");
+                    }
+                    Err(_) => {
+                        let _ = cmd.reply.send(Err("WS call_service timed out".into()));
+                        warn!(instance_id = %instance.id, "HA WS: call_service timed out");
+                    }
+                }
             }
 
             _ = interval.tick() => {
