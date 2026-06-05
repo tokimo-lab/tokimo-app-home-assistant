@@ -88,8 +88,7 @@ struct TestResp {
 /// CLI goes through HTTP API; no DB connection needed.
 async fn init(auth: &TokimoAuthArgs) -> anyhow::Result<(String, String)> {
     let credentials = Credentials::resolve(auth).context("resolve credentials failed")?;
-    let base_url =
-        std::env::var("TOKIMO_SERVER_URL").unwrap_or_else(|_| "http://localhost:5678".to_string());
+    let base_url = std::env::var("TOKIMO_SERVER_URL").unwrap_or_else(|_| "http://localhost:5678".to_string());
     Ok((base_url, credentials.token))
 }
 
@@ -110,10 +109,7 @@ const API: &str = "/api/apps/home-assistant";
 
 // ── Dispatch ─────────────────────────────────────────────────────────────────
 
-pub async fn run(
-    auth: TokimoAuthArgs,
-    command: crate::Command,
-) -> anyhow::Result<()> {
+pub async fn run(auth: TokimoAuthArgs, command: crate::Command) -> anyhow::Result<()> {
     match command {
         crate::Command::Status => run_status(auth).await,
         crate::Command::Instances => run_instances(auth).await,
@@ -126,9 +122,7 @@ pub async fn run(
             include_hidden,
             limit,
             raw,
-        } => {
-            run_search(auth, instance_id, query, domain, state, include_hidden, limit, raw).await
-        }
+        } => run_search(auth, instance_id, query, domain, state, include_hidden, limit, raw).await,
         crate::Command::Entity {
             instance_id,
             entity_id,
@@ -141,10 +135,7 @@ pub async fn run(
             entity_id,
             data,
         } => run_call(auth, instance_id, domain, service, entity_id, data).await,
-        crate::Command::Summary {
-            instance_id,
-            raw,
-        } => run_summary(auth, instance_id, raw).await,
+        crate::Command::Summary { instance_id, raw } => run_summary(auth, instance_id, raw).await,
     }
 }
 
@@ -227,17 +218,11 @@ pub async fn run_instances(auth: TokimoAuthArgs) -> anyhow::Result<()> {
         return Ok(());
     }
 
-    println!(
-        "{:<38} {:<25} {:<40} Status",
-        "ID", "Name", "URL"
-    );
+    println!("{:<38} {:<25} {:<40} Status", "ID", "Name", "URL");
     println!("{}", "-".repeat(120));
     for inst in &instances {
         let status_str = format_status(&inst.status);
-        println!(
-            "{:<38} {:<25} {:<40} {}",
-            inst.id, inst.name, inst.base_url, status_str
-        );
+        println!("{:<38} {:<25} {:<40} {}", inst.id, inst.name, inst.base_url, status_str);
     }
 
     Ok(())
@@ -310,20 +295,14 @@ pub async fn run_search(
         .context("parse entities")?;
 
     let query_lower = query.to_lowercase();
-    let domain_filter: Option<Vec<String>> =
-        domain.map(|d| d.split(',').map(|s| s.trim().to_lowercase()).collect());
-    let state_filter: Option<Vec<String>> =
-        state.map(|s| s.split(',').map(|s| s.trim().to_lowercase()).collect());
+    let domain_filter: Option<Vec<String>> = domain.map(|d| d.split(',').map(|s| s.trim().to_lowercase()).collect());
+    let state_filter: Option<Vec<String>> = state.map(|s| s.split(',').map(|s| s.trim().to_lowercase()).collect());
 
     let mut results: Vec<&EntityListItem> = entities
         .iter()
         .filter(|e| {
             // Match query against entity_id or friendly_name
-            let friendly = e
-                .attributes
-                .get("friendly_name")
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
+            let friendly = e.attributes.get("friendly_name").and_then(|v| v.as_str()).unwrap_or("");
             let display = e.display_name.as_deref().unwrap_or("");
             let matches_query = e.entity_id.to_lowercase().contains(&query_lower)
                 || friendly.to_lowercase().contains(&query_lower)
@@ -371,10 +350,7 @@ pub async fn run_search(
 
     let noun = if results.len() == 1 { "entity" } else { "entities" };
     println!("🔍 Found {} {noun} matching \"{query}\":\n", results.len());
-    println!(
-        "  {:<40} {:<12} {:<15} Friendly Name",
-        "Entity ID", "State", "Domain"
-    );
+    println!("  {:<40} {:<12} {:<15} Friendly Name", "Entity ID", "State", "Domain");
     println!("  {}", "-".repeat(100));
 
     for e in &results {
@@ -399,19 +375,12 @@ pub async fn run_search(
 // ── entity ───────────────────────────────────────────────────────────────────
 
 /// Show detailed info for a single entity (including device metadata).
-pub async fn run_entity(
-    auth: TokimoAuthArgs,
-    instance_id: Uuid,
-    entity_id: String,
-    raw: bool,
-) -> anyhow::Result<()> {
+pub async fn run_entity(auth: TokimoAuthArgs, instance_id: Uuid, entity_id: String, raw: bool) -> anyhow::Result<()> {
     let (base_url, token) = init(&auth).await?;
     let client = api_client(&token);
 
     let entity: EntityDetail = client
-        .get(format!(
-            "{base_url}{API}/instances/{instance_id}/entities/{entity_id}"
-        ))
+        .get(format!("{base_url}{API}/instances/{instance_id}/entities/{entity_id}"))
         .send()
         .await
         .context("request entity")?
@@ -490,10 +459,8 @@ pub async fn run_entity(
     }
 
     // Display overrides
-    let has_display = entity.display_name.is_some()
-        || entity.custom_icon.is_some()
-        || entity.hidden
-        || entity.is_favorite;
+    let has_display =
+        entity.display_name.is_some() || entity.custom_icon.is_some() || entity.hidden || entity.is_favorite;
     if has_display {
         println!("\n  Display:");
         if let Some(ref name) = entity.display_name {
@@ -568,18 +535,12 @@ pub async fn run_call(
 // ── summary ──────────────────────────────────────────────────────────────────
 
 /// Show instance summary: unavailable entities + domain distribution.
-pub async fn run_summary(
-    auth: TokimoAuthArgs,
-    instance_id: Uuid,
-    raw: bool,
-) -> anyhow::Result<()> {
+pub async fn run_summary(auth: TokimoAuthArgs, instance_id: Uuid, raw: bool) -> anyhow::Result<()> {
     let (base_url, token) = init(&auth).await?;
     let client = api_client(&token);
 
     let summary: InstanceSummary = client
-        .get(format!(
-            "{base_url}{API}/instances/{instance_id}/summary"
-        ))
+        .get(format!("{base_url}{API}/instances/{instance_id}/summary"))
         .send()
         .await
         .context("request summary")?
@@ -613,16 +574,9 @@ pub async fn run_summary(
 
     // Unavailable entities
     if !summary.unavailable_entities.is_empty() {
-        println!(
-            "  ⚠️  Unavailable entities ({}):",
-            summary.unavailable_entities.len()
-        );
+        println!("  ⚠️  Unavailable entities ({}):", summary.unavailable_entities.len());
         for ue in &summary.unavailable_entities {
-            println!(
-                "    - {:<45} ({})",
-                ue.entity_id,
-                format_date_local(&ue.last_changed)
-            );
+            println!("    - {:<45} ({})", ue.entity_id, format_date_local(&ue.last_changed));
         }
         println!();
     }
@@ -698,15 +652,6 @@ fn truncate(s: &str, max: usize) -> String {
 
 fn format_date_local(date_str: &str) -> String {
     chrono::DateTime::parse_from_rfc3339(date_str)
-        .map(|dt| {
-            dt.with_timezone(&chrono::Local)
-                .format("%Y-%m-%d %H:%M")
-                .to_string()
-        })
-        .unwrap_or_else(|_| {
-            date_str
-                .get(..16)
-                .unwrap_or(date_str)
-                .replace('T', " ")
-        })
+        .map(|dt| dt.with_timezone(&chrono::Local).format("%Y-%m-%d %H:%M").to_string())
+        .unwrap_or_else(|_| date_str.get(..16).unwrap_or(date_str).replace('T', " "))
 }

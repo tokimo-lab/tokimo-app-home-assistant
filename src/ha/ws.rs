@@ -44,7 +44,11 @@ struct StateChangedData {
 /// Run one connection attempt: connect, authenticate, bootstrap, subscribe,
 /// then loop reading events.  Returns an error on connection failure / auth
 /// failure / protocol violation. The caller handles backoff and cancellation.
-pub async fn run_connection(instance: Arc<InstanceCtx>, pool: sqlx::PgPool, ws_cmd_rx: &mut mpsc::Receiver<WsCmd>) -> anyhow::Result<()> {
+pub async fn run_connection(
+    instance: Arc<InstanceCtx>,
+    pool: sqlx::PgPool,
+    ws_cmd_rx: &mut mpsc::Receiver<WsCmd>,
+) -> anyhow::Result<()> {
     // Build WS URL from base_url.
     let (base_url, access_token, verify_tls) = {
         let cfg = instance.config.read().await;
