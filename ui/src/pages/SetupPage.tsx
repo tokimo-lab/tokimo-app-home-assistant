@@ -42,7 +42,7 @@ export function SetupPage({ t, onCreated, onBack }: SetupPageProps) {
   }
 
   return (
-    <div className="relative flex h-full w-full flex-col overflow-auto bg-[var(--surface-base,#0b0f17)]">
+    <div className="relative flex h-full w-full flex-col overflow-auto bg-surface-base">
       {onBack && (
         <button
           type="button"

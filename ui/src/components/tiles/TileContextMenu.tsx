@@ -118,7 +118,7 @@ export function TileContextMenu({
           "z-[9999] min-w-[220px] overflow-hidden rounded-2xl",
           "border border-white/10 shadow-2xl backdrop-blur-xl",
           "bg-white/90 text-gray-900",
-          "dark:bg-[var(--surface-elevated,#1f2937)]/90 dark:text-white",
+          "dark:bg-surface-raised/90 dark:text-fg-primary",
         )}
       >
         {visibleItems.map((item, idx) => (

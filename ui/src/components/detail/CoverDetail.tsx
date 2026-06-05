@@ -38,10 +38,10 @@ export function CoverDetail({ entity, onCall, t }: DomainDetailProps) {
         onChange={setPos}
         onChangeEnd={commit}
         fillClassName="bg-gradient-to-t from-sky-500 to-sky-400"
-        trackClassName="bg-zinc-200 dark:bg-zinc-800"
+        trackClassName="bg-surface-raised"
         ariaLabel={t("detailCoverPosition")}
       >
-        <span className="font-semibold text-2xl text-zinc-900 dark:text-zinc-100">
+        <span className="font-semibold text-2xl text-fg-primary">
           {pos}%
         </span>
       </VerticalSlider>
@@ -57,7 +57,7 @@ export function CoverDetail({ entity, onCall, t }: DomainDetailProps) {
               optimisticState: "opening",
             })
           }
-          className="cursor-pointer rounded-full bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
+          className="cursor-pointer rounded-full bg-surface-raised px-4 py-2 text-sm font-medium text-fg-primary transition hover:bg-surface-raised"
         >
           {t("detailCoverOpen")}
         </button>
@@ -72,7 +72,7 @@ export function CoverDetail({ entity, onCall, t }: DomainDetailProps) {
               optimisticState: "closing",
             })
           }
-          className="cursor-pointer rounded-full bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
+          className="cursor-pointer rounded-full bg-surface-raised px-4 py-2 text-sm font-medium text-fg-primary transition hover:bg-surface-raised"
         >
           {t("detailCoverClose")}
         </button>
@@ -86,7 +86,7 @@ export function CoverDetail({ entity, onCall, t }: DomainDetailProps) {
               target: { entity_id },
             })
           }
-          className="cursor-pointer rounded-full bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
+          className="cursor-pointer rounded-full bg-surface-raised px-4 py-2 text-sm font-medium text-fg-primary transition hover:bg-surface-raised"
         >
           {t("detailCoverStop")}
         </button>

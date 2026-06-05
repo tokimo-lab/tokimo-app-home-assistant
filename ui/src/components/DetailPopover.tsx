@@ -53,18 +53,18 @@ export function DetailPopover({
       {/* Popover */}
       <div
         ref={popoverRef}
-        className="fixed z-[9999] w-[300px] rounded-2xl border border-white/10 bg-[var(--surface-elevated,#1f2937)] shadow-2xl"
+        className="fixed z-[9999] w-[300px] rounded-2xl border border-white/10 bg-surface-raised shadow-2xl"
         style={{ left, top }}
         onPointerDown={(e) => e.stopPropagation()}
       >
         {title && (
           <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
-            <span className="font-medium text-sm text-[var(--text-primary)]">
+            <span className="font-medium text-sm text-fg-primary">
               {title}
             </span>
             <button
               type="button"
-              className="cursor-pointer rounded-full p-1 hover:bg-white/10 text-[var(--text-secondary)]"
+              className="cursor-pointer rounded-full p-1 hover:bg-white/10 text-fg-secondary"
               onClick={onClose}
             >
               <X size={14} />

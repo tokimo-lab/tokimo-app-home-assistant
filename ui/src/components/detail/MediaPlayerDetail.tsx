@@ -71,7 +71,7 @@ export function MediaPlayerDetail({ entity, onCall, t }: DomainDetailProps) {
     <div className="flex flex-col items-stretch gap-6 py-2">
       {/* Now playing */}
       <div className="flex items-center gap-4">
-        <div className="flex h-20 w-20 flex-shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-zinc-100 shadow-inner dark:bg-zinc-800">
+        <div className="flex h-20 w-20 flex-shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-surface-raised shadow-inner">
           {artwork ? (
             <img
               src={artwork}
@@ -80,20 +80,20 @@ export function MediaPlayerDetail({ entity, onCall, t }: DomainDetailProps) {
               draggable={false}
             />
           ) : (
-            <Play size={28} className="text-zinc-400 dark:text-zinc-500" />
+            <Play size={28} className="text-fg-muted" />
           )}
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate font-semibold text-base text-zinc-900 dark:text-zinc-100">
+          <p className="truncate font-semibold text-base text-fg-primary">
             {title || t("detailMediaPlayerNothingPlaying")}
           </p>
           {artist && (
-            <p className="truncate text-sm text-zinc-500 dark:text-zinc-400">
+            <p className="truncate text-sm text-fg-secondary">
               {artist}
             </p>
           )}
           {album && (
-            <p className="truncate text-xs text-zinc-400 dark:text-zinc-500">
+            <p className="truncate text-xs text-fg-muted">
               {album}
             </p>
           )}
@@ -107,7 +107,7 @@ export function MediaPlayerDetail({ entity, onCall, t }: DomainDetailProps) {
           onClick={() => call("media_previous_track")}
           disabled={isOff}
           aria-label={t("detailMediaPlayerPrevious")}
-          className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-full bg-zinc-100 text-zinc-700 transition hover:bg-zinc-200 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
+          className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-full bg-surface-raised text-fg-primary transition hover:bg-surface-raised active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
         >
           <SkipBack size={20} />
         </button>
@@ -132,7 +132,7 @@ export function MediaPlayerDetail({ entity, onCall, t }: DomainDetailProps) {
           onClick={() => call("media_next_track")}
           disabled={isOff}
           aria-label={t("detailMediaPlayerNext")}
-          className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-full bg-zinc-100 text-zinc-700 transition hover:bg-zinc-200 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
+          className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-full bg-surface-raised text-fg-primary transition hover:bg-surface-raised active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
         >
           <SkipForward size={20} />
         </button>
@@ -148,7 +148,7 @@ export function MediaPlayerDetail({ entity, onCall, t }: DomainDetailProps) {
           aria-label={
             muted ? t("detailMediaPlayerUnmute") : t("detailMediaPlayerMute")
           }
-          className="flex h-9 w-9 flex-shrink-0 cursor-pointer items-center justify-center rounded-full text-zinc-600 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-40 dark:text-zinc-300 dark:hover:bg-zinc-800"
+          className="flex h-9 w-9 flex-shrink-0 cursor-pointer items-center justify-center rounded-full text-fg-secondary transition hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-40"
         >
           {muted ? <VolumeX size={18} /> : <Volume2 size={18} />}
         </button>
@@ -161,10 +161,10 @@ export function MediaPlayerDetail({ entity, onCall, t }: DomainDetailProps) {
           onChangeEnd={commitVolume}
           ariaLabel={t("detailMediaPlayerVolume")}
           fillClassName="bg-amber-400"
-          trackClassName="bg-zinc-200 dark:bg-zinc-800"
+          trackClassName="bg-surface-raised"
           heightClassName="h-2"
         />
-        <span className="w-10 text-right text-xs text-zinc-500 tabular-nums dark:text-zinc-400">
+        <span className="w-10 text-right text-xs text-fg-secondary tabular-nums">
           {volume}%
         </span>
       </div>
@@ -174,7 +174,7 @@ export function MediaPlayerDetail({ entity, onCall, t }: DomainDetailProps) {
         <button
           type="button"
           onClick={() => call("select_source", { source: "Apple TV" })}
-          className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-zinc-100 px-4 py-3 font-medium text-sm text-zinc-700 transition hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
+          className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-surface-raised px-4 py-3 font-medium text-sm text-fg-primary transition hover:bg-surface-raised"
         >
           <ExternalLink size={16} />
           {t("detailMediaPlayerOpenAppleTv")}

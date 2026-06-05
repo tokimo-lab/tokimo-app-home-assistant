@@ -280,21 +280,21 @@ export function EntityManagementPage({
   );
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-white dark:bg-zinc-950">
-      <header className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-black/[0.05] bg-white/80 px-6 py-3 backdrop-blur-md dark:border-white/[0.06] dark:bg-zinc-950/80">
+    <div className="flex h-full flex-col overflow-hidden bg-surface-base">
+      <header className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-black/[0.05] bg-white/80 px-6 py-3 backdrop-blur-md dark:border-white/[0.06] dark:bg-surface-base/80">
         <button
           type="button"
           onClick={onBack}
-          className="flex cursor-pointer items-center gap-1 rounded-full px-2 py-1 text-sm text-zinc-700 transition hover:bg-black/[0.05] dark:text-zinc-200 dark:hover:bg-white/[0.08]"
+          className="flex cursor-pointer items-center gap-1 rounded-full px-2 py-1 text-sm text-fg-primary transition hover:bg-black/[0.05] dark:hover:bg-white/[0.08]"
           aria-label={t("roomBack")}
         >
           <ChevronLeft size={20} />
           <span>{t("roomBack")}</span>
         </button>
-        <h1 className="flex-1 truncate text-center text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
+        <h1 className="flex-1 truncate text-center text-2xl font-bold tracking-tight text-fg-primary">
           {t("entityManagement")}
         </h1>
-        <span className="hidden shrink-0 text-xs text-zinc-500 sm:inline dark:text-zinc-400">
+        <span className="hidden shrink-0 text-xs text-fg-secondary sm:inline">
           {t("entityMgmtShowing")
             .replace("{shown}", String(shownCount))
             .replace("{total}", String(totalCount))
@@ -306,14 +306,14 @@ export function EntityManagementPage({
         <div className="flex flex-1 items-center gap-2 rounded-lg border border-black/[0.06] bg-black/[0.03] px-3 py-2 dark:border-white/[0.06] dark:bg-white/[0.04]">
           <Search
             size={16}
-            className="shrink-0 text-zinc-500 dark:text-zinc-400"
+            className="shrink-0 text-fg-secondary"
           />
           <input
             type="text"
             value={query}
             onChange={(ev) => setQuery(ev.target.value)}
             placeholder={t("entityMgmtSearchPlaceholder")}
-            className="w-full bg-transparent text-sm text-zinc-900 outline-none placeholder:text-zinc-500 dark:text-zinc-50 dark:placeholder:text-zinc-500"
+            className="w-full bg-transparent text-sm text-fg-primary outline-none placeholder:text-fg-secondary"
           />
         </div>
       </div>
@@ -321,21 +321,21 @@ export function EntityManagementPage({
       <div className="flex-1 overflow-auto px-6 pt-2 pb-8">
         {load.status === "loading" && (
           <div className="flex h-full items-center justify-center">
-            <div className="h-6 w-6 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-700 dark:border-zinc-700 dark:border-t-zinc-200" />
+            <div className="h-6 w-6 animate-spin rounded-full border-2 border-base border-t-fg-secondary dark:border-[var(--color-border-base)] dark:border-t-fg-primary" />
           </div>
         )}
         {load.status === "error" && (
           <p className="text-sm text-red-500">{load.message}</p>
         )}
         {load.status === "ready" && groups.length === 0 && (
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          <p className="text-sm text-fg-secondary">
             {t("homeEmpty")}
           </p>
         )}
         {load.status === "ready" &&
           groups.map((g) => (
             <section key={g.domain} className="mb-6">
-              <h3 className="mt-2 mb-2 text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+              <h3 className="mt-2 mb-2 text-lg font-semibold text-fg-primary">
                 {t(g.titleKey)}
               </h3>
               <ul className="flex flex-col gap-1">
@@ -417,26 +417,26 @@ function EntityRow({
         onClick={onOpenSettings}
         className="flex flex-1 cursor-pointer items-center gap-3 text-left"
       >
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-black/[0.04] text-zinc-700 dark:bg-white/[0.06] dark:text-zinc-200">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-black/[0.04] text-fg-primary dark:bg-white/[0.06]">
           <EntityIcon domain={domain} state={entity.state} size={18} />
         </span>
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="flex items-center gap-2">
-            <span className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-50">
+            <span className="truncate text-sm font-medium text-fg-primary">
               {name}
             </span>
             {isNonPrimary && (
-              <span className="shrink-0 rounded-full bg-zinc-200 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300">
+              <span className="shrink-0 rounded-full bg-surface-raised px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-fg-secondary">
                 {t("entityMgmtNotPrimary")}
               </span>
             )}
           </span>
-          <span className="truncate text-xs text-zinc-500 dark:text-zinc-400">
+          <span className="truncate text-xs text-fg-secondary">
             {entity.entity_id}
           </span>
           {accessory && (
-            <span className="flex items-center gap-1.5 text-[11px] text-zinc-500 dark:text-zinc-400">
-              <span className="shrink-0 rounded bg-zinc-100 px-1.5 py-0.5 font-medium dark:bg-zinc-800">
+            <span className="flex items-center gap-1.5 text-[11px] text-fg-secondary">
+              <span className="shrink-0 rounded bg-surface-raised px-1.5 py-0.5 font-medium">
                 {accessory}
               </span>
               {isPrimary && (
@@ -481,7 +481,7 @@ function ToggleCell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center gap-1 text-[10px] uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+    <div className="flex flex-col items-center gap-1 text-[10px] uppercase tracking-wider text-fg-secondary">
       <span>{label}</span>
       {children}
     </div>

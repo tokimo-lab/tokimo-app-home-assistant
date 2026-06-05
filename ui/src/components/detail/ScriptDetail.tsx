@@ -43,11 +43,11 @@ export function ScriptDetail({ entity, onCall, t }: DomainDetailProps) {
       >
         <Play size={64} strokeWidth={1.5} fill="currentColor" />
       </button>
-      <p className="font-medium text-base text-zinc-900 dark:text-zinc-100">
+      <p className="font-medium text-base text-fg-primary">
         {t("detailScriptTapToRun")}
       </p>
       {relative && (
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+        <p className="text-sm text-fg-secondary">
           {t("detailScriptLastRun")}: {relative}
         </p>
       )}

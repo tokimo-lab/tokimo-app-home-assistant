@@ -128,7 +128,7 @@ function HomeSwitcher({
   // Single instance (or none): no chevron, no dropdown — plain title text.
   if (instances.length <= 1) {
     return (
-      <span className="text-3xl font-bold leading-tight text-[var(--text-primary)]">
+      <span className="text-3xl font-bold leading-tight text-fg-primary">
         {title}
       </span>
     );
@@ -141,11 +141,11 @@ function HomeSwitcher({
         type="button"
         aria-label={t("homeSwitch")}
         title={t("homeSwitchTitle")}
-        className="flex cursor-pointer items-center gap-1 text-[var(--text-primary)] transition hover:opacity-80"
+        className="flex cursor-pointer items-center gap-1 text-fg-primary transition hover:opacity-80"
         {...getReferenceProps()}
       >
         <span className="text-3xl font-bold leading-tight">{title}</span>
-        <ChevronDown size={22} className="text-[var(--text-secondary)]" />
+        <ChevronDown size={22} className="text-fg-secondary" />
       </button>
 
       {open && (
@@ -155,12 +155,12 @@ function HomeSwitcher({
             style={floatingStyles}
             className={cn(
               "z-[9999] min-w-[220px] overflow-hidden rounded-xl",
-              "border border-white/[0.08] bg-[var(--surface-elevated,#1a1a1a)]",
-              "py-1 text-[var(--text-primary)] shadow-2xl",
+              "border border-white/[0.08] bg-surface-raised",
+              "py-1 text-fg-primary shadow-2xl",
             )}
             {...getFloatingProps()}
           >
-            <div className="px-3 py-1 text-xs text-white/40">
+            <div className="px-3 py-1 text-xs text-fg-muted">
               {t("homeSwitchTitle")}
             </div>
             {instances.map((inst) => {
@@ -177,7 +177,7 @@ function HomeSwitcher({
                   }}
                   className="flex w-full cursor-pointer items-center gap-3 px-3 py-2 text-left text-sm hover:bg-white/[0.06]"
                 >
-                  <span className="flex h-4 w-4 items-center justify-center text-[var(--accent,#18b2a4)]">
+                  <span className="flex h-4 w-4 items-center justify-center text-accent">
                     {active ? <Check size={16} /> : null}
                   </span>
                   <span className="flex-1 truncate">{inst.name}</span>

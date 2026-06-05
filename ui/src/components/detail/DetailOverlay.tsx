@@ -1,6 +1,5 @@
 import { Settings } from "lucide-react";
 import { type ComponentType, useEffect } from "react";
-import { createPortal } from "react-dom";
 import { formatState, getFriendlyName } from "../../lib/format";
 import { useAccessoryMemberIds } from "../../state/useAccessories";
 import { useDetailOverlay } from "../../state/useDetailOverlay";
@@ -96,24 +95,24 @@ export function DetailOverlay({
     openDetail(id, currentEntity.instanceId);
   };
 
-  return createPortal(
+  return (
     <div
-      className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/40 backdrop-blur-xl motion-safe:animate-[detail-fade_180ms_ease-out] sm:items-center"
+      className="absolute inset-0 z-[9999] flex items-end justify-center overflow-hidden bg-black/40 backdrop-blur-xl motion-safe:animate-[detail-fade_180ms_ease-out] sm:items-center"
       onPointerDown={closeDetail}
     >
       <div
-        className="relative mx-auto flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl motion-safe:animate-[detail-slide_220ms_cubic-bezier(0.22,1,0.36,1)] sm:rounded-3xl dark:bg-zinc-900"
+        className="relative mx-auto flex max-h-[80%] w-full max-w-md flex-col overflow-hidden rounded-t-3xl bg-surface-base shadow-2xl motion-safe:animate-[detail-slide_220ms_cubic-bezier(0.22,1,0.36,1)] sm:rounded-3xl sm:max-h-[75%]"
         onPointerDown={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
         aria-label={name}
       >
         <header className="flex flex-col items-center gap-1 px-6 pt-6 pb-2 text-center">
-          <h2 className="font-semibold text-lg text-zinc-900 dark:text-zinc-100">
+          <h2 className="font-semibold text-lg text-fg-primary">
             {name}
           </h2>
           {subtitle && (
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+            <p className="text-sm text-fg-secondary">
               {subtitle}
             </p>
           )}
@@ -138,7 +137,7 @@ export function DetailOverlay({
               )}
             </>
           ) : (
-            <p className="py-12 text-center text-sm text-zinc-500 dark:text-zinc-400">
+            <p className="py-12 text-center text-sm text-fg-secondary">
               {t("detailEntityMissing")}
             </p>
           )}
@@ -147,7 +146,7 @@ export function DetailOverlay({
         <button
           type="button"
           onClick={() => onOpenSettings(currentEntity.entityId)}
-          className="absolute right-4 bottom-4 flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-zinc-100 text-zinc-600 shadow-md transition hover:bg-zinc-200 hover:text-zinc-900 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700 dark:hover:text-zinc-100"
+          className="absolute right-4 bottom-4 flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-surface-base/90 text-fg-secondary shadow-lg backdrop-blur-md transition hover:text-fg-primary"
           aria-label={t("detailOpenSettings")}
         >
           <Settings size={18} />
@@ -164,7 +163,6 @@ export function DetailOverlay({
           to { transform: translateY(0); opacity: 1; }
         }
       `}</style>
-    </div>,
-    document.body,
+    </div>
   );
 }

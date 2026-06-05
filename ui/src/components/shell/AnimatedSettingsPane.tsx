@@ -35,8 +35,8 @@ export function AnimatedSettingsPane({
     <div
       className={
         exiting
-          ? "absolute inset-0 z-10 animate-settings-pane-out bg-[var(--surface-base,#0b0f17)]"
-          : "absolute inset-0 z-10 animate-settings-pane-in bg-[var(--surface-base,#0b0f17)]"
+          ? "absolute inset-0 z-10 animate-settings-pane-out bg-surface-base"
+          : "absolute inset-0 z-10 animate-settings-pane-in bg-surface-base"
       }
       onAnimationEnd={() => {
         if (exiting) setRender(false);

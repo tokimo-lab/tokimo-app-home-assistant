@@ -33,14 +33,14 @@ export function EditModeToolbar({
           className={cn(
             "text-2xl font-semibold",
             muted
-              ? "text-[var(--text-secondary)]"
-              : "text-[var(--text-primary)]",
+              ? "text-fg-secondary"
+              : "text-fg-primary",
           )}
         >
           {title}
         </h1>
         {subtitle && (
-          <p className="text-xs text-[var(--text-secondary)]">{subtitle}</p>
+          <p className="text-xs text-fg-secondary">{subtitle}</p>
         )}
       </div>
       <button
@@ -49,7 +49,7 @@ export function EditModeToolbar({
         className={cn(
           "absolute right-0 top-1/2 -translate-y-1/2",
           "cursor-pointer rounded-full px-4 py-1.5",
-          "text-sm font-semibold text-[var(--accent,#3b82f6)]",
+          "text-sm font-semibold text-accent",
           "transition hover:bg-white/[0.06]",
         )}
       >

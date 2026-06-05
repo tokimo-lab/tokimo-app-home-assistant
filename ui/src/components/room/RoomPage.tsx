@@ -218,13 +218,13 @@ export function RoomPage({
   if (!room) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-4 px-6 py-6">
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+        <p className="text-sm text-fg-secondary">
           {t("errorLoad")}
         </p>
         <button
           type="button"
           onClick={onBack}
-          className="cursor-pointer rounded-full bg-black/[0.04] px-4 py-2 text-sm text-zinc-700 transition hover:bg-black/[0.08] dark:bg-white/[0.06] dark:text-zinc-200 dark:hover:bg-white/[0.1]"
+          className="cursor-pointer rounded-full bg-black/[0.04] px-4 py-2 text-sm text-fg-primary transition hover:bg-black/[0.08] dark:bg-surface-raised dark:hover:bg-white/[0.1]"
         >
           {t("roomBack")}
         </button>
@@ -238,13 +238,13 @@ export function RoomPage({
         <button
           type="button"
           onClick={onBack}
-          className="flex cursor-pointer items-center gap-1 rounded-full px-2 py-1 text-sm text-zinc-700 transition hover:bg-black/[0.05] dark:text-zinc-200 dark:hover:bg-white/[0.08]"
+          className="flex cursor-pointer items-center gap-1 rounded-full px-2 py-1 text-sm text-fg-primary transition hover:bg-black/[0.05] dark:hover:bg-surface-raised"
           aria-label={t("roomBack")}
         >
           <ChevronLeft size={20} />
           <span>{t("roomBack")}</span>
         </button>
-        <h1 className="flex-1 truncate text-center text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
+        <h1 className="flex-1 truncate text-center text-3xl font-bold tracking-tight text-fg-primary">
           {room.name}
         </h1>
         <RoomMenu
@@ -259,7 +259,7 @@ export function RoomPage({
 
         {groups.map((g) => (
           <section key={g.domain}>
-            <h3 className="mt-4 mb-2 text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+            <h3 className="mt-4 mb-2 text-lg font-semibold text-fg-primary">
               {t(g.titleKey)}
             </h3>
             <RoomDomainSection
@@ -277,7 +277,7 @@ export function RoomPage({
         ))}
 
         {groups.length === 0 && (
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          <p className="text-sm text-fg-secondary">
             {t("homeEmpty")}
           </p>
         )}
@@ -315,7 +315,7 @@ function RoomMenu({ enabled, onShowAll, t }: RoomMenuProps) {
       <button
         type="button"
         disabled
-        className="flex h-9 w-9 items-center justify-center rounded-full text-zinc-400 dark:text-zinc-500"
+        className="flex h-9 w-9 items-center justify-center rounded-full text-fg-muted"
         aria-label="more"
       >
         <MoreHorizontal size={20} />
@@ -329,7 +329,7 @@ function RoomMenu({ enabled, onShowAll, t }: RoomMenuProps) {
         ref={refs.setReference}
         type="button"
         aria-label={t("menuOpen")}
-        className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-zinc-700 transition hover:bg-black/[0.05] dark:text-zinc-200 dark:hover:bg-white/[0.08]"
+        className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-fg-primary transition hover:bg-black/[0.05] dark:hover:bg-surface-raised"
         {...getReferenceProps()}
       >
         <MoreHorizontal size={20} />
@@ -341,8 +341,8 @@ function RoomMenu({ enabled, onShowAll, t }: RoomMenuProps) {
             style={floatingStyles}
             className={cn(
               "z-[9999] min-w-[200px] overflow-hidden rounded-xl",
-              "border border-black/[0.08] bg-white py-1 text-zinc-900 shadow-2xl",
-              "dark:border-white/[0.08] dark:bg-[var(--surface-elevated,#1a1a1a)] dark:text-[var(--text-primary)]",
+              "border border-black/[0.08] bg-surface-raised py-1 text-fg-primary shadow-2xl",
+              "dark:border-white/[0.08] dark:bg-surface-raised",
             )}
             {...getFloatingProps()}
           >
@@ -355,7 +355,7 @@ function RoomMenu({ enabled, onShowAll, t }: RoomMenuProps) {
               }}
               className="flex w-full cursor-pointer items-center gap-3 px-3 py-2 text-left text-sm hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
             >
-              <span className="flex h-4 w-4 items-center justify-center text-zinc-500 dark:text-[var(--text-secondary)]">
+              <span className="flex h-4 w-4 items-center justify-center text-fg-secondary">
                 <Eye size={16} />
               </span>
               <span className="flex-1 truncate">{t("showAllDevices")}</span>

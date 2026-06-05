@@ -186,7 +186,7 @@ export function ClimateDetail({ entity, onCall, t }: DomainDetailProps) {
               strokeWidth={STROKE}
               strokeLinecap="round"
               strokeDasharray={`${ARC_LENGTH} ${GAP_LENGTH}`}
-              className="text-zinc-200 dark:text-zinc-800"
+              className="text-fg-secondary dark:text-fg-primary"
             />
             <circle
               cx={SIZE / 2}
@@ -215,7 +215,7 @@ export function ClimateDetail({ entity, onCall, t }: DomainDetailProps) {
             y={SIZE / 2 - 6}
             textAnchor="middle"
             dominantBaseline="middle"
-            className="fill-zinc-900 font-semibold text-5xl dark:fill-zinc-100"
+            className="fill-fg-primary font-semibold text-5xl dark:fill-fg-primary"
           >
             {target}
             {unit}
@@ -226,7 +226,7 @@ export function ClimateDetail({ entity, onCall, t }: DomainDetailProps) {
               y={SIZE / 2 + 28}
               textAnchor="middle"
               dominantBaseline="middle"
-              className="fill-zinc-500 text-sm dark:fill-zinc-400"
+              className="fill-fg-secondary text-sm dark:fill-fg-secondary"
             >
               {t("detailClimateCurrent")}:{" "}
               {formatNumeric(current, entity.decimal_places, 1) ?? current}
@@ -238,7 +238,7 @@ export function ClimateDetail({ entity, onCall, t }: DomainDetailProps) {
 
       {hvacModes.length > 0 && (
         <div className="flex w-full flex-col gap-2">
-          <span className="text-sm text-zinc-500 dark:text-zinc-400">
+          <span className="text-sm text-fg-secondary">
             {t("detailClimateMode")}
           </span>
           <div className="flex flex-wrap gap-2">
@@ -253,7 +253,7 @@ export function ClimateDetail({ entity, onCall, t }: DomainDetailProps) {
                   className={`cursor-pointer rounded-full px-4 py-2 text-sm font-medium transition ${
                     active
                       ? "bg-orange-500 text-white shadow-sm"
-                      : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
+                      : "bg-surface-raised text-fg-primary hover:bg-surface-raised"
                   }`}
                 >
                   {(() => {

@@ -66,7 +66,7 @@ export function EntityManagementHost({
 
   return (
     <div
-      className="fixed inset-0 z-30 bg-white dark:bg-zinc-950"
+      className="fixed inset-0 z-30 bg-surface-base"
       style={{
         transform: offscreen ? "translateX(100%)" : "translateX(0)",
         transition: `transform ${ANIM_MS}ms ease-out`,

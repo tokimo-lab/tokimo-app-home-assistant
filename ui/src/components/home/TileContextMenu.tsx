@@ -104,7 +104,7 @@ export function TileContextMenu({
       <div
         ref={refs.setFloating}
         style={floatingStyles}
-        className="z-[9999] min-w-[180px] rounded-xl border border-white/[0.08] bg-[var(--surface-elevated,#1a1a1a)] py-1 text-[var(--text-primary)] shadow-2xl"
+        className="z-[9999] min-w-[180px] rounded-xl border border-white/[0.08] bg-surface-raised py-1 text-fg-primary shadow-2xl"
         {...getFloatingProps()}
       >
         {/* Show Controls — primary action, mirrors Apple Home */}
@@ -117,7 +117,7 @@ export function TileContextMenu({
         <div className="my-1 h-px bg-white/[0.08]" />
 
         {/* Size selector */}
-        <div className="px-3 py-1 text-xs text-white/40">
+        <div className="px-3 py-1 text-xs text-fg-muted">
           {t("tileSizeHeading")}
         </div>
         {SIZES.map((s) => (
@@ -126,7 +126,7 @@ export function TileContextMenu({
             label={t(SIZE_LABEL_KEY[s])}
             trailing={
               s === currentSize ? (
-                <Check size={14} className="text-[var(--accent,#6366f1)]" />
+                <Check size={14} className="text-accent" />
               ) : null
             }
             onClick={handle(() => onSetSize(s))}
@@ -183,7 +183,7 @@ function MenuItem({
       className="flex w-full cursor-pointer items-center gap-3 px-3 py-2 text-left text-sm hover:bg-white/[0.06]"
     >
       {icon && (
-        <span className="flex h-4 w-4 items-center justify-center text-[var(--text-secondary)]">
+        <span className="flex h-4 w-4 items-center justify-center text-fg-secondary">
           {icon}
         </span>
       )}

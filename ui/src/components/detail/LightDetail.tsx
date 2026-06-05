@@ -106,10 +106,10 @@ export function LightDetail({ entity, onCall, t }: DomainDetailProps) {
           onChange={setPct}
           onChangeEnd={commitBrightness}
           fillClassName="bg-gradient-to-t from-amber-300 to-amber-200"
-          trackClassName="bg-zinc-200 dark:bg-zinc-800"
+          trackClassName="bg-surface-raised"
           ariaLabel={t("detailLightBrightness")}
         >
-          <span className="font-semibold text-2xl text-zinc-900 dark:text-zinc-100">
+          <span className="font-semibold text-2xl text-fg-primary">
             {pct}%
           </span>
         </VerticalSlider>
@@ -128,7 +128,7 @@ export function LightDetail({ entity, onCall, t }: DomainDetailProps) {
           className={`flex h-40 w-40 cursor-pointer items-center justify-center rounded-full font-semibold text-lg shadow-lg transition active:scale-95 ${
             isOn
               ? "bg-amber-400 text-white"
-              : "bg-zinc-200 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
+              : "bg-surface-raised text-fg-secondary"
           }`}
         >
           {isOn ? t("stateOn") : t("stateOff")}
@@ -137,7 +137,7 @@ export function LightDetail({ entity, onCall, t }: DomainDetailProps) {
 
       {hasColor && (
         <div className="flex w-full flex-col gap-2">
-          <span className="text-sm text-zinc-500 dark:text-zinc-400">
+          <span className="text-sm text-fg-secondary">
             {t("detailLightColor")}
           </span>
           <div className="flex flex-wrap gap-3">
@@ -155,8 +155,8 @@ export function LightDetail({ entity, onCall, t }: DomainDetailProps) {
                   aria-label={hex}
                   className={`h-9 w-9 cursor-pointer rounded-full border-2 transition hover:scale-110 ${
                     active
-                      ? "border-zinc-900 dark:border-white"
-                      : "border-white/40 dark:border-zinc-700"
+                      ? "border-accent dark:border-white"
+                      : "border-white/40 dark:border-[var(--color-border-base)]"
                   }`}
                   style={{ background: hex }}
                 />
@@ -169,10 +169,10 @@ export function LightDetail({ entity, onCall, t }: DomainDetailProps) {
       {hasColorTemp && (
         <div className="flex w-full flex-col gap-2">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-zinc-500 dark:text-zinc-400">
+            <span className="text-fg-secondary">
               {t("detailLightColorTemp")}
             </span>
-            <span className="font-medium text-zinc-900 dark:text-zinc-100">
+            <span className="font-medium text-fg-primary">
               {currentK}K
             </span>
           </div>

@@ -207,7 +207,7 @@ function RoomRow({
         disabled={busy}
         aria-label={t("roomsCrudDelete")}
         title={t("roomsCrudDelete")}
-        className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded text-white/40 transition hover:bg-red-500/10 hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-40"
+        className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded text-fg-muted transition hover:bg-red-500/10 hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-40"
       >
         <Trash2 size={13} />
       </button>

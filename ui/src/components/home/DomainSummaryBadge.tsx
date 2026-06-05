@@ -229,7 +229,7 @@ export function DomainSummaryBadge({
           <div
             key={b.key}
             className={cn(
-              "flex items-center gap-2 text-sm text-[var(--text-secondary)]",
+              "flex items-center gap-2 text-sm text-fg-secondary",
             )}
           >
             <span className="flex h-5 w-5 items-center justify-center rounded-full border border-current">

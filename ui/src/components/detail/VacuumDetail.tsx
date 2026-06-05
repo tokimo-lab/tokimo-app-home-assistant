@@ -23,13 +23,13 @@ export function VacuumDetail({ entity, onCall, t }: DomainDetailProps) {
     <div className="flex flex-col items-center gap-8 py-4">
       {battery != null && (
         <div className="flex flex-col items-center gap-1">
-          <div className="flex items-center gap-2 text-zinc-900 dark:text-zinc-100">
+          <div className="flex items-center gap-2 text-fg-primary">
             <Battery size={28} />
             <span className="font-semibold text-4xl tabular-nums">
               {battery}%
             </span>
           </div>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          <p className="text-sm text-fg-secondary">
             {(() => {
               const key = `detailVacuumState${state.charAt(0).toUpperCase()}${state.slice(1)}`;
               const v = t(key);
@@ -47,7 +47,7 @@ export function VacuumDetail({ entity, onCall, t }: DomainDetailProps) {
           className={`flex h-16 w-16 cursor-pointer items-center justify-center rounded-full shadow transition active:scale-95 ${
             isCleaning
               ? "bg-emerald-500 text-white"
-              : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
+              : "bg-surface-raised text-fg-primary hover:bg-surface-raised"
           }`}
         >
           <Play size={24} fill="currentColor" />
@@ -56,7 +56,7 @@ export function VacuumDetail({ entity, onCall, t }: DomainDetailProps) {
           type="button"
           onClick={() => call("pause", "paused")}
           aria-label={t("detailVacuumPause")}
-          className="flex h-16 w-16 cursor-pointer items-center justify-center rounded-full bg-zinc-100 text-zinc-700 shadow transition hover:bg-zinc-200 active:scale-95 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
+          className="flex h-16 w-16 cursor-pointer items-center justify-center rounded-full bg-surface-raised text-fg-primary shadow transition hover:bg-surface-raised active:scale-95"
         >
           <Pause size={24} fill="currentColor" />
         </button>
@@ -64,7 +64,7 @@ export function VacuumDetail({ entity, onCall, t }: DomainDetailProps) {
           type="button"
           onClick={() => call("return_to_base", "returning")}
           aria-label={t("detailVacuumReturnToBase")}
-          className="flex h-16 w-16 cursor-pointer items-center justify-center rounded-full bg-zinc-100 text-zinc-700 shadow transition hover:bg-zinc-200 active:scale-95 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
+          className="flex h-16 w-16 cursor-pointer items-center justify-center rounded-full bg-surface-raised text-fg-primary shadow transition hover:bg-surface-raised active:scale-95"
         >
           <Home size={22} />
         </button>

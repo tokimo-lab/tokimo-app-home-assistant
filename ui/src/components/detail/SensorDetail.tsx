@@ -42,19 +42,19 @@ export function SensorDetail({ entity, t }: DomainDetailProps) {
 
   return (
     <div className="flex flex-col items-center gap-4 py-8">
-      <Icon size={48} className="text-zinc-400 dark:text-zinc-500" />
+      <Icon size={48} className="text-fg-muted" />
       <div className="flex items-baseline gap-2">
-        <span className="font-semibold text-5xl text-zinc-900 tabular-nums dark:text-zinc-100">
+        <span className="font-semibold text-5xl text-fg-primary tabular-nums">
           {display}
         </span>
         {!isUnknown && unit && (
-          <span className="font-medium text-2xl text-zinc-500 dark:text-zinc-400">
+          <span className="font-medium text-2xl text-fg-secondary">
             {unit}
           </span>
         )}
       </div>
       {deviceClass && (
-        <p className="text-xs font-medium text-zinc-500 uppercase tracking-wide dark:text-zinc-400">
+        <p className="text-xs font-medium text-fg-secondary uppercase tracking-wide">
           {deviceClass}
         </p>
       )}

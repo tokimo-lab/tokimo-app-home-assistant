@@ -36,7 +36,7 @@ export function RescanModal({
         >
           {t("rescanClearLabel")}
         </Checkbox>
-        <p className="text-xs text-[var(--text-secondary)]">
+        <p className="text-xs text-fg-secondary">
           {t("rescanClearHint")}
         </p>
       </div>

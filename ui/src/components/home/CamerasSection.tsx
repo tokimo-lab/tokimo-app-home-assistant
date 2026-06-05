@@ -34,7 +34,7 @@ export function CamerasSection({
           // TODO(H5+): jump to dedicated cameras grid view.
           console.log("[CamerasSection] open cameras grid");
         }}
-        className="mb-3 flex cursor-pointer items-center gap-1 text-base font-semibold text-[var(--text-primary)] transition hover:text-[var(--accent,#6366f1)]"
+        className="mb-3 flex cursor-pointer items-center gap-1 text-base font-semibold text-fg-primary transition hover:text-accent"
       >
         <span>{t("sectionCameras")}</span>
         <ChevronRight size={18} />

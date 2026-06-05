@@ -37,8 +37,8 @@ export function SubFunctionList({
   }
 
   return (
-    <div className="mt-6 border-t border-zinc-100 pt-2 dark:border-zinc-800/60">
-      <div className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
+    <div className="mt-6 border-t border-[var(--color-border-base)] pt-2">
+      <div>
         {subMembers.map((m) => (
           <SubFunctionRow
             key={m.entity_id}
@@ -82,15 +82,15 @@ function SubFunctionRow({
       domain={domain}
       state={state}
       size={20}
-      className="shrink-0 text-zinc-500 dark:text-zinc-400"
+      className="shrink-0 text-fg-secondary"
     />
   ) : null;
 
   if (hasControl) {
     return (
-      <div className="flex items-center gap-3 py-3.5">
+      <div className="flex items-center gap-3 border-b border-[var(--color-border-base)] py-3.5">
         {iconNode}
-        <span className="flex-1 text-[15px] text-zinc-900 dark:text-zinc-100">
+        <span className="flex-1 text-[15px] text-fg-primary">
           {name}
         </span>
         <div className="flex items-center gap-2">{control}</div>
@@ -102,13 +102,13 @@ function SubFunctionRow({
     <button
       type="button"
       onClick={() => onNavigate(entity_id)}
-      className="flex w-full cursor-pointer items-center gap-3 py-3.5 text-left transition hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
+      className="flex w-full cursor-pointer items-center gap-3 border-b border-[var(--color-border-base)] py-3.5 text-left transition hover:bg-surface-raised"
     >
       {iconNode}
-      <span className="flex-1 text-[15px] text-zinc-900 dark:text-zinc-100">
+      <span className="flex-1 text-[15px] text-fg-primary">
         {name}
       </span>
-      <ChevronRight size={16} className="text-zinc-400 dark:text-zinc-500" />
+      <ChevronRight size={16} className="text-fg-muted" />
     </button>
   );
 }
@@ -201,7 +201,7 @@ function renderControl(
 
   // Fallback: show state text (non-interactive)
   return (
-    <span className="text-[15px] font-medium text-zinc-900 dark:text-zinc-100">
+    <span className="text-[15px] font-medium text-fg-primary">
       {state}
     </span>
   );

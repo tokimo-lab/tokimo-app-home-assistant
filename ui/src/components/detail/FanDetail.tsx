@@ -63,9 +63,9 @@ export function FanDetail({ entity, onCall, t }: DomainDetailProps) {
         onChangeEnd={commitPct}
         ariaLabel={t("detailFanSpeed")}
         fillClassName="bg-sky-400"
-        trackClassName="bg-zinc-200 dark:bg-zinc-800"
+        trackClassName="bg-surface-raised"
       >
-        <div className="flex flex-col items-center gap-1 text-zinc-700 dark:text-zinc-100">
+        <div className="flex flex-col items-center gap-1 text-fg-primary">
           <Fan
             size={36}
             className={
@@ -84,7 +84,7 @@ export function FanDetail({ entity, onCall, t }: DomainDetailProps) {
         className={`flex h-12 w-12 cursor-pointer items-center justify-center rounded-full shadow transition active:scale-95 ${
           isOn
             ? "bg-sky-500 text-white hover:bg-sky-600"
-            : "bg-zinc-200 text-zinc-500 hover:bg-zinc-300 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
+            : "bg-surface-raised text-fg-secondary hover:bg-surface-raised"
         }`}
       >
         <Power size={20} />
@@ -92,7 +92,7 @@ export function FanDetail({ entity, onCall, t }: DomainDetailProps) {
 
       {presetModes.length > 0 && (
         <div className="flex w-full flex-col gap-2">
-          <p className="text-center text-xs font-medium text-zinc-500 uppercase tracking-wide dark:text-zinc-400">
+          <p className="text-center text-xs font-medium text-fg-secondary uppercase tracking-wide">
             {t("detailFanPresetMode")}
           </p>
           <div className="flex flex-wrap items-center justify-center gap-2">
@@ -107,7 +107,7 @@ export function FanDetail({ entity, onCall, t }: DomainDetailProps) {
                   className={`cursor-pointer rounded-full px-4 py-1.5 text-sm font-medium transition ${
                     active
                       ? "bg-sky-500 text-white shadow"
-                      : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
+                      : "bg-surface-raised text-fg-primary hover:bg-surface-raised"
                   }`}
                 >
                   {mode}

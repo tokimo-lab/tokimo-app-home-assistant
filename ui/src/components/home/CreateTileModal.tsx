@@ -42,7 +42,7 @@ export default function CreateTileModalWindow({
 
   if (!meta.instanceId) {
     return (
-      <div className="flex h-full items-center justify-center bg-[var(--surface-base,#0b0f17)] px-4 text-sm text-red-300">
+      <div className="flex h-full items-center justify-center bg-surface-base px-4 text-sm text-red-300">
         Missing instanceId in modal metadata.
       </div>
     );
@@ -173,7 +173,7 @@ function CreateTileModal({
   }
 
   return (
-    <div className="flex h-full flex-col bg-[var(--surface-base,#0b0f17)] text-[var(--text-primary,#fff)]">
+    <div className="flex h-full flex-col bg-surface-base text-fg-primary">
       <header className="flex items-center justify-between border-b border-white/[0.06] px-5 py-3">
         <h2 className="text-base font-semibold">{t("createTileTitle")}</h2>
         <button
@@ -192,7 +192,7 @@ function CreateTileModal({
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder={t("createTileNamePlaceholder")}
-            className="w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white placeholder:text-white/40 focus:border-blue-500/50 focus:outline-none"
+            className="w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white placeholder:text-fg-muted focus:border-blue-500/50 focus:outline-none"
           />
         </Field>
 
@@ -215,14 +215,14 @@ function CreateTileModal({
           <div className="relative mb-2">
             <Search
               size={16}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40"
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-muted"
             />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={t("createTileSearchPlaceholder")}
-              className="w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 pl-9 text-sm text-white placeholder:text-white/40 focus:border-blue-500/50 focus:outline-none"
+              className="w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 pl-9 text-sm text-white placeholder:text-fg-muted focus:border-blue-500/50 focus:outline-none"
             />
           </div>
           <EntityPicker
@@ -262,7 +262,7 @@ function CreateTileModal({
               "rounded-full px-5 py-2 text-sm font-semibold transition",
               canSubmit
                 ? "cursor-pointer bg-blue-500 text-white hover:bg-blue-400"
-                : "cursor-not-allowed bg-white/[0.06] text-white/40",
+                : "cursor-not-allowed bg-white/[0.06] text-fg-muted",
             )}
           >
             {submitting ? "…" : t("createTileSubmit")}
@@ -302,14 +302,14 @@ function EntityPicker({
 }) {
   if (entities.length === 0) {
     return (
-      <div className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-6 text-center text-xs text-white/40">
+      <div className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-6 text-center text-xs text-fg-muted">
         {t("createTileNoMatch")}
       </div>
     );
   }
   return (
     <div className="max-h-[40vh] overflow-y-auto rounded-lg border border-white/10 bg-white/[0.02]">
-      <div className="grid grid-cols-[auto_1fr_auto] items-center gap-x-3 px-3 py-1.5 text-[10px] font-medium uppercase tracking-wide text-white/40">
+      <div className="grid grid-cols-[auto_1fr_auto] items-center gap-x-3 px-3 py-1.5 text-[10px] font-medium uppercase tracking-wide text-fg-muted">
         <span />
         <span />
         <span>{t("createTilePrimaryColumn")}</span>
@@ -344,7 +344,7 @@ function EntityPicker({
                 <span className="truncate text-white">
                   {e.attributes.friendly_name ?? e.entity_id}
                 </span>
-                <span className="truncate text-xs text-white/40">
+                <span className="truncate text-xs text-fg-muted">
                   {e.entity_id}
                 </span>
               </span>

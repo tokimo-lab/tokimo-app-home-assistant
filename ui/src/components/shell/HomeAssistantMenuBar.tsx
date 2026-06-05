@@ -117,7 +117,7 @@ export function HomeAssistantMenuBar({
           >
             {t("syncClearLabel", "清空数据重新同步")}
           </Checkbox>
-          <p className="text-xs text-[var(--text-secondary)]">
+          <p className="text-xs text-fg-secondary">
             {t(
               "syncClearHint",
               "勾选后将删除该家庭中所有设备并重新完整同步，适合修复数据异常。",

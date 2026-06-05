@@ -81,7 +81,7 @@ function iconBgFor(state: TileVisualState, domain: string | undefined): string {
     case "off":
       return "bg-gray-400/30 text-white/70";
     case "unavailable":
-      return "bg-gray-500/20 text-white/40";
+      return "bg-gray-500/20 text-fg-muted";
   }
 }
 
@@ -226,7 +226,7 @@ export function TileShell({
   const isUnavailable = state === "unavailable";
   const tileBg = selected
     ? "bg-white text-gray-900"
-    : "bg-[var(--surface-elevated,#1f2937)] text-white";
+    : "bg-surface-raised text-fg-primary";
 
   return (
     // biome-ignore lint/a11y/useSemanticElements: outer must remain a div to allow nesting the icon-region <button> inside; nested <button> is invalid HTML. The keyboard handler below preserves accessibility.

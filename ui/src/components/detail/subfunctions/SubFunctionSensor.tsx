@@ -19,7 +19,7 @@ export function SubFunctionSensor({ entity }: SubFunctionSensorProps) {
   const display = formatted ?? state;
 
   return (
-    <span className="text-[15px] font-medium text-zinc-900 tabular-nums dark:text-zinc-100">
+    <span className="text-[15px] font-medium text-fg-primary tabular-nums text-fg-primary">
       {display}
       {unit && ` ${unit}`}
     </span>

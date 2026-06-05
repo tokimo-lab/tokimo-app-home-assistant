@@ -23,7 +23,7 @@ export function SceneDetail({ entity, onCall, t }: DomainDetailProps) {
       >
         <Sparkles size={64} strokeWidth={1.5} />
       </button>
-      <p className="font-medium text-base text-zinc-900 dark:text-zinc-100">
+      <p className="font-medium text-base text-fg-primary">
         {t("detailSceneTapToActivate")}
       </p>
     </div>

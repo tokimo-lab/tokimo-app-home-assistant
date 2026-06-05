@@ -49,17 +49,17 @@ export function SectionDragRow({ room, count, t: _t }: SectionRowProps) {
         {...sortable.listeners}
         className={cn(
           "flex h-8 w-8 cursor-grab items-center justify-center rounded-md",
-          "text-[var(--text-secondary)] hover:bg-white/[0.06]",
+          "text-fg-secondary hover:bg-white/[0.06]",
           "active:cursor-grabbing",
         )}
       >
         <GripVertical size={18} />
       </button>
       <div className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate text-base font-semibold text-[var(--text-primary)]">
+        <span className="truncate text-base font-semibold text-fg-primary">
           {room.name}
         </span>
-        <span className="truncate text-xs text-[var(--text-secondary)]">
+        <span className="truncate text-xs text-fg-secondary">
           {count} item{count === 1 ? "" : "s"}
         </span>
       </div>

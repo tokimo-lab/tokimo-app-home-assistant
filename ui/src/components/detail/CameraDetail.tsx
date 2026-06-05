@@ -19,7 +19,7 @@ export function CameraDetail({ entity, t }: DomainDetailProps) {
 
   return (
     <div className="flex flex-col items-stretch gap-3 py-2">
-      <div className="relative flex aspect-video w-full items-center justify-center overflow-hidden rounded-2xl bg-zinc-100 dark:bg-zinc-800">
+      <div className="relative flex aspect-video w-full items-center justify-center overflow-hidden rounded-2xl bg-surface-raised">
         {src && (
           <img
             src={src}
@@ -33,18 +33,18 @@ export function CameraDetail({ entity, t }: DomainDetailProps) {
           />
         )}
         {status === "loading" && (
-          <div className="absolute inset-0 flex items-center justify-center text-zinc-400 dark:text-zinc-500">
+          <div className="absolute inset-0 flex items-center justify-center text-fg-muted">
             <Loader2 size={32} className="motion-safe:animate-spin" />
           </div>
         )}
         {status === "error" && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-zinc-400 dark:text-zinc-500">
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-fg-muted">
             <CameraOff size={32} />
             <p className="text-sm">{t("detailCameraUnavailable")}</p>
           </div>
         )}
       </div>
-      <p className="text-center text-xs text-zinc-500 dark:text-zinc-400">
+      <p className="text-center text-xs text-fg-secondary">
         {t("detailCameraSnapshotNote")}
       </p>
     </div>

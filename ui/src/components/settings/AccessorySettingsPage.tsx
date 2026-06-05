@@ -59,7 +59,7 @@ export default function AccessorySettingsModal({
 
   if (!meta.instanceId || !meta.entityId) {
     return (
-      <div className="flex h-full items-center justify-center bg-[var(--surface-base,#0b0f17)] px-4 text-sm text-red-300">
+      <div className="flex h-full items-center justify-center bg-surface-base px-4 text-sm text-red-300">
         Missing instanceId/entityId in modal metadata.
       </div>
     );
@@ -137,7 +137,7 @@ export function AccessorySettingsPage({
   );
 
   return (
-    <div className="flex h-full flex-col bg-[var(--surface-base,#0b0f17)] text-white dark:bg-[var(--surface-base,#0b0f17)]">
+    <div className="flex h-full flex-col bg-surface-base text-fg-primary">
       <Header
         entity={loadState.status === "ready" ? loadState.entity : null}
         onClose={onClose}
@@ -183,7 +183,7 @@ function Header({
     : "";
   const status = entity ? entity.state : "";
   return (
-    <header className="flex h-14 items-center gap-3 border-b border-white/10 px-4 dark:border-white/10">
+    <header className="flex h-14 items-center gap-3 border-b border-white/10 px-4 dark:border-[var(--color-border-base)]">
       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/[0.06] text-lg dark:bg-white/[0.06]">
         {entity?.custom_icon ?? entity?.attributes.icon ?? "💡"}
       </div>
@@ -263,7 +263,7 @@ function Body({
         />
       </SettingRow>
 
-      <p className="text-xs leading-relaxed text-white/40 dark:text-white/40">
+      <p className="text-xs leading-relaxed text-fg-muted">
         {t("accessoryHint")}
       </p>
 
@@ -271,7 +271,7 @@ function Body({
         <button
           type="button"
           disabled
-          className="w-full cursor-not-allowed rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2 text-left text-sm text-white/40"
+          className="w-full cursor-not-allowed rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2 text-left text-sm text-fg-muted"
         >
           {t("accessoryGroupComingSoon")}
         </button>
@@ -508,7 +508,7 @@ function Section({
 }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <h3 className="px-1 text-[11px] font-medium uppercase tracking-wider text-white/40 dark:text-white/40">
+      <h3 className="px-1 text-[11px] font-medium uppercase tracking-wider text-fg-muted">
         {label}
       </h3>
       <div className="flex flex-col gap-1">{children}</div>
@@ -520,7 +520,7 @@ function DisabledRow({ label }: { label: string }) {
   return (
     <div
       className={cn(
-        "flex items-center justify-between rounded-lg bg-white/[0.02] px-3 py-2 text-sm text-white/40",
+        "flex items-center justify-between rounded-lg bg-white/[0.02] px-3 py-2 text-sm text-fg-muted",
       )}
     >
       <span>{label}</span>

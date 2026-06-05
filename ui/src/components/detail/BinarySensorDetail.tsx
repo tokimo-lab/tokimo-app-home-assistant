@@ -65,21 +65,21 @@ export function BinarySensorDetail({ entity, t }: DomainDetailProps) {
         className={`flex h-24 w-24 items-center justify-center rounded-full transition ${
           isOn
             ? "bg-amber-100 text-amber-500 dark:bg-amber-500/20 dark:text-amber-300"
-            : "bg-zinc-100 text-zinc-400 dark:bg-zinc-800 dark:text-zinc-500"
+            : "bg-surface-raised text-fg-muted"
         }`}
       >
         {isOn ? <CircleDot size={56} /> : <Circle size={56} />}
       </div>
-      <p className="font-semibold text-3xl text-zinc-900 dark:text-zinc-100">
+      <p className="font-semibold text-3xl text-fg-primary">
         {label}
       </p>
       {deviceClass && (
-        <p className="text-xs font-medium text-zinc-500 uppercase tracking-wide dark:text-zinc-400">
+        <p className="text-xs font-medium text-fg-secondary uppercase tracking-wide">
           {deviceClass}
         </p>
       )}
       {changed && (
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+        <p className="text-sm text-fg-secondary">
           {t("detailBinarySensorLastChanged")}: {changed}
         </p>
       )}

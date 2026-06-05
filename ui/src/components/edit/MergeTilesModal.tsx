@@ -46,7 +46,7 @@ export default function MergeTilesModalWindow({
     meta.memberEntityIds.length === 0
   ) {
     return (
-      <div className="flex h-full items-center justify-center bg-[var(--surface-base,#0b0f17)] px-4 text-sm text-red-300">
+      <div className="flex h-full items-center justify-center bg-surface-base px-4 text-sm text-red-300">
         Missing merge metadata.
       </div>
     );
@@ -139,7 +139,7 @@ function MergeTilesModal({
   }
 
   return (
-    <div className="flex h-full flex-col bg-[var(--surface-base,#0b0f17)] text-[var(--text-primary,#fff)]">
+    <div className="flex h-full flex-col bg-surface-base text-fg-primary">
       <header className="flex items-center justify-between border-b border-white/[0.06] px-5 py-3">
         <h2 className="text-base font-semibold">{t("mergeTilesTitle")}</h2>
         <button
@@ -165,7 +165,7 @@ function MergeTilesModal({
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder={fallbackName}
-            className="w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white placeholder:text-white/40 focus:border-blue-500/50 focus:outline-none"
+            className="w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white placeholder:text-fg-muted focus:border-blue-500/50 focus:outline-none"
           />
         </label>
 
@@ -198,7 +198,7 @@ function MergeTilesModal({
                     <span className="truncate text-white">
                       {e.attributes.friendly_name ?? e.entity_id}
                     </span>
-                    <span className="truncate text-xs text-white/40">
+                    <span className="truncate text-xs text-fg-muted">
                       {e.entity_id}
                     </span>
                   </span>
@@ -223,7 +223,7 @@ function MergeTilesModal({
           className={cn(
             "rounded-full px-5 py-2 text-sm font-semibold transition",
             submitting
-              ? "cursor-wait bg-white/[0.06] text-white/40"
+              ? "cursor-wait bg-white/[0.06] text-fg-muted"
               : "cursor-pointer bg-blue-500 text-white hover:bg-blue-400",
           )}
         >

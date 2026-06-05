@@ -88,7 +88,7 @@ export function MembersSection({
 
   return (
     <div ref={sectionRef} className="flex flex-col gap-1.5">
-      <h3 className="px-1 text-[11px] font-medium uppercase tracking-wider text-white/40 dark:text-white/40">
+      <h3 className="px-1 text-[11px] font-medium uppercase tracking-wider text-fg-muted dark:text-fg-muted">
         {t("accessoryMembers")}
       </h3>
 
@@ -115,7 +115,7 @@ export function MembersSection({
                 <span className="truncate text-sm font-medium text-white">
                   {member.attributes.friendly_name ?? member.entity_id}
                 </span>
-                <span className="truncate text-xs text-white/40">
+                <span className="truncate text-xs text-fg-muted">
                   {member.entity_id}
                 </span>
               </div>

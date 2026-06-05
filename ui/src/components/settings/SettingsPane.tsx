@@ -28,7 +28,7 @@ export function SettingsPane({
   t,
 }: SettingsPaneProps) {
   return (
-    <div className="flex h-full flex-col bg-[var(--surface-base,#0b0f17)]">
+    <div className="flex h-full flex-col bg-surface-base">
       <header className="flex h-12 items-center justify-between border-b border-white/10 px-4">
         <h2 className="text-sm font-semibold text-white">
           {t("settingsTitle")}

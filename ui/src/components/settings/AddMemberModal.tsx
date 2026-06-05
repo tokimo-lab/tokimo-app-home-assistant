@@ -86,14 +86,14 @@ export function AddMemberModal({
         <div className="relative">
           <Search
             size={16}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40"
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-muted"
           />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t("addMemberModalSearch")}
-            className="w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 pl-9 text-sm text-white placeholder:text-white/40 focus:border-blue-500/50 focus:outline-none"
+            className="w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 pl-9 text-sm text-white placeholder:text-fg-muted focus:border-blue-500/50 focus:outline-none"
           />
         </div>
 
@@ -134,7 +134,7 @@ export function AddMemberModal({
                     <span className="truncate text-sm font-medium text-white">
                       {entity.attributes.friendly_name ?? entity.entity_id}
                     </span>
-                    <span className="truncate text-xs text-white/40">
+                    <span className="truncate text-xs text-fg-muted">
                       {entity.entity_id}
                     </span>
                   </div>

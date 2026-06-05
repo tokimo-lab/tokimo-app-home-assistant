@@ -15,13 +15,13 @@ export function EmptyState({
 }: EmptyStateProps) {
   return (
     <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
-      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white/[0.06] text-[var(--text-muted,#6b7280)]">
+      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white/[0.06] text-fg-muted">
         {icon ?? <Home size={28} />}
       </div>
       <div className="flex flex-col gap-1">
-        <p className="font-medium text-[var(--text-primary)]">{title}</p>
+        <p className="font-medium text-fg-primary">{title}</p>
         {description && (
-          <p className="text-sm text-[var(--text-secondary,#6b7280)]">
+          <p className="text-sm text-fg-secondary">
             {description}
           </p>
         )}

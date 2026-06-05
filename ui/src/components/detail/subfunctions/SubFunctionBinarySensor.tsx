@@ -30,7 +30,7 @@ export function SubFunctionBinarySensor({
   }
 
   return (
-    <span className="text-[15px] font-medium text-zinc-900 dark:text-zinc-100">
+    <span className="text-[15px] font-medium text-fg-primary">
       {displayText}
     </span>
   );

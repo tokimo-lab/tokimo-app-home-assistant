@@ -46,7 +46,7 @@ export function SubFunctionNumber({ entity, onSet }: SubFunctionNumberProps) {
       onKeyDown={(e) => e.key === " " && e.stopPropagation()}
       role="presentation"
     >
-      <span className="text-xs font-medium text-zinc-500 tabular-nums dark:text-zinc-400">
+      <span className="text-xs font-medium text-fg-secondary tabular-nums">
         {value.toFixed(step < 1 ? 1 : 0)}
       </span>
       <input
@@ -57,7 +57,7 @@ export function SubFunctionNumber({ entity, onSet }: SubFunctionNumberProps) {
         value={value}
         onChange={handleChange}
         onPointerUp={handleCommit}
-        className="h-2 w-24 cursor-pointer appearance-none rounded-full bg-zinc-200 accent-blue-500 dark:bg-zinc-700"
+        className="h-2 w-24 cursor-pointer appearance-none rounded-full bg-surface-raised accent-blue-500"
       />
     </div>
   );

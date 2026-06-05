@@ -87,7 +87,7 @@ export function RoomEnvBadges({ entities, t: _t }: RoomEnvBadgesProps) {
       {items.map(({ key, Icon, value, unit }) => (
         <div
           key={key}
-          className="flex items-center gap-1.5 rounded-full bg-black/[0.04] px-3 py-1.5 text-xs text-zinc-700 dark:bg-white/[0.06] dark:text-zinc-300"
+          className="flex items-center gap-1.5 rounded-full bg-black/[0.04] px-3 py-1.5 text-xs text-fg-primary dark:bg-white/[0.06] text-fg-secondary"
         >
           <Icon size={14} />
           <span className="font-medium tabular-nums">

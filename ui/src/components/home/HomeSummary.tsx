@@ -61,16 +61,16 @@ export function HomeSummary({
         <AlertCircle size={16} />
       </span>
       <span className="flex-1">
-        <span className="block text-sm font-medium text-[var(--text-primary)]">
+        <span className="block text-sm font-medium text-fg-primary">
           {count} {t("summaryAccessories")}
         </span>
-        <span className="block text-xs text-[var(--text-secondary)]">
+        <span className="block text-xs text-fg-secondary">
           {t("summaryNoResponse")}
         </span>
       </span>
       <ChevronRight
         size={16}
-        className="shrink-0 text-[var(--text-secondary)]"
+        className="shrink-0 text-fg-secondary"
       />
     </button>
   );

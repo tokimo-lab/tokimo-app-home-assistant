@@ -205,14 +205,14 @@ export function FilterChipBar({
                 className={cn(
                   "flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-full px-3.5 text-sm transition",
                   active
-                    ? "bg-white text-neutral-900 shadow-sm dark:bg-white dark:text-neutral-900"
-                    : "bg-white/[0.06] text-[var(--text-primary)] hover:bg-white/[0.1] dark:bg-white/[0.06]",
+                    ? "bg-white text-fg-primary shadow-sm dark:bg-white dark:text-fg-primary"
+                    : "bg-white/[0.06] text-fg-primary hover:bg-white/[0.1] dark:bg-white/[0.06]",
                 )}
                 aria-pressed={active}
               >
                 <Icon
                   size={15}
-                  className={active ? "text-neutral-900" : "text-current"}
+                  className={active ? "text-fg-primary" : "text-current"}
                 />
                 <span className="font-medium leading-none">
                   {t(meta.labelKey)}
@@ -222,8 +222,8 @@ export function FilterChipBar({
                     className={cn(
                       "text-xs leading-none",
                       active
-                        ? "text-neutral-500"
-                        : "text-[var(--text-secondary)]",
+                        ? "text-fg-secondary"
+                        : "text-fg-secondary",
                     )}
                   >
                     {summary}
@@ -236,14 +236,14 @@ export function FilterChipBar({
       <div
         aria-hidden
         className={cn(
-          "pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-[var(--surface-base,#0b0f17)] to-transparent transition-opacity duration-150",
+          "pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-surface-base to-transparent transition-opacity duration-150",
           scrollState.left ? "opacity-100" : "opacity-0",
         )}
       />
       <div
         aria-hidden
         className={cn(
-          "pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-[var(--surface-base,#0b0f17)] to-transparent transition-opacity duration-150",
+          "pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-surface-base to-transparent transition-opacity duration-150",
           scrollState.right ? "opacity-100" : "opacity-0",
         )}
       />

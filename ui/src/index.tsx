@@ -80,7 +80,7 @@ function parseRoute(route: string): ParsedRoute {
 function Spinner() {
   return (
     <div className="flex h-full items-center justify-center">
-      <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" />
+      <div className="h-8 w-8 animate-spin rounded-full border-2 border-accent border-t-transparent" />
     </div>
   );
 }

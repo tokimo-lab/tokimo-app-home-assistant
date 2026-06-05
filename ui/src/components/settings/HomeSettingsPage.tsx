@@ -67,8 +67,8 @@ export function HomeSettingsPage({
   }, [refresh]);
 
   return (
-    <div className="flex h-full flex-col bg-[var(--surface-base,#0b0f17)] text-white dark:bg-[var(--surface-base,#0b0f17)]">
-      <header className="flex h-12 items-center gap-2 border-b border-white/10 px-3 dark:border-white/10">
+    <div className="flex h-full flex-col bg-surface-base text-fg-primary">
+      <header className="flex h-12 items-center gap-2 border-b border-white/10 px-3 dark:border-[var(--color-border-base)]">
         {onBack && (
           <button
             type="button"
@@ -121,7 +121,7 @@ export function HomeSettingsPage({
             </Section>
 
             <Section label={t("homeSettingsSectionMembers")}>
-              <p className="rounded-lg bg-white/[0.02] px-3 py-2 text-xs text-white/40 dark:text-white/40">
+              <p className="rounded-lg bg-white/[0.02] px-3 py-2 text-xs text-fg-muted">
                 {t("homeSettingsMembersComingSoon")}
               </p>
             </Section>
@@ -145,7 +145,7 @@ export function HomeSettingsPage({
                     <RefreshCw size={13} />
                     {t("homeSettingsRotateToken")}
                   </span>
-                  <span className="text-xs text-white/40">›</span>
+                  <span className="text-xs text-fg-muted">›</span>
                 </button>
               )}
             </Section>
@@ -216,7 +216,7 @@ function Section({
 }) {
   return (
     <div className="flex flex-col gap-2">
-      <h3 className="px-1 text-[11px] font-medium uppercase tracking-wider text-white/40 dark:text-white/40">
+      <h3 className="px-1 text-[11px] font-medium uppercase tracking-wider text-fg-muted">
         {label}
       </h3>
       <div className="flex flex-col gap-1">{children}</div>

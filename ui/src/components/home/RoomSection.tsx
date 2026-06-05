@@ -55,14 +55,14 @@ export function RoomSection({
   const containerId = roomContainerId(room.id);
 
   const header = editMode ? (
-    <h2 className="mb-3 text-base font-semibold text-[var(--text-primary)]">
+    <h2 className="mb-3 text-base font-semibold text-fg-primary">
       {room.name}
     </h2>
   ) : (
     <button
       type="button"
       onClick={() => onOpenRoom(room.id)}
-      className="mb-3 flex cursor-pointer items-center gap-1 text-base font-semibold text-[var(--text-primary)] transition hover:text-[var(--accent,#6366f1)]"
+      className="mb-3 flex cursor-pointer items-center gap-1 text-base font-semibold text-fg-primary transition hover:text-accent"
     >
       <span>{room.name}</span>
       <ChevronRight size={18} />
@@ -121,7 +121,7 @@ export function RoomSection({
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
-          className="mt-3 flex cursor-pointer items-center gap-1 text-sm text-[var(--text-secondary)] transition hover:text-[var(--text-primary)]"
+          className="mt-3 flex cursor-pointer items-center gap-1 text-sm text-fg-secondary transition hover:text-fg-primary"
         >
           <ChevronDown
             size={16}

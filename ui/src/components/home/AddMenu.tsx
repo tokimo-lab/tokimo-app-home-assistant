@@ -88,7 +88,7 @@ export function AddMenu({
         type="button"
         aria-label={t("homeAdd")}
         title={t("homeAdd")}
-        className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-white/[0.06] text-[var(--text-primary)] transition hover:bg-white/[0.1]"
+        className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-white/[0.06] text-fg-primary transition hover:bg-white/[0.1]"
         {...getReferenceProps()}
       >
         <Plus size={20} />
@@ -102,7 +102,7 @@ export function AddMenu({
             className={cn(
               "z-[9999] min-w-[260px] overflow-hidden rounded-2xl",
               "border border-white/[0.06] bg-black/80 backdrop-blur-xl",
-              "py-1 text-[var(--text-primary)] shadow-2xl",
+              "py-1 text-fg-primary shadow-2xl",
             )}
             {...getFloatingProps()}
           >
@@ -183,7 +183,7 @@ function AddMenuItem({
       )}
     >
       <span className="flex-1 truncate">{label}</span>
-      <Icon size={22} className="shrink-0 text-[var(--text-secondary)]" />
+      <Icon size={22} className="shrink-0 text-fg-secondary" />
     </button>
   );
 }

@@ -57,7 +57,7 @@ export function RoomDomainSection({
   return (
     <section>
       {!hideTitle && (
-        <h2 className="mb-3 text-base font-semibold text-zinc-900 dark:text-zinc-100">
+        <h2 className="mb-3 text-base font-semibold text-fg-primary">
           {t(titleKey)}
         </h2>
       )}
@@ -85,7 +85,7 @@ export function RoomDomainSection({
         <button
           type="button"
           onClick={() => setLocalExpanded((v) => !v)}
-          className="mt-3 flex cursor-pointer items-center gap-1 text-sm text-zinc-500 transition hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+          className="mt-3 flex cursor-pointer items-center gap-1 text-sm text-fg-secondary transition hover:text-fg-primary text-fg-secondary dark:hover:text-fg-primary"
         >
           <ChevronDown
             size={16}

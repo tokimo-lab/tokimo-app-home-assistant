@@ -226,7 +226,7 @@ export function TileBaseStyle({
         "relative flex h-full w-full flex-col overflow-hidden rounded-2xl p-3 transition-colors",
         active
           ? "bg-[var(--ha-tile-accent)] text-white"
-          : "bg-white text-gray-500 dark:bg-white/[0.06] dark:text-gray-400",
+          : "bg-surface-raised text-fg-secondary",
         isLarge ? "items-center justify-center gap-2" : "justify-between",
         interactive &&
           "cursor-pointer select-none active:scale-[0.97] transition-transform",
@@ -265,7 +265,7 @@ export function TileBaseStyle({
           isLarge ? "h-12 w-12" : "h-8 w-8 self-start",
           onIconClick &&
             "cursor-pointer rounded-full transition-shadow hover:ring-4 hover:ring-white/15",
-          active ? "text-white" : "text-gray-400 dark:text-gray-400",
+          active ? "text-white" : "text-fg-secondary",
         )}
       >
         {icon}
@@ -284,7 +284,7 @@ export function TileBaseStyle({
           data-tile-name
           className={cn(
             "truncate text-[15px] font-semibold leading-tight",
-            active ? "text-white" : "text-gray-700 dark:text-gray-100",
+            active ? "text-white" : "text-fg-primary",
           )}
         >
           {name}
@@ -294,7 +294,7 @@ export function TileBaseStyle({
             data-tile-state
             className={cn(
               "mt-0.5 truncate text-[13px] leading-tight",
-              active ? "text-white/90" : "text-gray-500 dark:text-gray-400",
+              active ? "text-white/90" : "text-fg-secondary",
             )}
           >
             {stateText}

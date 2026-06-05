@@ -86,7 +86,7 @@ export function HomeMenu({
         ref={refs.setReference}
         type="button"
         aria-label={t("menuOpen")}
-        className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-[var(--text-secondary)] transition hover:bg-white/[0.06]"
+        className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-fg-secondary transition hover:bg-white/[0.06]"
         {...getReferenceProps()}
       >
         <MoreHorizontal size={20} />
@@ -99,8 +99,8 @@ export function HomeMenu({
             style={floatingStyles}
             className={cn(
               "z-[9999] min-w-[260px] overflow-hidden rounded-xl",
-              "border border-white/[0.08] bg-[var(--surface-elevated,#1a1a1a)]",
-              "py-1 text-[var(--text-primary)] shadow-2xl",
+              "border border-white/[0.08] bg-surface-raised",
+              "py-1 text-fg-primary shadow-2xl",
             )}
             {...getFloatingProps()}
           >
@@ -170,7 +170,7 @@ export function HomeMenu({
             {rooms.length > 0 && (
               <>
                 <div className="my-1 h-px bg-white/[0.08]" />
-                <div className="px-3 py-1 text-xs text-white/40">
+                <div className="px-3 py-1 text-xs text-fg-muted">
                   {t("menuRoomsHeading")}
                 </div>
                 {rooms.map((room) => (
@@ -207,7 +207,7 @@ function MenuItem({
       className="flex w-full cursor-pointer items-center gap-3 px-3 py-2 text-left text-sm hover:bg-white/[0.06]"
     >
       {icon && (
-        <span className="flex h-4 w-4 items-center justify-center text-[var(--text-secondary)]">
+        <span className="flex h-4 w-4 items-center justify-center text-fg-secondary">
           {icon}
         </span>
       )}

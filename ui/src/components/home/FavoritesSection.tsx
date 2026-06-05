@@ -39,7 +39,7 @@ export function FavoritesSection({
   }
 
   const header = (
-    <h2 className="mb-3 text-base font-semibold text-[var(--text-primary)]">
+    <h2 className="mb-3 text-base font-semibold text-fg-primary">
       {t("sectionFavorites")}
     </h2>
   );
