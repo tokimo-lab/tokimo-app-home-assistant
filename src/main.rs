@@ -19,8 +19,11 @@ mod db;
 mod error;
 mod ha;
 mod handlers;
+mod protocol;
 mod state;
 mod tls;
+mod uds_client;
+mod uds_server;
 
 use std::sync::{Arc, OnceLock};
 
@@ -163,10 +166,15 @@ async fn run_server() -> anyhow::Result<()> {
         client: Arc::clone(&client_slot),
     });
 
-    // Spawn UDS axum server.
+    // Spawn UDS axum server (for broker communication).
     let app_socket = app_server::spawn("home-assistant", Arc::clone(&ctx))
         .await
         .map_err(|e| anyhow::anyhow!("app_server spawn: {e}"))?;
+
+    // Spawn UDS server for CLI communication.
+    if let Err(e) = uds_server::spawn(Arc::clone(&ctx)).await {
+        tracing::warn!(error = %e, "uds-server: failed to start, CLI will use direct mode");
+    }
 
     // Register with broker.
     let client = BusClient::builder(cfg)

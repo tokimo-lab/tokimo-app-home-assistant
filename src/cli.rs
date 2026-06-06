@@ -1,13 +1,17 @@
 //! CLI entrypoints for Home Assistant.
 //!
-//! All commands go through the main server HTTP proxy (`/api/apps/home-assistant/...`)
-//! because live entity state and device registry are in-memory on the server side.
+//! Supports two modes:
+//! 1. **UDS mode** (fast): Connect to the running server via UDS socket
+//! 2. **Direct mode** (fallback): Connect via HTTP API through the broker
 
 use anyhow::Context;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use tokimo_bus_cli::{Credentials, TokimoAuthArgs};
+use tracing::debug;
 use uuid::Uuid;
+
+use crate::uds_client::UdsClient;
 
 // ── Response DTOs (minimal, matching server JSON shape) ──────────────────────
 
@@ -110,6 +114,50 @@ const API: &str = "/api/apps/home-assistant";
 // ── Dispatch ─────────────────────────────────────────────────────────────────
 
 pub async fn run(auth: TokimoAuthArgs, command: crate::Command) -> anyhow::Result<()> {
+    // Try UDS mode first (fast path).
+    if let Some(mut client) = UdsClient::connect().await {
+        debug!("cli: using UDS mode");
+        return run_uds(&mut client, &command).await;
+    }
+
+    // Fall back to direct HTTP mode.
+    debug!("cli: using direct HTTP mode");
+    run_direct(auth, command).await
+}
+
+/// Run command via UDS client.
+async fn run_uds(client: &mut UdsClient, command: &crate::Command) -> anyhow::Result<()> {
+    match command {
+        crate::Command::Status => run_status_uds(client).await,
+        crate::Command::Instances => run_instances_uds(client).await,
+        crate::Command::Test { id } => run_test_uds(client, *id).await,
+        crate::Command::Search {
+            instance_id,
+            query,
+            domain,
+            state,
+            include_hidden,
+            limit,
+            raw,
+        } => run_search_uds(client, *instance_id, query, domain.as_deref(), state.as_deref(), *include_hidden, *limit, *raw).await,
+        crate::Command::Entity {
+            instance_id,
+            entity_id,
+            raw,
+        } => run_entity_uds(client, *instance_id, entity_id, *raw).await,
+        crate::Command::Call {
+            instance_id,
+            domain,
+            service,
+            entity_id,
+            data,
+        } => run_call_uds(client, *instance_id, domain, service, entity_id, data.as_deref()).await,
+        crate::Command::Summary { instance_id, raw } => run_summary_uds(client, *instance_id, *raw).await,
+    }
+}
+
+/// Run command via direct HTTP (original implementation).
+async fn run_direct(auth: TokimoAuthArgs, command: crate::Command) -> anyhow::Result<()> {
     match command {
         crate::Command::Status => run_status(auth).await,
         crate::Command::Instances => run_instances(auth).await,
@@ -139,10 +187,261 @@ pub async fn run(auth: TokimoAuthArgs, command: crate::Command) -> anyhow::Resul
     }
 }
 
-// ── status ───────────────────────────────────────────────────────────────────
+// ── UDS implementations ─────────────────────────────────────────────────────
+
+async fn run_status_uds(client: &mut UdsClient) -> anyhow::Result<()> {
+    let status = client.status().await
+        .context("UDS status request failed")?;
+
+    println!("🏠 Home Assistant CLI — {} instance(s)\n", status.instances_count);
+
+    for inst in &status.instances {
+        println!("  Instance: {} ({})", inst.name, inst.id);
+        println!("  Status:   {}", inst.status);
+        println!("  Entities: {}", inst.entity_count);
+        println!();
+    }
+
+    Ok(())
+}
+
+async fn run_instances_uds(client: &mut UdsClient) -> anyhow::Result<()> {
+    let response = client.instances().await
+        .context("UDS instances request failed")?;
+
+    if response.instances.is_empty() {
+        println!("No instances configured.");
+        return Ok(());
+    }
+
+    println!("{:<38} {:<25} {:<40} Status", "ID", "Name", "URL");
+    println!("{}", "-".repeat(120));
+    for inst in &response.instances {
+        println!("{:<38} {:<25} {:<40} {}", inst.id, inst.name, inst.base_url, inst.status);
+    }
+
+    Ok(())
+}
+
+async fn run_test_uds(client: &mut UdsClient, instance_id: Uuid) -> anyhow::Result<()> {
+    let response = client.test(&instance_id.to_string()).await
+        .context("UDS test request failed")?;
+
+    if response.success {
+        println!("✅ Connected (latency: {}ms)", response.latency_ms);
+    } else {
+        println!("❌ Connection failed: {}", response.error.as_deref().unwrap_or("unknown error"));
+    }
+
+    Ok(())
+}
+
+async fn run_search_uds(
+    client: &mut UdsClient,
+    _instance_id: Uuid,
+    query: &str,
+    domain: Option<&str>,
+    state: Option<&str>,
+    include_hidden: bool,
+    limit: u32,
+    raw: bool,
+) -> anyhow::Result<()> {
+    let response = client.search(query, domain, state, include_hidden, limit).await
+        .context("UDS search request failed")?;
+
+    if raw {
+        let json_out: Vec<serde_json::Value> = response.entities
+            .iter()
+            .map(|e| {
+                serde_json::json!({
+                    "instance_id": e.instance_id,
+                    "entity_id": e.entity_id,
+                    "state": e.state,
+                    "attributes": e.attributes,
+                    "display_name": e.display_name,
+                })
+            })
+            .collect();
+        println!("{}", serde_json::to_string_pretty(&json_out)?);
+        return Ok(());
+    }
+
+    if response.entities.is_empty() {
+        println!("No entities found matching \"{query}\".");
+        return Ok(());
+    }
+
+    let noun = if response.entities.len() == 1 { "entity" } else { "entities" };
+    println!("🔍 Found {} {noun} matching \"{query}\":\n", response.entities.len());
+    println!("  {:<40} {:<12} {:<15} Friendly Name", "Entity ID", "State", "Domain");
+    println!("  {}", "-".repeat(100));
+
+    for e in &response.entities {
+        let domain_str = e.entity_id.split('.').next().unwrap_or("?");
+        let friendly = e.display_name.as_deref()
+            .or_else(|| e.attributes.get("friendly_name").and_then(|v| v.as_str()))
+            .unwrap_or("-");
+        println!(
+            "  {:<40} {:<12} {:<15} {}",
+            truncate(&e.entity_id, 40),
+            truncate(&e.state, 12),
+            domain_str,
+            truncate(friendly, 30)
+        );
+    }
+
+    Ok(())
+}
+
+async fn run_entity_uds(
+    client: &mut UdsClient,
+    instance_id: Uuid,
+    entity_id: &str,
+    raw: bool,
+) -> anyhow::Result<()> {
+    let entity = client.entity(&instance_id.to_string(), entity_id).await
+        .context("UDS entity request failed")?;
+
+    if raw {
+        println!("{}", serde_json::to_string_pretty(&entity)?);
+        return Ok(());
+    }
+
+    let domain = entity_id.split('.').next().unwrap_or("unknown");
+    let icon = domain_icon(domain);
+
+    println!("{icon} {entity_id}");
+    println!("  State:       {}", entity.state);
+    if let Some(ref name) = entity.display_name {
+        println!("  Name:        {name}");
+    }
+    if let Some(ref friendly) = entity.attributes.get("friendly_name").and_then(|v| v.as_str()) {
+        println!("  Friendly:    {friendly}");
+    }
+    println!("  Domain:      {domain}");
+
+    // Attributes
+    if let Some(obj) = entity.attributes.as_object() {
+        let skip = ["friendly_name", "supported_features", "supported_color_modes", "icon"];
+        let mut printed_header = false;
+        for (k, v) in obj {
+            if skip.contains(&k.as_str()) {
+                continue;
+            }
+            if !printed_header {
+                println!("\n  Attributes:");
+                printed_header = true;
+            }
+            let val = match v {
+                serde_json::Value::String(s) => s.clone(),
+                serde_json::Value::Array(arr) => {
+                    let items: Vec<String> = arr
+                        .iter()
+                        .map(|item| match item {
+                            serde_json::Value::String(s) => s.clone(),
+                            other => other.to_string(),
+                        })
+                        .collect();
+                    format!("[{}]", items.join(", "))
+                }
+                other => other.to_string(),
+            };
+            println!("    {:<22} {}", k, val);
+        }
+    }
+
+    // Display overrides
+    let has_display =
+        entity.display_name.is_some() || entity.custom_icon.is_some() || entity.hidden || entity.is_favorite;
+    if has_display {
+        println!("\n  Display:");
+        if let Some(ref name) = entity.display_name {
+            println!("    Name:          {name}");
+        }
+        if let Some(ref icon) = entity.custom_icon {
+            println!("    Icon:          {icon}");
+        }
+        if entity.is_favorite {
+            println!("    Favorite:      Yes");
+        }
+        if entity.hidden {
+            println!("    Hidden:        Yes");
+        }
+    }
+
+    println!("\n  Last Changed:  {}", format_date_local(&entity.last_changed));
+    println!("  Last Updated:  {}", format_date_local(&entity.last_updated));
+    println!("  Entity ID:     {entity_id}");
+
+    Ok(())
+}
+
+async fn run_call_uds(
+    client: &mut UdsClient,
+    instance_id: Uuid,
+    domain: &str,
+    service: &str,
+    entity_id: &str,
+    data: Option<&str>,
+) -> anyhow::Result<()> {
+    let data_value = if let Some(d) = data {
+        Some(serde_json::from_str(d).context("parse --data JSON")?)
+    } else {
+        None
+    };
+
+    let response = client.call(
+        &instance_id.to_string(),
+        domain,
+        service,
+        entity_id,
+        data_value,
+    ).await.context("UDS call request failed")?;
+
+    println!("✅ Service called: {domain}.{service} → {entity_id}");
+    println!("   Context ID: {}", response.context_id);
+
+    Ok(())
+}
+
+async fn run_summary_uds(client: &mut UdsClient, instance_id: Uuid, raw: bool) -> anyhow::Result<()> {
+    let summary = client.summary(&instance_id.to_string()).await
+        .context("UDS summary request failed")?;
+
+    if raw {
+        println!("{}", serde_json::to_string_pretty(&summary)?);
+        return Ok(());
+    }
+
+    println!("📊 Instance Summary\n");
+
+    // Unavailable entities
+    if !summary.unavailable_entities.is_empty() {
+        println!("  ⚠️  Unavailable entities ({}):", summary.unavailable_entities.len());
+        for ue in &summary.unavailable_entities {
+            println!("    - {:<45} ({})", ue.entity_id, format_date_local(&ue.last_changed));
+        }
+        println!();
+    }
+
+    // Domain distribution
+    if !summary.domain_counts.is_empty() {
+        let total: u32 = summary.domain_counts.iter().map(|d| d.total_count).sum();
+        println!("  Domain distribution:");
+        for dc in &summary.domain_counts {
+            println!("    {:<20} {:>4}", dc.domain, dc.total_count);
+        }
+        println!("    {}", "-".repeat(26));
+        println!("    {:<20} {:>4}", "Total", total);
+    }
+
+    Ok(())
+}
+
+// ── Direct HTTP implementations (original) ──────────────────────────────────
 
 /// Authenticate, list instances, print connection status + domain stats.
-pub async fn run_status(auth: TokimoAuthArgs) -> anyhow::Result<()> {
+async fn run_status(auth: TokimoAuthArgs) -> anyhow::Result<()> {
     let (base_url, token) = init(&auth).await?;
     let client = api_client(&token);
 
@@ -195,10 +494,8 @@ pub async fn run_status(auth: TokimoAuthArgs) -> anyhow::Result<()> {
     Ok(())
 }
 
-// ── instances ────────────────────────────────────────────────────────────────
-
 /// List all HA instances.
-pub async fn run_instances(auth: TokimoAuthArgs) -> anyhow::Result<()> {
+async fn run_instances(auth: TokimoAuthArgs) -> anyhow::Result<()> {
     let (base_url, token) = init(&auth).await?;
     let client = api_client(&token);
 
@@ -228,10 +525,8 @@ pub async fn run_instances(auth: TokimoAuthArgs) -> anyhow::Result<()> {
     Ok(())
 }
 
-// ── test ─────────────────────────────────────────────────────────────────────
-
 /// Test connectivity to an HA instance.
-pub async fn run_test(auth: TokimoAuthArgs, instance_id: Uuid) -> anyhow::Result<()> {
+async fn run_test(auth: TokimoAuthArgs, instance_id: Uuid) -> anyhow::Result<()> {
     let (base_url, token) = init(&auth).await?;
     let client = api_client(&token);
 
@@ -261,10 +556,8 @@ pub async fn run_test(auth: TokimoAuthArgs, instance_id: Uuid) -> anyhow::Result
     Ok(())
 }
 
-// ── search ───────────────────────────────────────────────────────────────────
-
 /// Search entities by entity_id / friendly_name, with optional domain and state filters.
-pub async fn run_search(
+async fn run_search(
     auth: TokimoAuthArgs,
     instance_id: Uuid,
     query: String,
@@ -372,10 +665,8 @@ pub async fn run_search(
     Ok(())
 }
 
-// ── entity ───────────────────────────────────────────────────────────────────
-
 /// Show detailed info for a single entity (including device metadata).
-pub async fn run_entity(auth: TokimoAuthArgs, instance_id: Uuid, entity_id: String, raw: bool) -> anyhow::Result<()> {
+async fn run_entity(auth: TokimoAuthArgs, instance_id: Uuid, entity_id: String, raw: bool) -> anyhow::Result<()> {
     let (base_url, token) = init(&auth).await?;
     let client = api_client(&token);
 
@@ -484,10 +775,8 @@ pub async fn run_entity(auth: TokimoAuthArgs, instance_id: Uuid, entity_id: Stri
     Ok(())
 }
 
-// ── call ─────────────────────────────────────────────────────────────────────
-
 /// Call a Home Assistant service (e.g. light.turn_on, lock.lock).
-pub async fn run_call(
+async fn run_call(
     auth: TokimoAuthArgs,
     instance_id: Uuid,
     domain: String,
@@ -532,10 +821,8 @@ pub async fn run_call(
     Ok(())
 }
 
-// ── summary ──────────────────────────────────────────────────────────────────
-
 /// Show instance summary: unavailable entities + domain distribution.
-pub async fn run_summary(auth: TokimoAuthArgs, instance_id: Uuid, raw: bool) -> anyhow::Result<()> {
+async fn run_summary(auth: TokimoAuthArgs, instance_id: Uuid, raw: bool) -> anyhow::Result<()> {
     let (base_url, token) = init(&auth).await?;
     let client = api_client(&token);
 
