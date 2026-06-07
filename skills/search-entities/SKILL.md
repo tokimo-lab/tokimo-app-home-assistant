@@ -9,58 +9,59 @@ context: inline
 
 # Search Home Assistant Entities
 
-**CLI command**: `tokimo-app-home-assistant search <instance_id> "<query>"`
+## CRITICAL: Command Format
 
-**Important**: The `search` command requires an `instance_id` as the first argument.
+```
+tokimo-app-home-assistant search <INSTANCE_ID> "<QUERY>"
+```
 
-## Step 1: Get instance ID
+**The first argument MUST be an instance_id (UUID format like `550e8400-e29b-41d4-a716-446655440000`).**
+
+## Step 1: Get instance ID (ALWAYS do this first)
 
 ```bash
 tokimo-app-home-assistant instances
 ```
 
-Output: `ID  Name  URL  Status` — copy the `ID` value (UUID format).
+This outputs a table. Copy the `ID` column value (UUID format).
 
 ## Step 2: Search for entities
 
 ```bash
-tokimo-app-home-assistant search <instance_id> "<query>"
+tokimo-app-home-assistant search <PASTE_INSTANCE_ID_HERE> "次卧 灯"
 ```
 
-Example:
+## CORRECT Examples
+
 ```bash
-tokimo-app-home-assistant search 550e8400-e29b-41d4-a716-446655440000 "次卧吸顶灯"
+# Get instance ID first
+tokimo-app-home-assistant instances
+# Output: 550e8400-e29b-41d4-a716-446655440000  My Home  ...
+
+# Then search (use the ID from above)
+tokimo-app-home-assistant search 550e8400-e29b-41d4-a716-446655440000 "次卧 灯"
+tokimo-app-home-assistant search 550e8400-e29b-41d4-a716-446655440000 "kitchen" --domain light
 ```
 
-Output: `entity_id  state  domain  display_name`
+## WRONG Examples (do NOT do this)
+
+```bash
+# WRONG: Two separate words as args
+tokimo-app-home-assistant search "次卧" "灯"  # ERROR! "次卧" is not an instance_id
+
+# WRONG: Missing instance_id
+tokimo-app-home-assistant search "次卧 灯"  # ERROR!
+
+# WRONG: entity search combination
+tokimo-app-home-assistant entity search "次卧 灯"  # ERROR!
+```
 
 ## Options
 
 | Option | Description |
 |--------|-------------|
-| `--domain <type>` | Filter by domain: `light`, `switch`, `sensor`, `climate`, etc. |
-| `--state <state>` | Filter by state: `on`, `off`, `unavailable`, etc. |
+| `--domain <type>` | Filter: `light`, `switch`, `sensor`, `climate`, etc. |
+| `--state <state>` | Filter: `on`, `off`, `unavailable`, etc. |
 | `--limit <n>` | Max results (default: 50) |
 | `--include-hidden` | Show hidden entities |
 | `--raw` | Output as JSON |
-
-## Full Example
-
-```bash
-# Step 1: Get instance ID
-tokimo-app-home-assistant instances
-# Output: 550e8400-e29b-41d4-a716-446655440000  My Home  http://192.168.1.100:8123  Connected
-
-# Step 2: Search for lights in kitchen
-tokimo-app-home-assistant search 550e8400-e29b-41d4-a716-446655440000 "kitchen" --domain light
-```
-
-## WRONG Usage (do NOT do this)
-
-```bash
-# WRONG: Missing instance_id
-tokimo-app-home-assistant search "次卧吸顶灯"  # ERROR!
-
-# WRONG: Using search as subcommand of entity
-tokimo-app-home-assistant entity search "次卧吸顶灯"  # ERROR!
-```

@@ -9,7 +9,13 @@ context: inline
 
 # Control Home Assistant Devices
 
-**This is a multi-step process using separate commands. Do NOT combine them.**
+## CRITICAL: Command Format
+
+```
+tokimo-app-home-assistant call <INSTANCE_ID> <DOMAIN> <SERVICE> --entity-id <ENTITY_ID>
+```
+
+**All four parts are REQUIRED.**
 
 ## Step 1: Get instance ID
 
@@ -17,29 +23,34 @@ context: inline
 tokimo-app-home-assistant instances
 ```
 
-Output: `ID  Name  URL  Status` — copy the `ID` value (UUID format).
+Copy the `ID` column value (UUID format).
 
-## Step 2: Find the entity ID
+## Step 2: Find entity ID
 
 ```bash
-tokimo-app-home-assistant search <instance_id> "<device name>"
+tokimo-app-home-assistant search <INSTANCE_ID> "次卧 灯"
 ```
 
-Example:
+Copy the `entity_id` from results (e.g., `light.bedroom_ceiling`).
+
+## Step 3: Call service
+
 ```bash
-tokimo-app-home-assistant search 550e8400-e29b-41d4-a716-446655440000 "次卧吸顶灯"
+tokimo-app-home-assistant call <INSTANCE_ID> light turn_on --entity-id <ENTITY_ID>
 ```
 
-Output: `light.bedroom_ceiling  off  light  次卧吸顶灯`
-
-## Step 3: Call the service
+## CORRECT Example
 
 ```bash
-tokimo-app-home-assistant call <instance_id> <domain> <service> --entity-id <entity_id>
-```
+# Step 1
+tokimo-app-home-assistant instances
+# -> 550e8400-e29b-41d4-a716-446655440000  My Home  ...
 
-Example:
-```bash
+# Step 2
+tokimo-app-home-assistant search 550e8400-e29b-41d4-a716-446655440000 "次卧 灯"
+# -> light.bedroom_ceiling  off  light  次卧吸顶灯
+
+# Step 3
 tokimo-app-home-assistant call 550e8400-e29b-41d4-a716-446655440000 light turn_on --entity-id light.bedroom_ceiling
 ```
 
@@ -55,24 +66,7 @@ tokimo-app-home-assistant call 550e8400-e29b-41d4-a716-446655440000 light turn_o
 | `lock` | `lock` | Lock door |
 | `lock` | `unlock` | Unlock door |
 
-## Full Example: Turn on light with brightness
-
-```bash
-# Step 1: Get instance ID
-tokimo-app-home-assistant instances
-# Output: 550e8400-e29b-41d4-a716-446655440000  My Home  ...
-
-# Step 2: Find the light
-tokimo-app-home-assistant search 550e8400-e29b-41d4-a716-446655440000 "次卧吸顶灯"
-# Output: light.bedroom_ceiling  off  light  次卧吸顶灯
-
-# Step 3: Turn on with brightness
-tokimo-app-home-assistant call 550e8400-e29b-41d4-a716-446655440000 light turn_on \
-  --entity-id light.bedroom_ceiling \
-  --data '{"brightness":128}'
-```
-
-## WRONG Usage (do NOT do this)
+## WRONG Examples
 
 ```bash
 # WRONG: Missing instance_id
@@ -81,6 +75,6 @@ tokimo-app-home-assistant call light turn_on --entity-id light.bedroom_ceiling  
 # WRONG: Missing --entity-id
 tokimo-app-home-assistant call 550e8400-e29b-41d4-a716-446655440000 light turn_on  # ERROR!
 
-# WRONG: Using call as subcommand of entity
+# WRONG: Combining commands
 tokimo-app-home-assistant entity call ...  # ERROR!
 ```
