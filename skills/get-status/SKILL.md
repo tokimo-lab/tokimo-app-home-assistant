@@ -9,70 +9,57 @@ context: inline
 
 # Get Home Assistant Entity Status
 
-**CLI command**: `tokimo-app-home-assistant entity <instance_id> <entity_id>`
+**This is a multi-step process using TWO separate commands. Do NOT combine them.**
 
-**Important**: This command requires:
-1. `instance_id` — Get from `tokimo-app-home-assistant instances`
-2. `entity_id` — Get from `tokimo-app-home-assistant search <instance_id> "<query>"`
+## Step 1: Search for the entity
 
-## Step-by-Step
-
-1. **Get the instance ID** (required):
-
-   ```bash
-   tokimo-app-home-assistant instances
-   ```
-
-2. **Find the entity ID** (required):
-
-   ```bash
-   tokimo-app-home-assistant search <instance_id> "<device name>"
-   ```
-
-3. **Get entity details**:
-
-   ```bash
-   tokimo-app-home-assistant entity <instance_id> <entity_id>
-   ```
-
-## Example: Check thermostat status
+Use the `search` command to find the entity_id:
 
 ```bash
-# Step 1: Get instance ID
+tokimo-app-home-assistant search <instance_id> "<device name>"
+```
+
+Example:
+```bash
+tokimo-app-home-assistant search 550e8400-e29b-41d4-a716-446655440000 "次卧吸顶灯"
+```
+
+Output will show entity_id like `light.bedroom_ceiling`.
+
+## Step 2: Get entity details
+
+Use the `entity` command with the entity_id from Step 1:
+
+```bash
+tokimo-app-home-assistant entity <instance_id> <entity_id>
+```
+
+Example:
+```bash
+tokimo-app-home-assistant entity 550e8400-e29b-41d4-a716-446655440000 light.bedroom_ceiling
+```
+
+## Full Example
+
+```bash
+# Step 1: Get instance ID (if unknown)
 tokimo-app-home-assistant instances
 # Output: 550e8400-e29b-41d4-a716-446655440000  My Home  ...
 
-# Step 2: Find the thermostat
-tokimo-app-home-assistant search 550e8400-e29b-41d4-a716-446655440000 "thermostat"
-# Output: climate.living_room  heat  climate  Living Room Thermostat
+# Step 2: Search for entity
+tokimo-app-home-assistant search 550e8400-e29b-41d4-a716-446655440000 "次卧吸顶灯"
+# Output: light.bedroom_ceiling  off  light  次卧吸顶灯
 
-# Step 3: Get details
-tokimo-app-home-assistant entity 550e8400-e29b-41d4-a716-446655440000 climate.living_room
+# Step 3: Get entity details
+tokimo-app-home-assistant entity 550e8400-e29b-41d4-a716-446655440000 light.bedroom_ceiling
 ```
 
-Output:
+## WRONG Usage (do NOT do this)
+
+```bash
+# WRONG: Do not combine entity and search
+tokimo-app-home-assistant entity search "次卧吸顶灯"  # ERROR!
+
+# WRONG: Do not use search keyword as entity_id
+tokimo-app-home-assistant entity <instance_id> search  # ERROR!
 ```
-🌡️ climate.living_room
-  State:       heat
-  Name:        Living Room Thermostat
-  Friendly:    Living Room Thermostat
-  Domain:      climate
-
-  Attributes:
-    current_temperature    22.5
-    target_temperature     23.0
-    hvac_mode              heat
-
-  Device:
-    Manufacturer:  Nest
-    Model:         Learning Thermostat
-
-  Last Changed:  2026-06-06 15:30
-  Last Updated:  2026-06-06 15:45
-```
-
-## Options
-
-| Option | Description |
-|--------|-------------|
-| `--raw` | Output as JSON |
