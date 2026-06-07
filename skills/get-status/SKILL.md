@@ -9,61 +9,44 @@ context: inline
 
 # Get Home Assistant Entity Status
 
-View the current state and detailed information of a Home Assistant entity.
+**CLI command**: `tokimo-app-home-assistant entity <instance_id> <entity_id>`
 
-## Prerequisites
+**Important**: This command requires:
+1. `instance_id` — Get from `tokimo-app-home-assistant instances`
+2. `entity_id` — Get from `tokimo-app-home-assistant search <instance_id> "<query>"`
 
-- At least one Home Assistant instance must be configured and connected.
-- The target entity must exist (find it with `search`).
+## Step-by-Step
 
-## Quick Reference
-
-| Step | Command |
-|------|---------|
-| Find the entity | `tokimo-app-home-assistant search <instance_id> "<device name>"` |
-| Get entity details | `tokimo-app-home-assistant entity <instance_id> <entity_id>` |
-| Get raw JSON | `tokimo-app-home-assistant entity <instance_id> <entity_id> --raw` |
-
-## Workflow
-
-1. **Find the entity ID.** Search for the device you want to check.
+1. **Get the instance ID** (required):
 
    ```bash
-   tokimo-app-home-assistant search <instance_id> "thermostat"
+   tokimo-app-home-assistant instances
    ```
 
-   Note the `entity_id` (e.g., `climate.living_room`).
-
-2. **Get entity details.** View the current state and attributes.
+2. **Find the entity ID** (required):
 
    ```bash
-   tokimo-app-home-assistant entity <instance_id> climate.living_room
+   tokimo-app-home-assistant search <instance_id> "<device name>"
    ```
 
-   The output shows:
-   - Current state (e.g., `heat`, `cool`, `off`)
-   - Friendly name
-   - Domain
-   - Attributes (temperature, humidity, mode, etc.)
-   - Device info (manufacturer, model, firmware)
-   - Display settings (custom name, icon, hidden, favorite)
-
-3. **(Optional) Get raw JSON.** For programmatic use or detailed inspection.
+3. **Get entity details**:
 
    ```bash
-   tokimo-app-home-assistant entity <instance_id> climate.living_room --raw
+   tokimo-app-home-assistant entity <instance_id> <entity_id>
    ```
 
-## Worked Example
-
-Check the living room thermostat:
+## Example: Check thermostat status
 
 ```bash
-# 1. Find the entity
-tokimo-app-home-assistant search 550e8400-e29b-41d4-a716-446655440000 "thermostat"
-#   -> entity_id: climate.living_room
+# Step 1: Get instance ID
+tokimo-app-home-assistant instances
+# Output: 550e8400-e29b-41d4-a716-446655440000  My Home  ...
 
-# 2. Get details
+# Step 2: Find the thermostat
+tokimo-app-home-assistant search 550e8400-e29b-41d4-a716-446655440000 "thermostat"
+# Output: climate.living_room  heat  climate  Living Room Thermostat
+
+# Step 3: Get details
 tokimo-app-home-assistant entity 550e8400-e29b-41d4-a716-446655440000 climate.living_room
 ```
 
@@ -79,21 +62,17 @@ Output:
     current_temperature    22.5
     target_temperature     23.0
     hvac_mode              heat
-    humidity               45
 
   Device:
     Manufacturer:  Nest
     Model:         Learning Thermostat
-    SW Version:    6.2-7
 
   Last Changed:  2026-06-06 15:30
   Last Updated:  2026-06-06 15:45
-  Entity ID:     climate.living_room
 ```
 
-## Notes
+## Options
 
-- Use `--raw` to get the full JSON response for programmatic use.
-- Entity state is cached in memory; updates are received via WebSocket subscription.
-- Some entities may have many attributes; the output shows the most relevant ones.
-- Device info is available if the entity is linked to a device in the HA registry.
+| Option | Description |
+|--------|-------------|
+| `--raw` | Output as JSON |

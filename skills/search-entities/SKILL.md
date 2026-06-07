@@ -9,81 +9,48 @@ context: inline
 
 # Search Home Assistant Entities
 
-Find entities by name or entity_id across all configured Home Assistant instances.
+**CLI command**: `tokimo-app-home-assistant search <instance_id> "<query>"`
 
-## Prerequisites
+**Important**: The `search` command requires an `instance_id` as the first argument. You must get this ID first by running `tokimo-app-home-assistant instances`.
 
-- At least one Home Assistant instance must be configured in the app.
-- The Home Assistant instance must be connected (check with `status`).
+## Step-by-Step
 
-## Quick Reference
-
-| Step | Command |
-|------|---------|
-| Check connection status | `tokimo-app-home-assistant status` |
-| List all instances | `tokimo-app-home-assistant instances` |
-| Search entities | `tokimo-app-home-assistant search <instance_id> "<query>"` |
-| Filter by domain | `tokimo-app-home-assistant search <instance_id> "<query>" --domain light` |
-| Filter by state | `tokimo-app-home-assistant search <instance_id> "<query>" --state on` |
-| View entity details | `tokimo-app-home-assistant entity <instance_id> <entity_id>` |
-
-## Workflow
-
-1. **Get the instance ID.** List all instances and find the target instance.
+1. **Get the instance ID first** (required):
 
    ```bash
    tokimo-app-home-assistant instances
    ```
 
-   The output shows: `ID, Name, URL, Status`.
+   This outputs a table with columns: `ID, Name, URL, Status`. Copy the `ID` value (UUID format like `550e8400-e29b-41d4-a716-446655440000`).
 
-2. **Search for entities.** Use the instance ID and a search query.
-
-   ```bash
-   tokimo-app-home-assistant search <instance_id> "kitchen"
-   ```
-
-   Results show: `Entity ID, State, Domain, Friendly Name`.
-
-3. **(Optional) Filter by domain.** Narrow results to specific device types.
+2. **Search for entities** using the instance ID:
 
    ```bash
-   tokimo-app-home-assistant search <instance_id> "kitchen" --domain light
+   tokimo-app-home-assistant search <instance_id> "<query>"
    ```
 
-   Common domains: `light`, `switch`, `sensor`, `binary_sensor`, `climate`, `cover`, `fan`, `lock`, `media_player`.
-
-4. **(Optional) Filter by state.** Find only entities in a specific state.
-
+   Example:
    ```bash
-   tokimo-app-home-assistant search <instance_id> "kitchen" --state on
+   tokimo-app-home-assistant search 550e8400-e29b-41d4-a716-446655440000 "次卧 吸顶灯"
    ```
 
-5. **(Optional) View entity details.** Get full information about a specific entity.
+## Options
 
-   ```bash
-   tokimo-app-home-assistant entity <instance_id> light.kitchen
-   ```
+| Option | Description |
+|--------|-------------|
+| `--domain <type>` | Filter by domain: `light`, `switch`, `sensor`, `climate`, etc. |
+| `--state <state>` | Filter by state: `on`, `off`, `unavailable`, etc. |
+| `--limit <n>` | Max results (default: 50) |
+| `--include-hidden` | Show hidden entities |
+| `--raw` | Output as JSON |
 
-## Worked Example
-
-Find all lights in the kitchen:
+## Example
 
 ```bash
-# 1. Get instance ID
+# Step 1: Get instance ID
 tokimo-app-home-assistant instances
-#   -> ID 550e8400-e29b-41d4-a716-446655440000  Name "My Home" ...
+# Output: 550e8400-e29b-41d4-a716-446655440000  My Home  http://192.168.1.100:8123  Connected
 
-# 2. Search for kitchen lights
+# Step 2: Search for lights in kitchen
 tokimo-app-home-assistant search 550e8400-e29b-41d4-a716-446655440000 "kitchen" --domain light
-
-# 3. View details of a specific light
-tokimo-app-home-assistant entity 550e8400-e29b-41d4-a716-446655440000 light.kitchen_main
 ```
-
-## Notes
-
-- The search query matches against both `entity_id` and `friendly_name` attribute.
-- Use `--limit` to control the number of results (default: 50).
-- Use `--raw` to get JSON output for programmatic use.
-- Use `--include-hidden` to show entities marked as hidden in the app.

@@ -9,87 +9,58 @@ context: inline
 
 # Control Home Assistant Devices
 
-Call Home Assistant services to control devices like lights, switches, locks, climate, etc.
+**CLI command**: `tokimo-app-home-assistant call <instance_id> <domain> <service> --entity-id <entity_id>`
 
-## Prerequisites
+**Important**: This command requires:
+1. `instance_id` — Get from `tokimo-app-home-assistant instances`
+2. `entity_id` — Get from `tokimo-app-home-assistant search <instance_id> "<query>"`
 
-- At least one Home Assistant instance must be configured and connected.
-- The target entity must exist (find it with `search`).
+## Step-by-Step
 
-## Quick Reference
+1. **Get the instance ID** (required):
 
-| Step | Command |
-|------|---------|
-| Find the entity | `tokimo-app-home-assistant search <instance_id> "<device name>"` |
-| Turn on a light | `tokimo-app-home-assistant call <instance_id> light turn_on --entity-id <entity_id>` |
-| Turn off a light | `tokimo-app-home-assistant call <instance_id> light turn_off --entity-id <entity_id>` |
-| Toggle a switch | `tokimo-app-home-assistant call <instance_id> switch toggle --entity-id <entity_id>` |
-| Lock a door | `tokimo-app-home-assistant call <instance_id> lock lock --entity-id <entity_id>` |
-| Unlock a door | `tokimo-app-home-assistant call <instance_id> lock unlock --entity-id <entity_id>` |
-| Set brightness | `tokimo-app-home-assistant call <instance_id> light turn_on --entity-id <entity_id> --data '{"brightness":128}'` |
+   ```bash
+   tokimo-app-home-assistant instances
+   ```
+
+2. **Find the entity ID** (required):
+
+   ```bash
+   tokimo-app-home-assistant search <instance_id> "<device name>"
+   ```
+
+3. **Call the service**:
+
+   ```bash
+   tokimo-app-home-assistant call <instance_id> <domain> <service> --entity-id <entity_id>
+   ```
 
 ## Common Services
 
-| Domain | Service | Description |
-|--------|---------|-------------|
-| `light` | `turn_on` | Turn on a light (supports brightness, color, etc.) |
-| `light` | `turn_off` | Turn off a light |
-| `light` | `toggle` | Toggle light state |
-| `switch` | `turn_on` | Turn on a switch |
-| `switch` | `turn_off` | Turn off a switch |
-| `switch` | `toggle` | Toggle switch state |
-| `lock` | `lock` | Lock a lock |
-| `lock` | `unlock` | Unlock a lock |
-| `climate` | `set_temperature` | Set target temperature |
-| `climate` | `set_hvac_mode` | Set HVAC mode (heat, cool, auto, etc.) |
-| `cover` | `open_cover` | Open a cover/blind |
-| `cover` | `close_cover` | Close a cover/blind |
-| `fan` | `turn_on` | Turn on a fan |
-| `fan` | `turn_off` | Turn off a fan |
-| `media_player` | `play` | Play media |
-| `media_player` | `pause` | Pause media |
-| `media_player` | `volume_set` | Set volume |
+| Domain | Service | Example |
+|--------|---------|---------|
+| `light` | `turn_on` | `call <id> light turn_on --entity-id light.kitchen` |
+| `light` | `turn_off` | `call <id> light turn_off --entity-id light.kitchen` |
+| `light` | `toggle` | `call <id> light toggle --entity-id light.kitchen` |
+| `switch` | `turn_on` | `call <id> switch turn_on --entity-id switch.fan` |
+| `switch` | `turn_off` | `call <id> switch turn_off --entity-id switch.fan` |
+| `lock` | `lock` | `call <id> lock lock --entity-id lock.front_door` |
+| `lock` | `unlock` | `call <id> lock unlock --entity-id lock.front_door` |
+| `climate` | `set_temperature` | `call <id> climate set_temperature --entity-id climate.living_room --data '{"temperature":23}'` |
 
-## Workflow
-
-1. **Find the entity ID.** Search for the device you want to control.
-
-   ```bash
-   tokimo-app-home-assistant search <instance_id> "kitchen light"
-   ```
-
-   Note the `entity_id` (e.g., `light.kitchen_main`).
-
-2. **Call the service.** Use the appropriate domain and service.
-
-   ```bash
-   tokimo-app-home-assistant call <instance_id> light turn_on --entity-id light.kitchen_main
-   ```
-
-3. **(Optional) Pass additional parameters.** Use `--data` for extra options.
-
-   ```bash
-   tokimo-app-home-assistant call <instance_id> light turn_on --entity-id light.kitchen_main --data '{"brightness":128,"color_temp":350}'
-   ```
-
-## Worked Example
-
-Turn on the kitchen light at 50% brightness:
+## Example: Turn on a light with brightness
 
 ```bash
-# 1. Find the entity
-tokimo-app-home-assistant search 550e8400-e29b-41d4-a716-446655440000 "kitchen light"
-#   -> entity_id: light.kitchen_main
+# Step 1: Get instance ID
+tokimo-app-home-assistant instances
+# Output: 550e8400-e29b-41d4-a716-446655440000  My Home  ...
 
-# 2. Turn on with brightness
+# Step 2: Find the light
+tokimo-app-home-assistant search 550e8400-e29b-41d4-a716-446655440000 "kitchen light"
+# Output: light.kitchen_main  off  light  Kitchen Main Light
+
+# Step 3: Turn on with brightness
 tokimo-app-home-assistant call 550e8400-e29b-41d4-a716-446655440000 light turn_on \
   --entity-id light.kitchen_main \
   --data '{"brightness":128}'
 ```
-
-## Notes
-
-- The `--entity-id` parameter is required for all service calls.
-- Use `--data` to pass additional parameters as JSON (brightness, color, temperature, etc.).
-- Service calls are asynchronous; the command returns immediately with a context_id.
-- Some services require specific parameters (e.g., `set_temperature` needs `temperature`).
