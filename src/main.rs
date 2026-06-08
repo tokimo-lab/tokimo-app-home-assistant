@@ -92,8 +92,6 @@ pub(crate) enum Command {
     },
     /// 调用 Home Assistant service（如 light.turn_on, lock.lock）。
     Call {
-        /// 实例 ID
-        instance_id: uuid::Uuid,
         /// 域名（如 "light", "switch", "climate"）
         domain: String,
         /// 服务名（如 "turn_on", "turn_off", "toggle"）
@@ -101,6 +99,9 @@ pub(crate) enum Command {
         /// 目标实体 ID（如 "light.kitchen"）
         #[arg(long = "entity-id")]
         entity_id: String,
+        /// 实例 ID（可选，默认使用第一个实例）
+        #[arg(short, long)]
+        instance: Option<uuid::Uuid>,
         /// 额外参数（JSON 格式，如 '{"brightness":128}'）
         #[arg(long)]
         data: Option<String>,

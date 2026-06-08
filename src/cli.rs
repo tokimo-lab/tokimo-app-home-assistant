@@ -146,12 +146,12 @@ async fn run_uds(client: &mut UdsClient, command: &crate::Command) -> anyhow::Re
             raw,
         } => run_entity_uds(client, *instance_id, entity_id, *raw).await,
         crate::Command::Call {
-            instance_id,
             domain,
             service,
             entity_id,
+            instance,
             data,
-        } => run_call_uds(client, *instance_id, domain, service, entity_id, data.as_deref()).await,
+        } => run_call_uds(client, *instance, domain, service, entity_id, data.as_deref()).await,
         crate::Command::Summary { instance_id, raw } => run_summary_uds(client, *instance_id, *raw).await,
     }
 }
@@ -177,12 +177,12 @@ async fn run_direct(auth: TokimoAuthArgs, command: crate::Command) -> anyhow::Re
             raw,
         } => run_entity(auth, instance_id, entity_id, raw).await,
         crate::Command::Call {
-            instance_id,
             domain,
             service,
             entity_id,
+            instance,
             data,
-        } => run_call(auth, instance_id, domain, service, entity_id, data).await,
+        } => run_call(auth, instance, domain, service, entity_id, data).await,
         crate::Command::Summary { instance_id, raw } => run_summary(auth, instance_id, raw).await,
     }
 }
@@ -396,12 +396,30 @@ async fn run_entity_uds(
 
 async fn run_call_uds(
     client: &mut UdsClient,
-    instance_id: Uuid,
+    instance_id: Option<Uuid>,
     domain: &str,
     service: &str,
     entity_id: &str,
     data: Option<&str>,
 ) -> anyhow::Result<()> {
+    // If no instance_id specified, get the first available instance
+    let instance_id = match instance_id {
+        Some(id) => id,
+        None => {
+            let instances = client.instances().await
+                .context("UDS instances request failed")?;
+            if instances.instances.is_empty() {
+                anyhow::bail!("No Home Assistant instances configured");
+            }
+            let first = &instances.instances[0];
+            if instances.instances.len() > 1 {
+                eprintln!("⚠️  Multiple instances found, using first: {} ({})", first.name, first.id);
+            }
+            uuid::Uuid::parse_str(&first.id)
+                .map_err(|e| anyhow::anyhow!("invalid instance id: {e}"))?
+        }
+    };
+
     let data_value = if let Some(d) = data {
         Some(serde_json::from_str(d).context("parse --data JSON")?)
     } else {
@@ -821,7 +839,7 @@ async fn run_entity(auth: TokimoAuthArgs, instance_id: Uuid, entity_id: String, 
 /// Call a Home Assistant service (e.g. light.turn_on, lock.lock).
 async fn run_call(
     auth: TokimoAuthArgs,
-    instance_id: Uuid,
+    instance_id: Option<Uuid>,
     domain: String,
     service: String,
     entity_id: String,
@@ -829,6 +847,31 @@ async fn run_call(
 ) -> anyhow::Result<()> {
     let (base_url, token) = init(&auth).await?;
     let client = api_client(&token);
+
+    // If no instance_id specified, get the first available instance
+    let instance_id = match instance_id {
+        Some(id) => id,
+        None => {
+            let instances: Vec<InstanceInfo> = client
+                .get(format!("{base_url}{API}/instances"))
+                .send()
+                .await
+                .context("request instances")?
+                .error_for_status()
+                .context("instances request failed")?
+                .json()
+                .await
+                .context("parse instances")?;
+            if instances.is_empty() {
+                anyhow::bail!("No Home Assistant instances configured");
+            }
+            let first = &instances[0];
+            if instances.len() > 1 {
+                eprintln!("⚠️  Multiple instances found, using first: {} ({})", first.name, first.id);
+            }
+            first.id
+        }
+    };
 
     let mut body: serde_json::Value = if let Some(ref d) = data {
         serde_json::from_str(d).context("parse --data JSON")?

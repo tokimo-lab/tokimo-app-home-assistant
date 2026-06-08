@@ -3,7 +3,7 @@ name: call-service
 description: "Control Home Assistant devices by calling services. Turn lights on/off, lock doors, adjust climate, etc."
 when-to-use: "When the user wants to control a Home Assistant device (turn on/off, toggle, set state, etc.)."
 argument-hint: "<device name> <action>"
-version: "0.2.0"
+version: "0.3.0"
 context: inline
 ---
 
@@ -15,15 +15,15 @@ context: inline
 tokimo-app-home-assistant search "次卧吸顶灯"
 ```
 
-Output: `light.bedroom_ceiling  off  light  次卧吸顶灯`
+Output: `light.yeelink_ceil40_3fc8_light  on  light  次卧吸顶灯 灯`
 
 ## Step 2: Call service
 
 ```bash
-tokimo-app-home-assistant call light turn_off --entity-id light.bedroom_ceiling
+tokimo-app-home-assistant call light turn_off --entity-id light.yeelink_ceil40_3fc8_light
 ```
 
-**Note:** No instance_id needed — auto-selects if only one exists.
+**No instance_id needed** — auto-selects if only one exists.
 
 ## Common Services
 
@@ -34,11 +34,9 @@ tokimo-app-home-assistant call light turn_off --entity-id light.bedroom_ceiling
 | `light` | `toggle` | `call light toggle --entity-id light.xxx` |
 | `switch` | `turn_on` | `call switch turn_on --entity-id switch.xxx` |
 | `switch` | `turn_off` | `call switch turn_off --entity-id switch.xxx` |
-| `lock` | `lock` | `call lock lock --entity-id lock.xxx` |
-| `lock` | `unlock` | `call lock unlock --entity-id lock.xxx` |
 
-## With brightness/color
+## With extra params
 
 ```bash
-tokimo-app-home-assistant call light turn_on --entity-id light.bedroom_ceiling --data '{"brightness":128}'
+tokimo-app-home-assistant call light turn_on --entity-id light.xxx --data '{"brightness":128}'
 ```
