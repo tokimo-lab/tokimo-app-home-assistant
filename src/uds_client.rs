@@ -154,6 +154,7 @@ impl UdsClient {
     /// Search entities.
     pub async fn search(
         &mut self,
+        instance_id: &str,
         query: &str,
         domain: Option<&str>,
         state: Option<&str>,
@@ -161,6 +162,7 @@ impl UdsClient {
         limit: u32,
     ) -> Result<SearchResponse, ProtocolError> {
         let request_payload = serde_json::to_vec(&SearchRequest {
+            instance_id: instance_id.to_string(),
             query: query.to_string(),
             domain: domain.map(|s| s.to_string()),
             state: state.map(|s| s.to_string()),

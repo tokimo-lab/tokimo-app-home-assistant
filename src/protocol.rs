@@ -114,6 +114,7 @@ pub struct TestRequest {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SearchRequest {
+    pub instance_id: String,
     pub query: String,
     pub domain: Option<String>,
     pub state: Option<String>,

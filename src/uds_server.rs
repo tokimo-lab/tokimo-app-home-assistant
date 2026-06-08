@@ -270,9 +270,19 @@ mod handlers {
             .map(|s| s.to_lowercase())
             .collect();
 
+        // Filter by instance_id if specified
+        let instance_filter = uuid::Uuid::parse_str(&request.instance_id).ok();
+
         for entry in ctx.conn_pool.instances.iter() {
-            let instance_id = entry.key().to_string();
+            let instance_id = entry.key();
             let instance = entry.value();
+
+            // Skip if instance doesn't match filter
+            if let Some(filter_id) = instance_filter {
+                if *instance_id != filter_id {
+                    continue;
+                }
+            }
 
             for entity in instance.store.states.iter() {
                 let entity_id = &entity.entity_id;
@@ -314,7 +324,7 @@ mod handlers {
                     .and_then(|o| o.display_name.clone());
 
                 results.push(EntitySearchResult {
-                    instance_id: instance_id.clone(),
+                    instance_id: instance_id.to_string(),
                     entity_id: entity_id.clone(),
                     state: state.clone(),
                     attributes: entity.attributes.clone(),

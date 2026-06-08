@@ -643,7 +643,6 @@ async fn run_search(
             let display = e.display_name.as_deref().unwrap_or("");
             let searchable_text = format!("{} {} {}", e.entity_id, friendly, display).to_lowercase();
             let matches_query = query_tokens.iter().all(|token| searchable_text.contains(token.as_str()));
-                || display.to_lowercase().contains(&query_lower);
 
             let matches_domain = domain_filter
                 .as_ref()
