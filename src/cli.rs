@@ -132,14 +132,14 @@ async fn run_uds(client: &mut UdsClient, command: &crate::Command) -> anyhow::Re
         crate::Command::Instances => run_instances_uds(client).await,
         crate::Command::Test { id } => run_test_uds(client, *id).await,
         crate::Command::Search {
-            instance_id,
             query,
+            instance,
             domain,
             state,
             include_hidden,
             limit,
             raw,
-        } => run_search_uds(client, *instance_id, query, domain.as_deref(), state.as_deref(), *include_hidden, *limit, *raw).await,
+        } => run_search_uds(client, *instance, query, domain.as_deref(), state.as_deref(), *include_hidden, *limit, *raw).await,
         crate::Command::Entity {
             instance_id,
             entity_id,
@@ -163,14 +163,14 @@ async fn run_direct(auth: TokimoAuthArgs, command: crate::Command) -> anyhow::Re
         crate::Command::Instances => run_instances(auth).await,
         crate::Command::Test { id } => run_test(auth, id).await,
         crate::Command::Search {
-            instance_id,
             query,
+            instance,
             domain,
             state,
             include_hidden,
             limit,
             raw,
-        } => run_search(auth, instance_id, query, domain, state, include_hidden, limit, raw).await,
+        } => run_search(auth, instance, query, domain, state, include_hidden, limit, raw).await,
         crate::Command::Entity {
             instance_id,
             entity_id,
@@ -238,7 +238,7 @@ async fn run_test_uds(client: &mut UdsClient, instance_id: Uuid) -> anyhow::Resu
 
 async fn run_search_uds(
     client: &mut UdsClient,
-    _instance_id: Uuid,
+    instance_id: Option<Uuid>,
     query: &str,
     domain: Option<&str>,
     state: Option<&str>,
@@ -246,7 +246,25 @@ async fn run_search_uds(
     limit: u32,
     raw: bool,
 ) -> anyhow::Result<()> {
-    let response = client.search(query, domain, state, include_hidden, limit).await
+    // If no instance_id specified, get the first available instance
+    let instance_id = match instance_id {
+        Some(id) => id,
+        None => {
+            let instances = client.instances().await
+                .context("UDS instances request failed")?;
+            if instances.instances.is_empty() {
+                anyhow::bail!("No Home Assistant instances configured");
+            }
+            let first = &instances.instances[0];
+            if instances.instances.len() > 1 {
+                eprintln!("⚠️  Multiple instances found, using first: {} ({})", first.name, first.id);
+            }
+            uuid::Uuid::parse_str(&first.id)
+                .map_err(|e| anyhow::anyhow!("invalid instance id: {e}"))?
+        }
+    };
+
+    let response = client.search(&instance_id.to_string(), query, domain, state, include_hidden, limit).await
         .context("UDS search request failed")?;
 
     if raw {
@@ -559,7 +577,7 @@ async fn run_test(auth: TokimoAuthArgs, instance_id: Uuid) -> anyhow::Result<()>
 /// Search entities by entity_id / friendly_name, with optional domain and state filters.
 async fn run_search(
     auth: TokimoAuthArgs,
-    instance_id: Uuid,
+    instance_id: Option<Uuid>,
     query: String,
     domain: Option<String>,
     state: Option<String>,
@@ -569,6 +587,31 @@ async fn run_search(
 ) -> anyhow::Result<()> {
     let (base_url, token) = init(&auth).await?;
     let client = api_client(&token);
+
+    // If no instance_id specified, get the first available instance
+    let instance_id = match instance_id {
+        Some(id) => id,
+        None => {
+            let instances: Vec<InstanceInfo> = client
+                .get(format!("{base_url}{API}/instances"))
+                .send()
+                .await
+                .context("request instances")?
+                .error_for_status()
+                .context("instances request failed")?
+                .json()
+                .await
+                .context("parse instances")?;
+            if instances.is_empty() {
+                anyhow::bail!("No Home Assistant instances configured");
+            }
+            let first = &instances[0];
+            if instances.len() > 1 {
+                eprintln!("⚠️  Multiple instances found, using first: {} ({})", first.name, first.id);
+            }
+            first.id
+        }
+    };
 
     let url = if include_hidden {
         format!("{base_url}{API}/instances/{instance_id}/entities?include_hidden=true")
@@ -587,18 +630,19 @@ async fn run_search(
         .await
         .context("parse entities")?;
 
-    let query_lower = query.to_lowercase();
+    // Split query into tokens for AND matching
+    let query_tokens: Vec<String> = query.split_whitespace().map(|s| s.to_lowercase()).collect();
     let domain_filter: Option<Vec<String>> = domain.map(|d| d.split(',').map(|s| s.trim().to_lowercase()).collect());
     let state_filter: Option<Vec<String>> = state.map(|s| s.split(',').map(|s| s.trim().to_lowercase()).collect());
 
     let mut results: Vec<&EntityListItem> = entities
         .iter()
         .filter(|e| {
-            // Match query against entity_id or friendly_name
+            // Match query against entity_id or friendly_name (AND matching for all tokens)
             let friendly = e.attributes.get("friendly_name").and_then(|v| v.as_str()).unwrap_or("");
             let display = e.display_name.as_deref().unwrap_or("");
-            let matches_query = e.entity_id.to_lowercase().contains(&query_lower)
-                || friendly.to_lowercase().contains(&query_lower)
+            let searchable_text = format!("{} {} {}", e.entity_id, friendly, display).to_lowercase();
+            let matches_query = query_tokens.iter().all(|token| searchable_text.contains(token.as_str()));
                 || display.to_lowercase().contains(&query_lower);
 
             let matches_domain = domain_filter

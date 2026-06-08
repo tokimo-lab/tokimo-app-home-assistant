@@ -263,7 +263,12 @@ mod handlers {
         request: SearchRequest,
     ) -> Result<SearchResponse, ProtocolError> {
         let mut results = Vec::new();
-        let query_lower = request.query.to_lowercase();
+
+        // Split query into tokens for AND matching
+        let query_tokens: Vec<String> = request.query
+            .split_whitespace()
+            .map(|s| s.to_lowercase())
+            .collect();
 
         for entry in ctx.conn_pool.instances.iter() {
             let instance_id = entry.key().to_string();
@@ -273,13 +278,18 @@ mod handlers {
                 let entity_id = &entity.entity_id;
                 let state = &entity.state;
 
-                // Match by entity_id or friendly_name attribute.
+                // Match by entity_id or friendly_name attribute (AND matching for all tokens)
                 let friendly_name = entity.attributes.get("friendly_name")
                     .and_then(|v| v.as_str())
                     .unwrap_or("");
 
-                let matches_query = entity_id.to_lowercase().contains(&query_lower)
-                    || friendly_name.to_lowercase().contains(&query_lower);
+                let entity_id_lower = entity_id.to_lowercase();
+                let friendly_name_lower = friendly_name.to_lowercase();
+                let searchable_text = format!("{entity_id_lower} {friendly_name_lower}");
+
+                let matches_query = query_tokens.iter().all(|token| {
+                    searchable_text.contains(token.as_str())
+                });
 
                 if !matches_query {
                     continue;

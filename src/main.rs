@@ -59,10 +59,11 @@ pub(crate) enum Command {
     },
     /// 按 entity_id 或 friendly_name 搜索实体。
     Search {
-        /// 实例 ID
-        instance_id: uuid::Uuid,
-        /// 搜索关键词（匹配 entity_id 和 friendly_name）
+        /// 搜索关键词（匹配 entity_id 和 friendly_name，空格分词 AND 匹配）
         query: String,
+        /// 实例 ID（可选，默认搜索所有实例）
+        #[arg(short, long)]
+        instance: Option<uuid::Uuid>,
         /// 按域过滤（逗号分隔，如 "light,switch"）
         #[arg(short, long)]
         domain: Option<String>,
