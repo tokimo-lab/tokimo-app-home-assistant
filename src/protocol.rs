@@ -13,7 +13,10 @@ use std::fmt;
 pub enum ProtocolError {
     Io(std::io::Error),
     InvalidFrame(String),
-    PayloadTooLarge { size: usize, max: usize },
+    PayloadTooLarge {
+        size: usize,
+        max: usize,
+    },
     UnknownCommand(u32),
     #[allow(dead_code)]
     ServerError(u32, String),
@@ -272,7 +275,11 @@ pub fn decode_response_header(buf: &[u8; 12]) -> Result<(CommandId, StatusCode, 
         0x01 => StatusCode::BadRequest,
         0x02 => StatusCode::NotFound,
         0x03 => StatusCode::InternalError,
-        _ => return Err(ProtocolError::InvalidFrame(format!("unknown status code: {status_code}"))),
+        _ => {
+            return Err(ProtocolError::InvalidFrame(format!(
+                "unknown status code: {status_code}"
+            )));
+        }
     };
 
     Ok((CommandId::from_u32(command_id)?, status, payload_len))
