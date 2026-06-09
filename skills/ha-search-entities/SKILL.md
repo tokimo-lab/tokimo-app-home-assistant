@@ -1,5 +1,5 @@
 ---
-name: search-entities
+name: ha-search-entities
 description: "Search for Home Assistant entities by name or entity_id."
 when-to-use: "When the user asks to find, search, or list Home Assistant devices or entities."
 argument-hint: "<search query>"

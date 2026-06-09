@@ -1,5 +1,5 @@
 ---
-name: call-service
+name: ha-call-service
 description: "Control Home Assistant devices by calling services. Turn lights on/off, lock doors, adjust climate, etc."
 when-to-use: "When the user wants to control a Home Assistant device (turn on/off, toggle, set state, etc.)."
 argument-hint: "<device name> <action>"
