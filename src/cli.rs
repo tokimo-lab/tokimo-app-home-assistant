@@ -11,7 +11,6 @@ use tokimo_bus_cli::{Credentials, TokimoAuthArgs};
 use tracing::debug;
 use uuid::Uuid;
 
-#[cfg(unix)]
 use crate::uds_client::UdsClient;
 
 // ── Response DTOs (minimal, matching server JSON shape) ──────────────────────
@@ -117,7 +116,6 @@ const API: &str = "/api/apps/home-assistant";
 pub async fn run(auth: TokimoAuthArgs, command: crate::Command) -> anyhow::Result<()> {
     // Try UDS mode first (fast path). Unix domain sockets are unavailable on
     // non-Unix platforms, so this fast path is compiled in only on Unix.
-    #[cfg(unix)]
     if let Some(mut client) = UdsClient::connect().await {
         debug!("cli: using UDS mode");
         return run_uds(&mut client, &command).await;
@@ -129,7 +127,6 @@ pub async fn run(auth: TokimoAuthArgs, command: crate::Command) -> anyhow::Resul
 }
 
 /// Run command via UDS client.
-#[cfg(unix)]
 async fn run_uds(client: &mut UdsClient, command: &crate::Command) -> anyhow::Result<()> {
     match command {
         crate::Command::Status => run_status_uds(client).await,
@@ -205,7 +202,6 @@ async fn run_direct(auth: TokimoAuthArgs, command: crate::Command) -> anyhow::Re
 
 // ── UDS implementations ─────────────────────────────────────────────────────
 
-#[cfg(unix)]
 async fn run_status_uds(client: &mut UdsClient) -> anyhow::Result<()> {
     let status = client.status().await.context("UDS status request failed")?;
 
@@ -221,7 +217,6 @@ async fn run_status_uds(client: &mut UdsClient) -> anyhow::Result<()> {
     Ok(())
 }
 
-#[cfg(unix)]
 async fn run_instances_uds(client: &mut UdsClient) -> anyhow::Result<()> {
     let response = client.instances().await.context("UDS instances request failed")?;
 
@@ -242,7 +237,6 @@ async fn run_instances_uds(client: &mut UdsClient) -> anyhow::Result<()> {
     Ok(())
 }
 
-#[cfg(unix)]
 async fn run_test_uds(client: &mut UdsClient, instance_id: Uuid) -> anyhow::Result<()> {
     let response = client
         .test(&instance_id.to_string())
@@ -261,7 +255,6 @@ async fn run_test_uds(client: &mut UdsClient, instance_id: Uuid) -> anyhow::Resu
     Ok(())
 }
 
-#[cfg(unix)]
 async fn run_search_uds(
     client: &mut UdsClient,
     instance_id: Option<Uuid>,
@@ -347,7 +340,6 @@ async fn run_search_uds(
     Ok(())
 }
 
-#[cfg(unix)]
 async fn run_entity_uds(client: &mut UdsClient, instance_id: Uuid, entity_id: &str, raw: bool) -> anyhow::Result<()> {
     let entity = client
         .entity(&instance_id.to_string(), entity_id)
@@ -428,7 +420,6 @@ async fn run_entity_uds(client: &mut UdsClient, instance_id: Uuid, entity_id: &s
     Ok(())
 }
 
-#[cfg(unix)]
 async fn run_call_uds(
     client: &mut UdsClient,
     instance_id: Option<Uuid>,
@@ -473,7 +464,6 @@ async fn run_call_uds(
     Ok(())
 }
 
-#[cfg(unix)]
 async fn run_summary_uds(client: &mut UdsClient, instance_id: Uuid, raw: bool) -> anyhow::Result<()> {
     let summary = client
         .summary(&instance_id.to_string())

@@ -3,10 +3,10 @@
 //! This client connects to the UDS server and sends binary protocol commands.
 //! It provides a high-level API for CLI commands.
 
-use std::path::PathBuf;
+use std::time::Duration;
 
+use tokimo_bus_protocol::transport::BusStream;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::UnixStream;
 use tracing::debug;
 
 use crate::protocol::{
@@ -15,45 +15,48 @@ use crate::protocol::{
     TestResponse,
 };
 
-/// Client for communicating with the UDS server.
+/// Client for communicating with the IPC server.
 pub struct UdsClient {
-    stream: UnixStream,
+    stream: BusStream,
 }
 
 impl UdsClient {
-    /// Connect to the UDS server.
+    /// Connect to the IPC server.
     ///
-    /// Returns `None` if the socket doesn't exist (server not running).
+    /// Returns `None` when the server is not running. Because a filesystem
+    /// `.exists()` precheck is meaningless for Windows Named Pipes and
+    /// [`BusStream::connect`] retries for ~5s, the connect is wrapped in a short
+    /// timeout: any timeout or error maps to `None`, letting the CLI fall back
+    /// to direct HTTP mode quickly and cross-platform.
     pub async fn connect() -> Option<Self> {
-        let socket_path = get_socket_path()?;
+        let socket = match crate::uds_server::cli_socket() {
+            Ok(socket) => socket,
+            Err(e) => {
+                debug!(error = %e, "uds-client: cannot resolve socket address");
+                return None;
+            }
+        };
 
-        // Check if socket file exists.
-        if !std::path::Path::new(&socket_path).exists() {
-            debug!(path = %socket_path, "uds-client: socket not found");
-            return None;
-        }
-
-        match UnixStream::connect(&socket_path).await {
-            Ok(stream) => {
-                debug!(path = %socket_path, "uds-client: connected");
+        match tokio::time::timeout(Duration::from_millis(300), BusStream::connect(&socket)).await {
+            Ok(Ok(stream)) => {
+                debug!(socket = %socket.display_name(), "uds-client: connected");
                 Some(Self { stream })
             }
-            Err(e) => {
-                debug!(error = %e, path = %socket_path, "uds-client: connection failed");
+            Ok(Err(e)) => {
+                debug!(error = %e, socket = %socket.display_name(), "uds-client: connection failed");
+                None
+            }
+            Err(_) => {
+                debug!(socket = %socket.display_name(), "uds-client: connection timed out (server not running)");
                 None
             }
         }
     }
 
-    /// Check if the server is available (socket exists and can connect).
+    /// Check if the server is available (can connect within the timeout).
     #[allow(dead_code)]
     pub async fn is_available() -> bool {
-        let socket_path = match get_socket_path() {
-            Some(path) => path,
-            None => return false,
-        };
-
-        std::path::Path::new(&socket_path).exists()
+        Self::connect().await.is_some()
     }
 
     /// Send a PING command to check server responsiveness.
@@ -300,13 +303,4 @@ impl UdsClient {
 
         Ok((cmd, status, payload))
     }
-}
-
-/// Get the socket path for CLI communication.
-fn get_socket_path() -> Option<String> {
-    let bus = std::env::var("TOKIMO_BUS_SOCKET").ok()?;
-    let parent = PathBuf::from(&bus).parent()?.to_path_buf();
-    let apps_dir = parent.join("apps");
-    let path = apps_dir.join("tokimo-app-home-assistant.sock");
-    Some(path.to_string_lossy().into_owned())
 }

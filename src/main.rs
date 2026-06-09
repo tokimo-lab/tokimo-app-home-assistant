@@ -19,13 +19,10 @@ mod db;
 mod error;
 mod ha;
 mod handlers;
-#[cfg(unix)]
 mod protocol;
 mod state;
 mod tls;
-#[cfg(unix)]
 mod uds_client;
-#[cfg(unix)]
 mod uds_server;
 
 use std::sync::{Arc, OnceLock};
@@ -176,13 +173,11 @@ async fn run_server() -> anyhow::Result<()> {
         .await
         .map_err(|e| anyhow::anyhow!("app_server spawn: {e}"))?;
 
-    // Spawn UDS server for CLI communication (Unix domain sockets, Unix-only).
-    #[cfg(unix)]
+    // Spawn the cross-platform IPC server for CLI communication (Unix domain
+    // socket on Unix, Named Pipe on Windows).
     if let Err(e) = uds_server::spawn(Arc::clone(&ctx)).await {
         tracing::warn!(error = %e, "uds-server: failed to start, CLI will use direct mode");
     }
-    #[cfg(not(unix))]
-    tracing::warn!("uds-server: unavailable on this platform, CLI will use direct mode");
 
     // Register with broker.
     let client = BusClient::builder(cfg)

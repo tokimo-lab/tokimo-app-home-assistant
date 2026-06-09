@@ -7,35 +7,40 @@
 use std::sync::Arc;
 use std::time::Instant;
 
+use tokimo_bus_protocol::DataPlaneSocket;
+use tokimo_bus_protocol::transport::{self, BusListener, BusStream};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::UnixListener;
 use tracing::{debug, error, info, warn};
 
 use crate::handlers::AppCtx;
 use crate::protocol::{self, CommandId, ProtocolError, StatusCode};
 
-/// Start the UDS server for CLI communication.
+/// Start the cross-platform IPC server for CLI communication.
 ///
-/// Listens on `$DATA_LOCAL_PATH/apps/tokimo-app-home-assistant.sock`
-/// and spawns a task for each incoming connection.
+/// Listens on the address returned by [`cli_socket`] — a Unix domain socket on
+/// Unix and a Windows Named Pipe on Windows — and spawns a task for each
+/// incoming connection.
 pub async fn spawn(ctx: Arc<AppCtx>) -> anyhow::Result<()> {
-    let socket_path = get_socket_path()?;
+    let socket = cli_socket()?;
 
-    // Remove stale socket file if it exists.
-    let _ = std::fs::remove_file(&socket_path);
-
-    // Ensure parent directory exists.
-    if let Some(parent) = std::path::Path::new(&socket_path).parent() {
+    // For Unix sockets, ensure the parent directory exists before binding.
+    // (No-op for Named Pipes, which have no filesystem parent.)
+    if let DataPlaneSocket::Unix { path } = &socket
+        && let Some(parent) = std::path::Path::new(path).parent()
+    {
         std::fs::create_dir_all(parent)?;
     }
 
-    let listener = UnixListener::bind(&socket_path)?;
-    info!(path = %socket_path, "uds-server: listening for CLI connections");
+    // Remove any stale Unix socket file from a previous run (no-op on Windows).
+    transport::cleanup(&socket);
+
+    let mut listener = BusListener::bind(&socket)?;
+    info!(socket = %socket.display_name(), "uds-server: listening for CLI connections");
 
     tokio::spawn(async move {
         loop {
             match listener.accept().await {
-                Ok((stream, _addr)) => {
+                Ok(stream) => {
                     let ctx = Arc::clone(&ctx);
                     tokio::spawn(async move {
                         if let Err(e) = handle_connection(stream, ctx).await {
@@ -54,20 +59,39 @@ pub async fn spawn(ctx: Arc<AppCtx>) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Get the socket path for CLI communication.
-fn get_socket_path() -> anyhow::Result<String> {
-    let bus = std::env::var("TOKIMO_BUS_SOCKET").map_err(|_| anyhow::anyhow!("TOKIMO_BUS_SOCKET not set"))?;
-    let parent = std::path::PathBuf::from(&bus)
-        .parent()
-        .ok_or_else(|| anyhow::anyhow!("TOKIMO_BUS_SOCKET has no parent"))?
-        .to_path_buf();
-    let apps_dir = parent.join("apps");
-    let path = apps_dir.join("tokimo-app-home-assistant.sock");
-    Ok(path.to_string_lossy().into_owned())
+/// Compute the cross-platform IPC address for the home-assistant CLI<->server
+/// channel.
+///
+/// Both client and server must agree on this value. `cfg` is used only to pick
+/// the address *variant*, never to disable functionality:
+/// - **Unix**: a `DataPlaneSocket::Unix` at
+///   `<parent of $TOKIMO_BUS_SOCKET>/apps/tokimo-app-home-assistant.sock`.
+/// - **Windows**: a `DataPlaneSocket::NamedPipe` with the stable name
+///   `tokimo-app-home-assistant` (the transport adds the `\\.\pipe\` prefix).
+pub(crate) fn cli_socket() -> anyhow::Result<DataPlaneSocket> {
+    #[cfg(unix)]
+    {
+        let bus = std::env::var("TOKIMO_BUS_SOCKET").map_err(|_| anyhow::anyhow!("TOKIMO_BUS_SOCKET not set"))?;
+        let parent = std::path::PathBuf::from(&bus)
+            .parent()
+            .ok_or_else(|| anyhow::anyhow!("TOKIMO_BUS_SOCKET has no parent"))?
+            .to_path_buf();
+        let apps_dir = parent.join("apps");
+        let path = apps_dir.join("tokimo-app-home-assistant.sock");
+        Ok(DataPlaneSocket::Unix {
+            path: path.to_string_lossy().into_owned(),
+        })
+    }
+    #[cfg(not(unix))]
+    {
+        Ok(DataPlaneSocket::NamedPipe {
+            name: "tokimo-app-home-assistant".to_string(),
+        })
+    }
 }
 
 /// Handle a single CLI connection.
-async fn handle_connection(mut stream: tokio::net::UnixStream, ctx: Arc<AppCtx>) -> Result<(), ProtocolError> {
+async fn handle_connection(mut stream: BusStream, ctx: Arc<AppCtx>) -> Result<(), ProtocolError> {
     loop {
         // Read request header (8 bytes).
         let mut header = [0u8; 8];
