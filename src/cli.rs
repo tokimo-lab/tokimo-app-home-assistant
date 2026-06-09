@@ -11,6 +11,7 @@ use tokimo_bus_cli::{Credentials, TokimoAuthArgs};
 use tracing::debug;
 use uuid::Uuid;
 
+#[cfg(unix)]
 use crate::uds_client::UdsClient;
 
 // ── Response DTOs (minimal, matching server JSON shape) ──────────────────────
@@ -114,7 +115,9 @@ const API: &str = "/api/apps/home-assistant";
 // ── Dispatch ─────────────────────────────────────────────────────────────────
 
 pub async fn run(auth: TokimoAuthArgs, command: crate::Command) -> anyhow::Result<()> {
-    // Try UDS mode first (fast path).
+    // Try UDS mode first (fast path). Unix domain sockets are unavailable on
+    // non-Unix platforms, so this fast path is compiled in only on Unix.
+    #[cfg(unix)]
     if let Some(mut client) = UdsClient::connect().await {
         debug!("cli: using UDS mode");
         return run_uds(&mut client, &command).await;
@@ -126,6 +129,7 @@ pub async fn run(auth: TokimoAuthArgs, command: crate::Command) -> anyhow::Resul
 }
 
 /// Run command via UDS client.
+#[cfg(unix)]
 async fn run_uds(client: &mut UdsClient, command: &crate::Command) -> anyhow::Result<()> {
     match command {
         crate::Command::Status => run_status_uds(client).await,
@@ -139,7 +143,19 @@ async fn run_uds(client: &mut UdsClient, command: &crate::Command) -> anyhow::Re
             include_hidden,
             limit,
             raw,
-        } => run_search_uds(client, *instance, query, domain.as_deref(), state.as_deref(), *include_hidden, *limit, *raw).await,
+        } => {
+            run_search_uds(
+                client,
+                *instance,
+                query,
+                domain.as_deref(),
+                state.as_deref(),
+                *include_hidden,
+                *limit,
+                *raw,
+            )
+            .await
+        }
         crate::Command::Entity {
             instance_id,
             entity_id,
@@ -189,9 +205,9 @@ async fn run_direct(auth: TokimoAuthArgs, command: crate::Command) -> anyhow::Re
 
 // ── UDS implementations ─────────────────────────────────────────────────────
 
+#[cfg(unix)]
 async fn run_status_uds(client: &mut UdsClient) -> anyhow::Result<()> {
-    let status = client.status().await
-        .context("UDS status request failed")?;
+    let status = client.status().await.context("UDS status request failed")?;
 
     println!("🏠 Home Assistant CLI — {} instance(s)\n", status.instances_count);
 
@@ -205,9 +221,9 @@ async fn run_status_uds(client: &mut UdsClient) -> anyhow::Result<()> {
     Ok(())
 }
 
+#[cfg(unix)]
 async fn run_instances_uds(client: &mut UdsClient) -> anyhow::Result<()> {
-    let response = client.instances().await
-        .context("UDS instances request failed")?;
+    let response = client.instances().await.context("UDS instances request failed")?;
 
     if response.instances.is_empty() {
         println!("No instances configured.");
@@ -217,25 +233,35 @@ async fn run_instances_uds(client: &mut UdsClient) -> anyhow::Result<()> {
     println!("{:<38} {:<25} {:<40} Status", "ID", "Name", "URL");
     println!("{}", "-".repeat(120));
     for inst in &response.instances {
-        println!("{:<38} {:<25} {:<40} {}", inst.id, inst.name, inst.base_url, inst.status);
+        println!(
+            "{:<38} {:<25} {:<40} {}",
+            inst.id, inst.name, inst.base_url, inst.status
+        );
     }
 
     Ok(())
 }
 
+#[cfg(unix)]
 async fn run_test_uds(client: &mut UdsClient, instance_id: Uuid) -> anyhow::Result<()> {
-    let response = client.test(&instance_id.to_string()).await
+    let response = client
+        .test(&instance_id.to_string())
+        .await
         .context("UDS test request failed")?;
 
     if response.success {
         println!("✅ Connected (latency: {}ms)", response.latency_ms);
     } else {
-        println!("❌ Connection failed: {}", response.error.as_deref().unwrap_or("unknown error"));
+        println!(
+            "❌ Connection failed: {}",
+            response.error.as_deref().unwrap_or("unknown error")
+        );
     }
 
     Ok(())
 }
 
+#[cfg(unix)]
 async fn run_search_uds(
     client: &mut UdsClient,
     instance_id: Option<Uuid>,
@@ -250,25 +276,29 @@ async fn run_search_uds(
     let instance_id = match instance_id {
         Some(id) => id,
         None => {
-            let instances = client.instances().await
-                .context("UDS instances request failed")?;
+            let instances = client.instances().await.context("UDS instances request failed")?;
             if instances.instances.is_empty() {
                 anyhow::bail!("No Home Assistant instances configured");
             }
             let first = &instances.instances[0];
             if instances.instances.len() > 1 {
-                eprintln!("⚠️  Multiple instances found, using first: {} ({})", first.name, first.id);
+                eprintln!(
+                    "⚠️  Multiple instances found, using first: {} ({})",
+                    first.name, first.id
+                );
             }
-            uuid::Uuid::parse_str(&first.id)
-                .map_err(|e| anyhow::anyhow!("invalid instance id: {e}"))?
+            uuid::Uuid::parse_str(&first.id).map_err(|e| anyhow::anyhow!("invalid instance id: {e}"))?
         }
     };
 
-    let response = client.search(&instance_id.to_string(), query, domain, state, include_hidden, limit).await
+    let response = client
+        .search(&instance_id.to_string(), query, domain, state, include_hidden, limit)
+        .await
         .context("UDS search request failed")?;
 
     if raw {
-        let json_out: Vec<serde_json::Value> = response.entities
+        let json_out: Vec<serde_json::Value> = response
+            .entities
             .iter()
             .map(|e| {
                 serde_json::json!({
@@ -289,14 +319,20 @@ async fn run_search_uds(
         return Ok(());
     }
 
-    let noun = if response.entities.len() == 1 { "entity" } else { "entities" };
+    let noun = if response.entities.len() == 1 {
+        "entity"
+    } else {
+        "entities"
+    };
     println!("🔍 Found {} {noun} matching \"{query}\":\n", response.entities.len());
     println!("  {:<40} {:<12} {:<15} Friendly Name", "Entity ID", "State", "Domain");
     println!("  {}", "-".repeat(100));
 
     for e in &response.entities {
         let domain_str = e.entity_id.split('.').next().unwrap_or("?");
-        let friendly = e.display_name.as_deref()
+        let friendly = e
+            .display_name
+            .as_deref()
             .or_else(|| e.attributes.get("friendly_name").and_then(|v| v.as_str()))
             .unwrap_or("-");
         println!(
@@ -311,13 +347,11 @@ async fn run_search_uds(
     Ok(())
 }
 
-async fn run_entity_uds(
-    client: &mut UdsClient,
-    instance_id: Uuid,
-    entity_id: &str,
-    raw: bool,
-) -> anyhow::Result<()> {
-    let entity = client.entity(&instance_id.to_string(), entity_id).await
+#[cfg(unix)]
+async fn run_entity_uds(client: &mut UdsClient, instance_id: Uuid, entity_id: &str, raw: bool) -> anyhow::Result<()> {
+    let entity = client
+        .entity(&instance_id.to_string(), entity_id)
+        .await
         .context("UDS entity request failed")?;
 
     if raw {
@@ -394,6 +428,7 @@ async fn run_entity_uds(
     Ok(())
 }
 
+#[cfg(unix)]
 async fn run_call_uds(
     client: &mut UdsClient,
     instance_id: Option<Uuid>,
@@ -406,17 +441,18 @@ async fn run_call_uds(
     let instance_id = match instance_id {
         Some(id) => id,
         None => {
-            let instances = client.instances().await
-                .context("UDS instances request failed")?;
+            let instances = client.instances().await.context("UDS instances request failed")?;
             if instances.instances.is_empty() {
                 anyhow::bail!("No Home Assistant instances configured");
             }
             let first = &instances.instances[0];
             if instances.instances.len() > 1 {
-                eprintln!("⚠️  Multiple instances found, using first: {} ({})", first.name, first.id);
+                eprintln!(
+                    "⚠️  Multiple instances found, using first: {} ({})",
+                    first.name, first.id
+                );
             }
-            uuid::Uuid::parse_str(&first.id)
-                .map_err(|e| anyhow::anyhow!("invalid instance id: {e}"))?
+            uuid::Uuid::parse_str(&first.id).map_err(|e| anyhow::anyhow!("invalid instance id: {e}"))?
         }
     };
 
@@ -426,13 +462,10 @@ async fn run_call_uds(
         None
     };
 
-    let response = client.call(
-        &instance_id.to_string(),
-        domain,
-        service,
-        entity_id,
-        data_value,
-    ).await.context("UDS call request failed")?;
+    let response = client
+        .call(&instance_id.to_string(), domain, service, entity_id, data_value)
+        .await
+        .context("UDS call request failed")?;
 
     println!("✅ Service called: {domain}.{service} → {entity_id}");
     println!("   Context ID: {}", response.context_id);
@@ -440,8 +473,11 @@ async fn run_call_uds(
     Ok(())
 }
 
+#[cfg(unix)]
 async fn run_summary_uds(client: &mut UdsClient, instance_id: Uuid, raw: bool) -> anyhow::Result<()> {
-    let summary = client.summary(&instance_id.to_string()).await
+    let summary = client
+        .summary(&instance_id.to_string())
+        .await
         .context("UDS summary request failed")?;
 
     if raw {
@@ -625,7 +661,10 @@ async fn run_search(
             }
             let first = &instances[0];
             if instances.len() > 1 {
-                eprintln!("⚠️  Multiple instances found, using first: {} ({})", first.name, first.id);
+                eprintln!(
+                    "⚠️  Multiple instances found, using first: {} ({})",
+                    first.name, first.id
+                );
             }
             first.id
         }
@@ -660,7 +699,9 @@ async fn run_search(
             let friendly = e.attributes.get("friendly_name").and_then(|v| v.as_str()).unwrap_or("");
             let display = e.display_name.as_deref().unwrap_or("");
             let searchable_text = format!("{} {} {}", e.entity_id, friendly, display).to_lowercase();
-            let matches_query = query_tokens.iter().all(|token| searchable_text.contains(token.as_str()));
+            let matches_query = query_tokens
+                .iter()
+                .all(|token| searchable_text.contains(token.as_str()));
 
             let matches_domain = domain_filter
                 .as_ref()
@@ -867,7 +908,10 @@ async fn run_call(
             }
             let first = &instances[0];
             if instances.len() > 1 {
-                eprintln!("⚠️  Multiple instances found, using first: {} ({})", first.name, first.id);
+                eprintln!(
+                    "⚠️  Multiple instances found, using first: {} ({})",
+                    first.name, first.id
+                );
             }
             first.id
         }

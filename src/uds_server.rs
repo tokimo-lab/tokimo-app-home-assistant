@@ -12,9 +12,7 @@ use tokio::net::UnixListener;
 use tracing::{debug, error, info, warn};
 
 use crate::handlers::AppCtx;
-use crate::protocol::{
-    self, CommandId, ProtocolError, StatusCode,
-};
+use crate::protocol::{self, CommandId, ProtocolError, StatusCode};
 
 /// Start the UDS server for CLI communication.
 ///
@@ -58,8 +56,7 @@ pub async fn spawn(ctx: Arc<AppCtx>) -> anyhow::Result<()> {
 
 /// Get the socket path for CLI communication.
 fn get_socket_path() -> anyhow::Result<String> {
-    let bus = std::env::var("TOKIMO_BUS_SOCKET")
-        .map_err(|_| anyhow::anyhow!("TOKIMO_BUS_SOCKET not set"))?;
+    let bus = std::env::var("TOKIMO_BUS_SOCKET").map_err(|_| anyhow::anyhow!("TOKIMO_BUS_SOCKET not set"))?;
     let parent = std::path::PathBuf::from(&bus)
         .parent()
         .ok_or_else(|| anyhow::anyhow!("TOKIMO_BUS_SOCKET has no parent"))?
@@ -70,10 +67,7 @@ fn get_socket_path() -> anyhow::Result<String> {
 }
 
 /// Handle a single CLI connection.
-async fn handle_connection(
-    mut stream: tokio::net::UnixStream,
-    ctx: Arc<AppCtx>,
-) -> Result<(), ProtocolError> {
+async fn handle_connection(mut stream: tokio::net::UnixStream, ctx: Arc<AppCtx>) -> Result<(), ProtocolError> {
     loop {
         // Read request header (8 bytes).
         let mut header = [0u8; 8];
@@ -117,11 +111,7 @@ async fn handle_connection(
 }
 
 /// Route a command to the appropriate handler.
-async fn route_command(
-    command_id: CommandId,
-    payload: &[u8],
-    ctx: &Arc<AppCtx>,
-) -> Result<Vec<u8>, ProtocolError> {
+async fn route_command(command_id: CommandId, payload: &[u8], ctx: &Arc<AppCtx>) -> Result<Vec<u8>, ProtocolError> {
     match command_id {
         CommandId::Ping => Ok(b"PONG".to_vec()),
 
@@ -136,43 +126,41 @@ async fn route_command(
         }
 
         CommandId::Test => {
-            let request: protocol::TestRequest = serde_json::from_slice(payload)
-                .map_err(|e| ProtocolError::InvalidFrame(e.to_string()))?;
+            let request: protocol::TestRequest =
+                serde_json::from_slice(payload).map_err(|e| ProtocolError::InvalidFrame(e.to_string()))?;
             let response = handlers::handle_test(ctx, request).await?;
             Ok(serde_json::to_vec(&response).unwrap_or_default())
         }
 
         CommandId::Search => {
-            let request: protocol::SearchRequest = serde_json::from_slice(payload)
-                .map_err(|e| ProtocolError::InvalidFrame(e.to_string()))?;
+            let request: protocol::SearchRequest =
+                serde_json::from_slice(payload).map_err(|e| ProtocolError::InvalidFrame(e.to_string()))?;
             let response = handlers::handle_search(ctx, request).await?;
             Ok(serde_json::to_vec(&response).unwrap_or_default())
         }
 
         CommandId::Entity => {
-            let request: protocol::EntityRequest = serde_json::from_slice(payload)
-                .map_err(|e| ProtocolError::InvalidFrame(e.to_string()))?;
+            let request: protocol::EntityRequest =
+                serde_json::from_slice(payload).map_err(|e| ProtocolError::InvalidFrame(e.to_string()))?;
             let response = handlers::handle_entity(ctx, request).await?;
             Ok(serde_json::to_vec(&response).unwrap_or_default())
         }
 
         CommandId::Call => {
-            let request: protocol::CallRequest = serde_json::from_slice(payload)
-                .map_err(|e| ProtocolError::InvalidFrame(e.to_string()))?;
+            let request: protocol::CallRequest =
+                serde_json::from_slice(payload).map_err(|e| ProtocolError::InvalidFrame(e.to_string()))?;
             let response = handlers::handle_call(ctx, request).await?;
             Ok(serde_json::to_vec(&response).unwrap_or_default())
         }
 
         CommandId::Summary => {
-            let request: protocol::SummaryRequest = serde_json::from_slice(payload)
-                .map_err(|e| ProtocolError::InvalidFrame(e.to_string()))?;
+            let request: protocol::SummaryRequest =
+                serde_json::from_slice(payload).map_err(|e| ProtocolError::InvalidFrame(e.to_string()))?;
             let response = handlers::handle_summary(ctx, request).await?;
             Ok(serde_json::to_vec(&response).unwrap_or_default())
         }
 
-        CommandId::Pong => {
-            Err(ProtocolError::InvalidFrame("PONG is a response-only command".into()))
-        }
+        CommandId::Pong => Err(ProtocolError::InvalidFrame("PONG is a response-only command".into())),
     }
 }
 
@@ -184,11 +172,16 @@ mod handlers {
     use std::collections::HashMap;
 
     pub async fn handle_status(ctx: &AppCtx) -> Result<StatusResponse, ProtocolError> {
-        let instances = ctx.conn_pool.instances.iter()
+        let instances = ctx
+            .conn_pool
+            .instances
+            .iter()
             .map(|entry| {
                 let id = entry.key().to_string();
                 let instance = entry.value();
-                let status = instance.status.try_read()
+                let status = instance
+                    .status
+                    .try_read()
                     .map(|s| format!("{:?}", *s))
                     .unwrap_or_else(|_| "unknown".to_string());
                 let entity_count = instance.store.states.len();
@@ -210,17 +203,22 @@ mod handlers {
     }
 
     pub async fn handle_instances(ctx: &AppCtx) -> Result<InstancesResponse, ProtocolError> {
-        let instances = ctx.conn_pool.instances.iter()
+        let instances = ctx
+            .conn_pool
+            .instances
+            .iter()
             .map(|entry| {
                 let id = entry.key().to_string();
                 let instance = entry.value();
-                let status = instance.status.try_read()
+                let status = instance
+                    .status
+                    .try_read()
                     .map(|s| format!("{:?}", *s))
                     .unwrap_or_else(|_| "unknown".to_string());
                 let entity_count = instance.store.states.len();
                 InstanceInfo {
                     id: id.clone(),
-                    name: id, // TODO: get name from config
+                    name: id,                // TODO: get name from config
                     base_url: String::new(), // TODO: get from config
                     status,
                     entity_count,
@@ -231,20 +229,23 @@ mod handlers {
         Ok(InstancesResponse { instances })
     }
 
-    pub async fn handle_test(
-        ctx: &AppCtx,
-        request: TestRequest,
-    ) -> Result<TestResponse, ProtocolError> {
+    pub async fn handle_test(ctx: &AppCtx, request: TestRequest) -> Result<TestResponse, ProtocolError> {
         let instance_id = uuid::Uuid::parse_str(&request.instance_id)
             .map_err(|e| ProtocolError::InvalidFrame(format!("invalid instance_id: {e}")))?;
 
         let start = Instant::now();
 
-        let instance = ctx.conn_pool.instances.get(&instance_id)
+        let instance = ctx
+            .conn_pool
+            .instances
+            .get(&instance_id)
             .ok_or_else(|| ProtocolError::InvalidFrame(format!("instance not found: {instance_id}")))?;
 
         // Check if instance is connected by reading status.
-        let status = instance.value().status.try_read()
+        let status = instance
+            .value()
+            .status
+            .try_read()
             .map(|s| format!("{:?}", *s))
             .unwrap_or_else(|_| "unknown".to_string());
 
@@ -258,17 +259,11 @@ mod handlers {
         })
     }
 
-    pub async fn handle_search(
-        ctx: &AppCtx,
-        request: SearchRequest,
-    ) -> Result<SearchResponse, ProtocolError> {
+    pub async fn handle_search(ctx: &AppCtx, request: SearchRequest) -> Result<SearchResponse, ProtocolError> {
         let mut results = Vec::new();
 
         // Split query into tokens for AND matching
-        let query_tokens: Vec<String> = request.query
-            .split_whitespace()
-            .map(|s| s.to_lowercase())
-            .collect();
+        let query_tokens: Vec<String> = request.query.split_whitespace().map(|s| s.to_lowercase()).collect();
 
         // Filter by instance_id if specified
         let instance_filter = uuid::Uuid::parse_str(&request.instance_id).ok();
@@ -278,10 +273,10 @@ mod handlers {
             let instance = entry.value();
 
             // Skip if instance doesn't match filter
-            if let Some(filter_id) = instance_filter {
-                if *instance_id != filter_id {
-                    continue;
-                }
+            if let Some(filter_id) = instance_filter
+                && *instance_id != filter_id
+            {
+                continue;
             }
 
             for entity in instance.store.states.iter() {
@@ -289,7 +284,9 @@ mod handlers {
                 let state = &entity.state;
 
                 // Match by entity_id or friendly_name attribute (AND matching for all tokens)
-                let friendly_name = entity.attributes.get("friendly_name")
+                let friendly_name = entity
+                    .attributes
+                    .get("friendly_name")
                     .and_then(|v| v.as_str())
                     .unwrap_or("");
 
@@ -297,30 +294,32 @@ mod handlers {
                 let friendly_name_lower = friendly_name.to_lowercase();
                 let searchable_text = format!("{entity_id_lower} {friendly_name_lower}");
 
-                let matches_query = query_tokens.iter().all(|token| {
-                    searchable_text.contains(token.as_str())
-                });
+                let matches_query = query_tokens
+                    .iter()
+                    .all(|token| searchable_text.contains(token.as_str()));
 
                 if !matches_query {
                     continue;
                 }
 
                 // Filter by domain if specified.
-                if let Some(ref domain) = request.domain {
-                    if !entity_id.starts_with(domain) {
-                        continue;
-                    }
+                if let Some(ref domain) = request.domain
+                    && !entity_id.starts_with(domain)
+                {
+                    continue;
                 }
 
                 // Filter by state if specified.
-                if let Some(ref state_filter) = request.state {
-                    if state != state_filter {
-                        continue;
-                    }
+                if let Some(ref state_filter) = request.state
+                    && state != state_filter
+                {
+                    continue;
                 }
 
                 // Get display name from override cache if available.
-                let display_name = instance.override_cache.get(entity_id)
+                let display_name = instance
+                    .override_cache
+                    .get(entity_id)
                     .and_then(|o| o.display_name.clone());
 
                 results.push(EntitySearchResult {
@@ -340,17 +339,20 @@ mod handlers {
         Ok(SearchResponse { entities: results })
     }
 
-    pub async fn handle_entity(
-        ctx: &AppCtx,
-        request: EntityRequest,
-    ) -> Result<EntityResponse, ProtocolError> {
+    pub async fn handle_entity(ctx: &AppCtx, request: EntityRequest) -> Result<EntityResponse, ProtocolError> {
         let instance_id = uuid::Uuid::parse_str(&request.instance_id)
             .map_err(|e| ProtocolError::InvalidFrame(format!("invalid instance_id: {e}")))?;
 
-        let instance = ctx.conn_pool.instances.get(&instance_id)
+        let instance = ctx
+            .conn_pool
+            .instances
+            .get(&instance_id)
             .ok_or_else(|| ProtocolError::InvalidFrame(format!("instance not found: {instance_id}")))?;
 
-        let entity = instance.store.states.get(&request.entity_id)
+        let entity = instance
+            .store
+            .states
+            .get(&request.entity_id)
             .ok_or_else(|| ProtocolError::InvalidFrame(format!("entity not found: {}", request.entity_id)))?;
 
         let override_data = instance.override_cache.get(&request.entity_id);
@@ -368,14 +370,14 @@ mod handlers {
         })
     }
 
-    pub async fn handle_call(
-        ctx: &AppCtx,
-        request: CallRequest,
-    ) -> Result<CallResponse, ProtocolError> {
+    pub async fn handle_call(ctx: &AppCtx, request: CallRequest) -> Result<CallResponse, ProtocolError> {
         let instance_id = uuid::Uuid::parse_str(&request.instance_id)
             .map_err(|e| ProtocolError::InvalidFrame(format!("invalid instance_id: {e}")))?;
 
-        let instance = ctx.conn_pool.instances.get(&instance_id)
+        let instance = ctx
+            .conn_pool
+            .instances
+            .get(&instance_id)
             .ok_or_else(|| ProtocolError::InvalidFrame(format!("instance not found: {instance_id}")))?;
 
         let (reply_tx, reply_rx) = tokio::sync::oneshot::channel();
@@ -384,22 +386,30 @@ mod handlers {
             domain: request.domain,
             service: request.service,
             entity_id: request.entity_id,
-            data: request.data.unwrap_or(serde_json::Value::Object(serde_json::Map::new())),
+            data: request
+                .data
+                .unwrap_or(serde_json::Value::Object(serde_json::Map::new())),
             reply: reply_tx,
         };
 
         // Send command through the WS channel.
-        instance.value().ws_cmd_tx.send(cmd).await
+        instance
+            .value()
+            .ws_cmd_tx
+            .send(cmd)
+            .await
             .map_err(|_| ProtocolError::InvalidFrame("failed to send command to WS supervisor".into()))?;
 
         // Wait for response.
-        let result = reply_rx.await
+        let result = reply_rx
+            .await
             .map_err(|_| ProtocolError::InvalidFrame("WS supervisor dropped reply".into()))?;
 
         match result {
             Ok(value) => {
                 // Extract context_id from the response.
-                let context_id = value.get("context")
+                let context_id = value
+                    .get("context")
                     .and_then(|c| c.get("id"))
                     .and_then(|id| id.as_str())
                     .unwrap_or("unknown")
@@ -411,14 +421,14 @@ mod handlers {
         }
     }
 
-    pub async fn handle_summary(
-        ctx: &AppCtx,
-        request: SummaryRequest,
-    ) -> Result<SummaryResponse, ProtocolError> {
+    pub async fn handle_summary(ctx: &AppCtx, request: SummaryRequest) -> Result<SummaryResponse, ProtocolError> {
         let instance_id = uuid::Uuid::parse_str(&request.instance_id)
             .map_err(|e| ProtocolError::InvalidFrame(format!("invalid instance_id: {e}")))?;
 
-        let instance = ctx.conn_pool.instances.get(&instance_id)
+        let instance = ctx
+            .conn_pool
+            .instances
+            .get(&instance_id)
             .ok_or_else(|| ProtocolError::InvalidFrame(format!("instance not found: {instance_id}")))?;
 
         let mut unavailable_entities = Vec::new();
@@ -433,7 +443,9 @@ mod handlers {
             if entity.state == "unavailable" {
                 unavailable_entities.push(UnavailableEntity {
                     entity_id: entity.entity_id.clone(),
-                    name: entity.attributes.get("friendly_name")
+                    name: entity
+                        .attributes
+                        .get("friendly_name")
                         .and_then(|v| v.as_str())
                         .unwrap_or("")
                         .to_string(),
@@ -444,7 +456,8 @@ mod handlers {
             }
         }
 
-        let domain_counts = domain_counts.into_iter()
+        let domain_counts = domain_counts
+            .into_iter()
             .map(|(domain, (on_count, total_count))| DomainCount {
                 domain,
                 on_count,

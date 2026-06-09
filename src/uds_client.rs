@@ -10,9 +10,9 @@ use tokio::net::UnixStream;
 use tracing::debug;
 
 use crate::protocol::{
-    self, CallRequest, CallResponse, CommandId, EntityRequest, EntityResponse, InstancesResponse,
-    ProtocolError, SearchRequest, SearchResponse, StatusCode, StatusResponse, SummaryRequest,
-    SummaryResponse, TestRequest, TestResponse,
+    self, CallRequest, CallResponse, CommandId, EntityRequest, EntityResponse, InstancesResponse, ProtocolError,
+    SearchRequest, SearchResponse, StatusCode, StatusResponse, SummaryRequest, SummaryResponse, TestRequest,
+    TestResponse,
 };
 
 /// Client for communicating with the UDS server.
@@ -46,6 +46,7 @@ impl UdsClient {
     }
 
     /// Check if the server is available (socket exists and can connect).
+    #[allow(dead_code)]
     pub async fn is_available() -> bool {
         let socket_path = match get_socket_path() {
             Some(path) => path,
@@ -56,6 +57,7 @@ impl UdsClient {
     }
 
     /// Send a PING command to check server responsiveness.
+    #[allow(dead_code)]
     pub async fn ping(&mut self) -> Result<(), ProtocolError> {
         let request = protocol::encode_request(CommandId::Ping, &[]);
         self.stream.write_all(&request).await?;
@@ -63,10 +65,7 @@ impl UdsClient {
         let (cmd, status, payload) = self.read_response().await?;
 
         if cmd != CommandId::Pong {
-            return Err(ProtocolError::InvalidFrame(format!(
-                "expected PONG, got {:?}",
-                cmd
-            )));
+            return Err(ProtocolError::InvalidFrame(format!("expected PONG, got {:?}", cmd)));
         }
 
         if status != StatusCode::Ok {
@@ -96,8 +95,7 @@ impl UdsClient {
             return Err(ProtocolError::ServerError(status as u32, msg));
         }
 
-        serde_json::from_slice(&payload)
-            .map_err(|e| ProtocolError::InvalidFrame(e.to_string()))
+        serde_json::from_slice(&payload).map_err(|e| ProtocolError::InvalidFrame(e.to_string()))
     }
 
     /// List all instances.
@@ -119,8 +117,7 @@ impl UdsClient {
             return Err(ProtocolError::ServerError(status as u32, msg));
         }
 
-        serde_json::from_slice(&payload)
-            .map_err(|e| ProtocolError::InvalidFrame(e.to_string()))
+        serde_json::from_slice(&payload).map_err(|e| ProtocolError::InvalidFrame(e.to_string()))
     }
 
     /// Test instance connectivity.
@@ -147,8 +144,7 @@ impl UdsClient {
             return Err(ProtocolError::ServerError(status as u32, msg));
         }
 
-        serde_json::from_slice(&payload)
-            .map_err(|e| ProtocolError::InvalidFrame(e.to_string()))
+        serde_json::from_slice(&payload).map_err(|e| ProtocolError::InvalidFrame(e.to_string()))
     }
 
     /// Search entities.
@@ -188,16 +184,11 @@ impl UdsClient {
             return Err(ProtocolError::ServerError(status as u32, msg));
         }
 
-        serde_json::from_slice(&payload)
-            .map_err(|e| ProtocolError::InvalidFrame(e.to_string()))
+        serde_json::from_slice(&payload).map_err(|e| ProtocolError::InvalidFrame(e.to_string()))
     }
 
     /// Get entity details.
-    pub async fn entity(
-        &mut self,
-        instance_id: &str,
-        entity_id: &str,
-    ) -> Result<EntityResponse, ProtocolError> {
+    pub async fn entity(&mut self, instance_id: &str, entity_id: &str) -> Result<EntityResponse, ProtocolError> {
         let request_payload = serde_json::to_vec(&EntityRequest {
             instance_id: instance_id.to_string(),
             entity_id: entity_id.to_string(),
@@ -221,8 +212,7 @@ impl UdsClient {
             return Err(ProtocolError::ServerError(status as u32, msg));
         }
 
-        serde_json::from_slice(&payload)
-            .map_err(|e| ProtocolError::InvalidFrame(e.to_string()))
+        serde_json::from_slice(&payload).map_err(|e| ProtocolError::InvalidFrame(e.to_string()))
     }
 
     /// Call a service.
@@ -260,15 +250,11 @@ impl UdsClient {
             return Err(ProtocolError::ServerError(status as u32, msg));
         }
 
-        serde_json::from_slice(&payload)
-            .map_err(|e| ProtocolError::InvalidFrame(e.to_string()))
+        serde_json::from_slice(&payload).map_err(|e| ProtocolError::InvalidFrame(e.to_string()))
     }
 
     /// Get instance summary.
-    pub async fn summary(
-        &mut self,
-        instance_id: &str,
-    ) -> Result<SummaryResponse, ProtocolError> {
+    pub async fn summary(&mut self, instance_id: &str) -> Result<SummaryResponse, ProtocolError> {
         let request_payload = serde_json::to_vec(&SummaryRequest {
             instance_id: instance_id.to_string(),
         })
@@ -291,14 +277,11 @@ impl UdsClient {
             return Err(ProtocolError::ServerError(status as u32, msg));
         }
 
-        serde_json::from_slice(&payload)
-            .map_err(|e| ProtocolError::InvalidFrame(e.to_string()))
+        serde_json::from_slice(&payload).map_err(|e| ProtocolError::InvalidFrame(e.to_string()))
     }
 
     /// Read a response frame from the server.
-    async fn read_response(
-        &mut self,
-    ) -> Result<(CommandId, StatusCode, Vec<u8>), ProtocolError> {
+    async fn read_response(&mut self) -> Result<(CommandId, StatusCode, Vec<u8>), ProtocolError> {
         // Read response header (12 bytes).
         let mut header = [0u8; 12];
         self.stream.read_exact(&mut header).await?;
