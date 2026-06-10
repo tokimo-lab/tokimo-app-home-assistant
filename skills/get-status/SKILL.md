@@ -1,5 +1,5 @@
 ---
-name: ha-get-status
+name: get-status
 description: "Get the current status and details of a Home Assistant entity."
 when-to-use: "When the user wants to know the current state or details of a specific Home Assistant entity."
 argument-hint: "<entity_id>"
