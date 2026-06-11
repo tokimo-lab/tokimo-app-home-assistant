@@ -35,8 +35,8 @@ use tracing::{error, info};
 #[derive(Parser, Debug)]
 #[command(
     name = "tokimo-app-home-assistant",
-    about = "Home Assistant — Tokimo 子 app CLI",
-    long_about = "Home Assistant CLI — 通过 Tokimo 主 server 调用 home-assistant app。",
+    about = "Home Assistant — Tokimo app CLI",
+    long_about = "Home Assistant CLI — call the home-assistant app via the Tokimo main server.",
     term_width = 100
 )]
 struct Cli {
@@ -48,69 +48,69 @@ struct Cli {
 
 #[derive(Subcommand, Debug)]
 pub(crate) enum Command {
-    /// 检查连接状态，列出实例及域统计。
+    /// Check connection status, list instances and domain stats.
     Status,
-    /// 列出所有 Home Assistant 实例。
+    /// List all Home Assistant instances.
     Instances,
-    /// 测试指定实例的连通性。
+    /// Test connectivity of a specific instance.
     Test {
-        /// 实例 ID
+        /// Instance ID
         id: uuid::Uuid,
     },
-    /// 按 entity_id 或 friendly_name 搜索实体。
+    /// Search entities by entity_id or friendly_name.
     Search {
-        /// 搜索关键词（匹配 entity_id 和 friendly_name，空格分词 AND 匹配）
+        /// Search keyword (matches entity_id and friendly_name, space-tokenized AND matching)
         query: String,
-        /// 实例 ID（可选，默认搜索所有实例）
+        /// Instance ID (optional, searches all instances by default)
         #[arg(short, long)]
         instance: Option<uuid::Uuid>,
-        /// 按域过滤（逗号分隔，如 "light,switch"）
+        /// Filter by domain (comma-separated, e.g. "light,switch")
         #[arg(short, long)]
         domain: Option<String>,
-        /// 按状态过滤（逗号分隔，如 "on,off"）
+        /// Filter by state (comma-separated, e.g. "on,off")
         #[arg(short, long)]
         state: Option<String>,
-        /// 包含隐藏实体
+        /// Include hidden entities
         #[arg(long)]
         include_hidden: bool,
-        /// 返回结果数量上限
+        /// Max number of results
         #[arg(short, long, default_value_t = 50)]
         limit: u32,
-        /// 输出原始 JSON
+        /// Output raw JSON
         #[arg(long)]
         raw: bool,
     },
-    /// 查看单个实体的详细信息（含设备元数据）。
+    /// View details of a single entity (including device metadata).
     Entity {
-        /// 实例 ID
+        /// Instance ID
         instance_id: uuid::Uuid,
-        /// 实体 ID（如 "light.kitchen"）
+        /// Entity ID (e.g. "light.kitchen")
         entity_id: String,
-        /// 输出原始 JSON
+        /// Output raw JSON
         #[arg(long)]
         raw: bool,
     },
-    /// 调用 Home Assistant service（如 light.turn_on, lock.lock）。
+    /// Call a Home Assistant service (e.g. light.turn_on, lock.lock).
     Call {
-        /// 域名（如 "light", "switch", "climate"）
+        /// Domain name (e.g. "light", "switch", "climate")
         domain: String,
-        /// 服务名（如 "turn_on", "turn_off", "toggle"）
+        /// Service name (e.g. "turn_on", "turn_off", "toggle")
         service: String,
-        /// 目标实体 ID（如 "light.kitchen"）
+        /// Target entity ID (e.g. "light.kitchen")
         #[arg(long = "entity-id")]
         entity_id: String,
-        /// 实例 ID（可选，默认使用第一个实例）
+        /// Instance ID (optional, uses first instance by default)
         #[arg(short, long)]
         instance: Option<uuid::Uuid>,
-        /// 额外参数（JSON 格式，如 '{"brightness":128}'）
+        /// Extra parameters (JSON format, e.g. '{"brightness":128}')
         #[arg(long)]
         data: Option<String>,
     },
-    /// 查看实例摘要（不可用实体、域分布统计）。
+    /// View instance summary (unavailable entities, domain distribution stats).
     Summary {
-        /// 实例 ID
+        /// Instance ID
         instance_id: uuid::Uuid,
-        /// 输出原始 JSON
+        /// Output raw JSON
         #[arg(long)]
         raw: bool,
     },
