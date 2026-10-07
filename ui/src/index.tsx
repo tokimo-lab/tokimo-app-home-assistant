@@ -395,6 +395,11 @@ export default defineApp({
     category: "app",
   },
   translations: { "zh-CN": zhCN, "en-US": enUS },
+  standalone: {
+    createWindow: (route) => ({ type: "home-assistant", route }),
+    getRoute: (window) =>
+      window.type === "home-assistant" ? (window.route ?? "/") : null,
+  },
   mount(container, ctx): Dispose {
     const root: Root = createRoot(container);
     const locale = ctx.locale.startsWith("zh") ? uiZhCN : uiEnUS;
