@@ -1,5 +1,8 @@
 import {
   FloatingPortal,
+  flip,
+  shift,
+  size,
   useDismiss,
   useFloating,
   useInteractions,
@@ -16,6 +19,7 @@ import {
 import { useLayoutEffect } from "react";
 import type { EntitySize, EntityState } from "../../types";
 import { effectiveSizeForEntity } from "./_helpers";
+import { getSafeAreaPadding } from "../../lib/safe-area";
 
 interface TileContextMenuProps {
   entity: EntityState;
@@ -69,6 +73,19 @@ export function TileContextMenu({
     },
     placement: "bottom-start",
     strategy: "fixed",
+    middleware: [
+      flip(() => ({ padding: getSafeAreaPadding(8) })),
+      shift(() => ({ padding: getSafeAreaPadding(8), crossAxis: true })),
+      size(() => ({
+        padding: getSafeAreaPadding(8),
+        apply({ availableHeight, elements }) {
+          Object.assign(elements.floating.style, {
+            maxHeight: `${Math.max(0, availableHeight)}px`,
+            overflowY: "auto",
+          });
+        },
+      })),
+    ],
   });
 
   // Anchor at the click coordinates via a virtual reference rect.

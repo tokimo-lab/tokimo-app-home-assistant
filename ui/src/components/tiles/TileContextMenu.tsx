@@ -4,11 +4,13 @@ import {
   flip,
   offset,
   shift,
+  size,
   useDismiss,
   useFloating,
   useInteractions,
 } from "@floating-ui/react";
 import { cn } from "@tokimo/ui";
+import { getSafeAreaPadding } from "../../lib/safe-area";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 
 export interface TileMenuItem {
@@ -77,7 +79,20 @@ export function TileContextMenu({
       if (!next) onClose();
     },
     placement: "bottom-start",
-    middleware: [offset(4), flip(), shift({ padding: 8 })],
+    middleware: [
+      offset(4),
+      flip(() => ({ padding: getSafeAreaPadding(8) })),
+      shift(() => ({ padding: getSafeAreaPadding(8), crossAxis: true })),
+      size(() => ({
+        padding: getSafeAreaPadding(8),
+        apply({ availableHeight, elements }) {
+          Object.assign(elements.floating.style, {
+            maxHeight: `${Math.max(0, availableHeight)}px`,
+            overflowY: "auto",
+          });
+        },
+      })),
+    ],
     whileElementsMounted: autoUpdate,
   });
 

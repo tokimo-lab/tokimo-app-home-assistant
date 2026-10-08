@@ -1,6 +1,7 @@
 import { X } from "lucide-react";
 import { type ReactNode, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
+import { getSafeAreaPadding } from "../lib/safe-area";
 
 interface DetailPopoverProps {
   anchor: HTMLElement;
@@ -33,18 +34,20 @@ export function DetailPopover({
 
   // Compute position
   const rect = anchor.getBoundingClientRect();
-  const popoverWidth = 300;
+  const safe = getSafeAreaPadding(8);
   const viewportW = window.innerWidth;
   const viewportH = window.innerHeight;
+  const popoverWidth = Math.min(300, Math.max(0, viewportW - safe.left - safe.right));
 
   let left = rect.left + rect.width / 2 - popoverWidth / 2;
-  left = Math.max(8, Math.min(left, viewportW - popoverWidth - 8));
+  left = Math.max(safe.left, Math.min(left, viewportW - popoverWidth - safe.right));
 
   let top = rect.bottom + 8;
   // If too close to bottom, flip above
-  if (top + 320 > viewportH && rect.top > 320) {
+  if (top + 320 > viewportH - safe.bottom && rect.top - safe.top > 320) {
     top = rect.top - 328;
   }
+  top = Math.max(safe.top, Math.min(top, viewportH - safe.bottom - 320));
 
   return createPortal(
     <>
@@ -53,8 +56,8 @@ export function DetailPopover({
       {/* Popover */}
       <div
         ref={popoverRef}
-        className="fixed z-[9999] w-[300px] rounded-2xl border border-white/10 bg-surface-raised shadow-2xl"
-        style={{ left, top }}
+        className="fixed z-[9999] overflow-y-auto rounded-2xl border border-white/10 bg-surface-raised shadow-2xl"
+        style={{ left, top, width: popoverWidth, maxHeight: Math.max(0, viewportH - safe.bottom - top) }}
         onPointerDown={(e) => e.stopPropagation()}
       >
         {title && (

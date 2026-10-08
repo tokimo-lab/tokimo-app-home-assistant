@@ -36,7 +36,7 @@ export function BottomActionBar({
     <div
       data-testid="bottom-action-bar"
       className={cn(
-        "pointer-events-none fixed inset-x-0 bottom-6 z-30 flex justify-center",
+        "pointer-events-none absolute inset-x-0 bottom-6 z-30 flex justify-center",
       )}
     >
       <div
