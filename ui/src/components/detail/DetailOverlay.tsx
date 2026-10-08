@@ -118,7 +118,7 @@ export function DetailOverlay({
           )}
         </header>
 
-        <div className="flex-1 overflow-y-auto px-6 py-4 pb-20">
+        <div className="app-safe-area-bottom flex-1 overflow-y-auto px-6 py-4 [--app-safe-area-padding-bottom:5rem]">
           {entity ? (
             <>
               <DomainComponent
@@ -146,7 +146,7 @@ export function DetailOverlay({
         <button
           type="button"
           onClick={() => onOpenSettings(currentEntity.entityId)}
-          className="absolute right-4 bottom-4 flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-surface-base/90 text-fg-secondary shadow-lg backdrop-blur-md transition hover:text-fg-primary"
+          className="absolute right-4 bottom-[calc(1rem+var(--app-safe-area-bottom,0px))] flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-surface-base/90 text-fg-secondary shadow-lg backdrop-blur-md transition hover:text-fg-primary"
           aria-label={t("detailOpenSettings")}
         >
           <Settings size={18} />

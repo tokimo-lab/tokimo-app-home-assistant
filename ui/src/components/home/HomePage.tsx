@@ -310,7 +310,7 @@ export function HomePage({
   if (allEntities.length === 0) {
     return (
       <>
-        <div className="flex h-full flex-col px-6 pt-10 pb-6">
+        <div className="app-safe-area flex h-full flex-col bg-surface-base [--app-safe-area-padding:1.5rem] [--app-safe-area-padding-top:2.5rem]">
           {headerEl}
           <div className="flex flex-1 items-center justify-center">
             <EmptyState title={t("homeEmpty")} />
@@ -329,7 +329,7 @@ export function HomePage({
 
   return (
     <>
-      <div className="relative h-full overflow-y-auto">
+      <div className="app-safe-area relative h-full overflow-y-auto bg-surface-base">
         <div className="px-6 pt-10 pb-3">{headerEl}</div>
         {!reorderSections && (
           <div

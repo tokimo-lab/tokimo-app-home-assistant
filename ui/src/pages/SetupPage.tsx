@@ -48,13 +48,13 @@ export function SetupPage({ t, onCreated, onBack }: SetupPageProps) {
           type="button"
           onClick={onBack}
           aria-label={t("back")}
-          className="absolute left-20 top-10 z-10 flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-white/[0.08] text-white/80 transition-colors hover:bg-white/[0.14] hover:text-white"
+          className="absolute left-[calc(5rem+var(--app-safe-area-left,0px))] top-[calc(2.5rem+var(--app-safe-area-top,0px))] z-10 flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-white/[0.08] text-white/80 transition-colors hover:bg-white/[0.14] hover:text-white"
         >
           <ChevronLeft size={22} />
         </button>
       )}
 
-      <div className="flex min-h-full w-full items-center justify-center px-8 py-16">
+      <div className="app-safe-area flex min-h-full w-full items-center justify-center [--app-safe-area-padding:2rem] [--app-safe-area-padding-top:4rem] [--app-safe-area-padding-bottom:4rem]">
         <div className="flex w-full max-w-md flex-col gap-8">
           <div className="flex flex-col items-center gap-4 text-center">
             <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-indigo-400 via-purple-500 to-pink-500 shadow-[0_20px_60px_-15px_rgba(120,80,255,0.6)]">
